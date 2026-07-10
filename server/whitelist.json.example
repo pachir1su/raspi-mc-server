@@ -1,0 +1,8 @@
+[
+  {
+    "//": "One entry per allowed player (you + 2–3 friends).",
+    "//tip": "Easiest way: run  /whitelist add <name>  from the Discord bot or console.",
+    "uuid": "00000000-0000-0000-0000-000000000000",
+    "name": "YourMinecraftName"
+  }
+]

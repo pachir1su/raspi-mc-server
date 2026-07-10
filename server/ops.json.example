@@ -1,0 +1,10 @@
+[
+  {
+    "//": "OP ONLY YOURSELF. Add exactly one entry — you, the owner.",
+    "//uuid": "Get your account UUID from https://mcuuid.net or the server console.",
+    "uuid": "00000000-0000-0000-0000-000000000000",
+    "name": "YourMinecraftName",
+    "level": 4,
+    "bypassesPlayerLimit": true
+  }
+]
