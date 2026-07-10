@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────────
+# server.properties — tuned for a Raspberry Pi 4B (4GB), 3–4 players
+#
+# Copy this to `server/server.properties` on first run (the install
+# script does this for you). Values chosen to keep a Pi responsive
+# and to make the OWNER the only in-game cheater.
+#
+# CHEATS / OP MODEL
+#   On a multiplayer server there is no "Allow Cheats" toggle like in
+#   singleplayer. Commands are gated by operator (op) level instead:
+#     - Normal players cannot run cheat commands at all.
+#     - Only ops can. Op ONLY yourself (see server/ops.json.example).
+#   The server console, RCON, the Discord bot, and SSH always run at
+#   op level 4 — so YOU can always cheat remotely, others never can.
+# ─────────────────────────────────────────────────────────────
+
+# --- Identity ---
+motd=§bRaspberry Pi Minecraft §7| whitelist only
+server-port=25565
+
+# --- Access control (small, private, friends-only server) ---
+white-list=true
+enforce-whitelist=true
+online-mode=true
+max-players=6
+op-permission-level=4
+function-permission-level=2
+# Command blocks off by default (fewer ways for non-ops to run commands
+# and a little less load). Turn on only if you need redstone commands.
+enable-command-block=false
+
+# --- Gameplay ---
+gamemode=survival
+force-gamemode=false
+difficulty=normal
+hardcore=false
+pvp=true
+allow-flight=false
+spawn-protection=16
+
+# --- Performance (Pi-friendly) ---
+# Lower view/simulation distance is the single biggest Pi win.
+view-distance=8
+simulation-distance=6
+max-tick-time=60000
+network-compression-threshold=256
+entity-broadcast-range-percentage=100
+sync-chunk-writes=false
+
+# --- World ---
+level-name=world
+level-type=minecraft\:normal
+allow-nether=true
+generate-structures=true
+spawn-monsters=true
+spawn-animals=true
+spawn-npcs=true
+
+# --- RCON (remote console for the Discord bot / CLI) ---
+# Enable RCON so the bot and rcon-cli can send commands. Keep the
+# password out of git — set it in server.properties on the Pi only.
+enable-rcon=true
+rcon.port=25575
+rcon.password=REPLACE_WITH_RCON_PASSWORD
+broadcast-rcon-to-ops=false
+
+# --- Query (optional, off by default) ---
+enable-query=false
