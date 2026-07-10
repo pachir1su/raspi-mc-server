@@ -1,0 +1,39 @@
+# Secrets & local config
+.env
+*.env
+!.env.example
+
+# Minecraft server runtime (do not commit world data or the server jar)
+server/world/
+server/world_nether/
+server/world_the_end/
+server/*.jar
+server/logs/
+server/crash-reports/
+server/cache/
+server/libraries/
+server/versions/
+server/plugins/*.jar
+server/ops.json
+server/whitelist.json
+server/banned-*.json
+server/usercache.json
+server/eula.txt
+
+# Backups
+backups/
+*.tar.gz
+*.tar.zst
+
+# Discord bot runtime
+bot/logs/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
