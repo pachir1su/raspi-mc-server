@@ -1,0 +1,26 @@
+# systemd unit for the Discord admin bot.
+#
+# Install:
+#   sudo cp deploy/mc-discord-bot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mc-discord-bot.service
+#
+# The bot reads .env from the repo root for its token, RCON password, and
+# admin user IDs. Keep .env readable only by the bot's user (chmod 600).
+[Unit]
+Description=Discord admin bot for raspi-mc-server
+After=network-online.target minecraft.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/raspi-mc-server
+EnvironmentFile=/home/pi/raspi-mc-server/.env
+ExecStart=/home/pi/raspi-mc-server/.venv/bin/python -m bot.main
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
