@@ -1,0 +1,30 @@
+# systemd unit for the PaperMC server.
+#
+# Install:
+#   sudo cp deploy/minecraft.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now minecraft.service
+#
+# Adjust User= and paths to match your Pi. A graceful stop is sent via
+# RCON-free systemd TERM; PaperMC handles SIGTERM by saving and shutting
+# down cleanly.
+[Unit]
+Description=PaperMC Minecraft server (raspi-mc-server)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/raspi-mc-server/server
+ExecStart=/home/pi/raspi-mc-server/scripts/start_server.sh
+# Give the JVM time to save chunks on shutdown before systemd gives up.
+TimeoutStopSec=90
+Restart=on-failure
+RestartSec=10
+# Light hardening.
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
