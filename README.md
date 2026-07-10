@@ -1,1 +1,115 @@
 # raspi-mc-server
+
+A complete, friends-only **Minecraft (Java) server for the Raspberry Pi 4B (4GB)**,
+built for **3–4 players**, with **owner-only cheats** and **remote administration**
+from Discord, SSH, or the web.
+
+> 🇰🇷 한국어 문서: **[README.ko.md](README.ko.md)**
+
+---
+
+## What you get
+
+- **PaperMC** server tuned for a Pi 4B 4GB on a 32GB SD card (Aikar GC flags,
+  Pi-friendly view/simulation distance).
+- **Whitelist-only, no mods** — a small private world for you and a few friends.
+- **Owner-only cheats.** On a multiplayer server, only *operators* can run
+  commands. You op **only yourself**, so nobody else can cheat in-game — but you
+  always can, remotely, through any admin channel.
+- **Remote administration** three ways:
+  - 🤖 **Discord bot** (primary) — admin-only slash commands, a loading
+    animation for slow actions, and log-file attachments.
+  - 💻 **SSH + RCON** (baseline) — a console from anywhere you can SSH in.
+  - 🌐 **Cloudflare Tunnel** (optional) — reach the server/console with no port
+    forwarding.
+- **Automated backups** with rotation, **systemd** services for auto-start, and
+  a one-shot **provisioning script**.
+- **Optional Raspberry Pi cluster** guidance for when one Pi isn't enough.
+- **Full docs in English and Korean.**
+
+---
+
+## Quick start
+
+On a 64-bit Raspberry Pi OS, from the Pi:
+
+```bash
+git clone https://github.com/pachir1su/raspi-mc-server.git
+cd raspi-mc-server
+
+# 1. Provision everything (Java, PaperMC, Python venv, systemd, sudoers)
+./deploy/setup_raspberrypi.sh
+
+# 2. Set your secrets
+#    - server/server.properties -> rcon.password
+#    - .env                     -> DISCORD_TOKEN, ADMIN_USER_IDS, RCON_PASSWORD
+
+# 3. Start the server, op yourself, start the bot
+sudo systemctl enable --now minecraft.service
+sudo systemctl enable --now mc-discord-bot.service
+```
+
+Full walkthrough: **[docs/en/setup.md](docs/en/setup.md)**.
+
+---
+
+## Cheats: how "only I can cheat" works
+
+Multiplayer Minecraft has no per-world "Allow Cheats" switch like singleplayer.
+Instead, commands are gated by **operator (op) level**:
+
+- **Normal players** cannot run cheat commands at all.
+- **Operators** can. You op **only yourself** (`server/ops.json`).
+- The **console, RCON, the Discord bot, and SSH** always run at op level 4 — so
+  **you** can always cheat remotely, and **no one else** can in-game.
+
+Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
+
+---
+
+## Documentation
+
+| Topic | English | 한국어 |
+|---|---|---|
+| Setup & first run | [setup](docs/en/setup.md) | [설치](docs/ko/setup.md) |
+| Server configuration | [configuration](docs/en/configuration.md) | [설정](docs/ko/configuration.md) |
+| Cheats & operators | [cheats-and-ops](docs/en/cheats-and-ops.md) | [치트와 관리자](docs/ko/cheats-and-ops.md) |
+| Discord bot | [discord-bot](docs/en/discord-bot.md) | [디스코드 봇](docs/ko/discord-bot.md) |
+| Remote access (RCON / Cloudflare) | [remote-access](docs/en/remote-access.md) | [원격 접속](docs/ko/remote-access.md) |
+| Backups | [backup](docs/en/backup.md) | [백업](docs/ko/backup.md) |
+| Performance tuning | [performance](docs/en/performance.md) | [성능 튜닝](docs/ko/performance.md) |
+| Raspberry Pi cluster | [cluster](docs/en/cluster.md) | [클러스터](docs/ko/cluster.md) |
+| Bedrock alternative | [bedrock](docs/en/bedrock.md) | [베드락 대안](docs/ko/bedrock.md) |
+| Troubleshooting | [troubleshooting](docs/en/troubleshooting.md) | [문제 해결](docs/ko/troubleshooting.md) |
+| Prompts for coding agents | [agent-prompts](docs/prompts/agent-prompts.md) | (same file, bilingual) |
+
+Agent working rules live in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md).
+
+---
+
+## Repository layout
+
+```
+raspi-mc-server/
+├── server/        # server.properties template, ops/whitelist examples
+├── scripts/       # install / start / stop / backup / restore
+├── deploy/        # systemd units + one-shot Pi provisioning
+├── bot/           # Discord admin bot (Python, discord.py)
+├── docs/          # English + Korean docs, and agent prompts
+├── .env.example   # copy to .env and fill in
+└── README.md / README.ko.md
+```
+
+---
+
+## Requirements
+
+- Raspberry Pi 4B (4GB) with **64-bit** Raspberry Pi OS (Bookworm recommended).
+- A 32GB (or larger) SD card — an SSD over USB 3.0 is strongly recommended for
+  world I/O and SD-card longevity.
+- A Discord application/bot token (for the bot) — see
+  [docs/en/discord-bot.md](docs/en/discord-bot.md).
+
+## License
+
+[MIT](LICENSE).
