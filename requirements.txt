@@ -1,0 +1,4 @@
+# Discord admin bot dependencies.
+# Pin major versions; discord.py 2.x is required for app_commands (slash).
+discord.py>=2.3,<3.0
+python-dotenv>=1.0,<2.0
