@@ -14,6 +14,8 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Load the HDD-backed server directory selected during setup.
+[ -f "$REPO_DIR/.env" ] && set -a && . "$REPO_DIR/.env" && set +a
 SERVER_DIR="${MC_SERVER_DIR:-$REPO_DIR/server}"
 MC_VERSION="${MC_VERSION:-1.21.4}"
 

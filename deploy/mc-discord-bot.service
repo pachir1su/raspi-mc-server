@@ -11,6 +11,7 @@
 Description=Discord admin bot for raspi-mc-server
 After=network-online.target minecraft.service
 Wants=network-online.target
+RequiresMountsFor=/mnt/minecraft
 
 [Service]
 Type=simple
