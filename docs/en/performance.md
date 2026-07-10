@@ -9,7 +9,8 @@ small. The goal is a steady **20 TPS** (ticks per second).
    fewer chunks loaded/ticked. Start at `view-distance=8`, `simulation-distance=6`;
    drop to `6`/`4` if you see lag with everyone online. Simulation distance
    matters most for TPS.
-2. **Storage.** Use a **USB 3.0 SSD**, not the SD card, for the world. SD-card
+2. **Storage.** Use **USB 3.0 storage**, not microSD, for the world. SSD is best,
+   but a 500GB HDD is workable for a 3-4 player server. SD-card
    random writes are the most common Pi bottleneck and cause tick stalls.
 3. **Memory.** `MC_MEMORY=2600M` (fixed Xms=Xmx) leaves room for the OS + bot.
    Don't over-allocate — the Pi has only 4GB shared with the GPU/OS.
@@ -46,7 +47,7 @@ Apply changes and restart. Change one thing at a time and watch TPS.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Periodic freezes | SD-card write stalls | Move world to USB SSD |
+| Periodic freezes | Storage write stalls | Check USB 3.0, pregenerate, or consider SSD |
 | Low TPS with mobs | Too much simulation | Lower `simulation-distance`, mob caps |
 | Lag on join/explore | Chunk gen on SD | SSD; pre-generate with a plugin |
 | Rising lag over hours | Thermal throttling | Cooling; check `vcgencmd measure_temp` |

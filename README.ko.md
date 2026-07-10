@@ -10,8 +10,8 @@
 
 ## 무엇이 들어 있나
 
-- **PaperMC** 서버 — Pi 4B(4GB)·32GB SD카드에 맞춘 튜닝(Aikar GC 플래그,
-  파이 친화적인 렌더/시뮬레이션 거리).
+- **PaperMC** 서버 — Pi 4B(4GB)·32GB microSD + 500GB USB HDD에 맞춘 튜닝
+  (Aikar GC 플래그, 파이 친화적인 렌더/시뮬레이션 거리).
 - **화이트리스트 전용, 모드 없음** — 나와 친구 몇 명만 들어오는 작은 사설 월드.
 - **소유자만 치트.** 멀티플레이 서버에서는 *관리자(op)*만 명령어를 쓸 수 있습니다.
   **나만 op**로 지정하면 게임 안에서는 아무도 치트를 못 쓰고, 나는 어떤 관리
@@ -21,7 +21,7 @@
     애니메이션, 로그 파일 첨부.
   - 💻 **SSH + RCON**(기본) — SSH만 되면 어디서든 콘솔.
   - 🌐 **Cloudflare Tunnel**(선택) — 포트포워딩 없이 서버/콘솔 접근.
-- **자동 백업**(회전 보관), 자동 시작용 **systemd** 서비스, 한 번에 끝내는
+- **30분 기본 HDD 자동 백업**, 디스코드 복구·맵 업로드/전환, 자동 시작용 **systemd** 서비스, 한 번에 끝내는
   **프로비저닝 스크립트**.
 - **필요할 때를 위한 라즈베리파이 클러스터** 안내.
 - **영어·한국어 전체 문서.**
@@ -36,14 +36,19 @@
 git clone https://github.com/pachir1su/raspi-mc-server.git
 cd raspi-mc-server
 
-# 1. 전부 프로비저닝(자바, PaperMC, 파이썬 venv, systemd, sudoers)
+# 1. 500GB HDD 파티션 확인 후 준비(/dev/sda1은 예시이며 포맷 시 데이터 삭제)
+lsblk -f
+sudo mkfs.ext4 /dev/sda1
+sudo ./scripts/setup_hdd.sh /dev/sda1
+
+# 2. 전부 프로비저닝(자바, PaperMC, 파이썬 venv, systemd, sudoers)
 ./deploy/setup_raspberrypi.sh
 
-# 2. 비밀값 설정
-#    - server/server.properties -> rcon.password
+# 3. 비밀값 설정
+#    - /mnt/minecraft/live/server.properties -> rcon.password
 #    - .env                     -> DISCORD_TOKEN, ADMIN_USER_IDS, RCON_PASSWORD
 
-# 3. 서버 시작, 나 op 지정, 봇 시작
+# 4. 서버 시작, 나 op 지정, 봇 시작
 sudo systemctl enable --now minecraft.service
 sudo systemctl enable --now mc-discord-bot.service
 ```
@@ -104,7 +109,7 @@ raspi-mc-server/
 ## 준비물
 
 - **64비트** 라즈베리파이 OS(Bookworm 권장)를 올린 라즈베리파이 4B(4GB).
-- 32GB 이상 SD카드 — 월드 I/O와 SD카드 수명을 위해 USB 3.0 SSD를 강력 권장.
+- 32GB microSD와 PaperMC·월드·백업용 500GB USB 3.0 HDD.
 - 디스코드 애플리케이션/봇 토큰(봇용) — [docs/ko/discord-bot.md](docs/ko/discord-bot.md) 참고.
 
 ## 라이선스

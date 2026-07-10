@@ -1,70 +1,73 @@
-# 백업
+# HDD 자동 백업·복구·맵 관리
 
-`scripts/backup.sh`는 월드 폴더(`world`, `world_nether`, `world_the_end`)를
-`backups/` 아래 타임스탬프가 붙은 `.tar.gz`로 스냅샷하고, SD카드가 가득 차지
-않도록 회전 보관합니다.
+현재 월드와 큰 파일은 500GB 외장 HDD의 `/mnt/minecraft`에 저장합니다. 봇은 이
+경로가 실제 마운트포인트인지 확인하므로, HDD가 빠졌을 때 microSD에 백업을 잘못
+쌓지 않습니다.
 
-## 실행 중 서버의 안전한 백업
+## 저장 구조
 
-서버가 켜져 있고 RCON이 닿으면 스크립트는:
-
-1. `save-off` — 자동 저장을 멈춰 복사 중 청크가 쓰이지 않게.
-2. `save-all flush` — 전부 디스크로 플러시.
-3. 월드 폴더 아카이브.
-4. `save-on` — 자동 저장 재개.
-
-서버가 꺼져 있으면 폴더를 바로 아카이브합니다.
-
-## 백업 실행
-
-```bash
-./scripts/backup.sh
+```text
+/mnt/minecraft/
+├── live/          # PaperMC와 현재 월드
+├── backups/       # .tar.gz 백업과 SHA-256
+├── worlds/        # 검증 완료된 업로드 맵
+├── uploads/       # 다운로드용 임시 파일
+├── staging/       # 안전한 압축 해제·복구
+└── quarantine/    # 격리용 예약 공간
 ```
 
-디스코드에서는: `/backup`(로딩 애니메이션 후 결과 표시).
+## 자동 백업 정책
 
-## 회전
+봇이 1분마다 설정을 확인하고 기본 **30분 간격**으로 백업합니다. 서버 실행 중에는
+`save-off`, `save-all flush`, 백업, `save-on` 순서로 일관된 스냅샷을 만듭니다.
 
-최신 `BACKUP_KEEP`개(기본 **10**)만 유지하고 오래된 것은 삭제합니다. `.env`에서
-조정:
+- 최근 48시간: 모든 백업 유지
+- 이후 30일: 하루 최신 백업 1개 유지
+- HDD 사용률 80% 이상 또는 여유 30GB 미만이면 새 백업 중단
+- `/backup configure` 변경값은 `data/backup-settings.json`에 영구 저장
+- 최소 허용 주기는 10분
 
-```dotenv
-MC_BACKUP_DIR=/home/pi/raspi-mc-server/backups
-BACKUP_KEEP=10
+`/backup settings`에서 현재 정책과 HDD 용량을 확인하고 다음처럼 변경합니다.
+
+```text
+/backup configure interval_minutes:30 retention_hours:48 daily_retention_days:30
+/backup configure max_usage_percent:80 min_free_gb:30
+/backup enabled enabled:false
 ```
 
-32GB SD카드에서는 총 용량을 주시하세요 — 성숙한 월드는 스냅샷당 수백 MB가 될 수
-있습니다. USB SSD에 백업하거나 아카이브를 기기 밖으로 복사하는 것을 고려하세요.
+## 백업과 복구
 
-## cron으로 예약
-
-매일 05:00:
-
-```bash
-crontab -e
+```text
+/backup create
+/backup list
+/backup download name:<파일명>
+/backup restore name:<파일명> confirm:RESTORE
+/backup delete name:<파일명> confirm:DELETE
 ```
 
-```cron
-0 5 * * *  /home/pi/raspi-mc-server/scripts/backup.sh >> /home/pi/mc-backup.log 2>&1
+복구는 현재 월드 비상 백업을 먼저 만들고, 서버 정지에 성공한 뒤에만 월드를
+교체합니다. 디렉터리 교체가 실패하면 이전 월드를 되돌립니다. 복구가 끝나면 서버를
+다시 시작합니다.
+
+디스코드 서버의 실제 첨부 한도보다 큰 백업은 `/backup download`로 보낼 수
+없습니다. 이때는 SSH/SFTP로 `/mnt/minecraft/backups`에서 받으세요.
+
+## 맵 업로드와 전환
+
+```text
+/world upload name:<보관이름> file:<zip/tar.gz/tgz>
+/world list
+/world activate name:<보관이름> confirm:ACTIVATE
+/world download name:<보관이름>
+/world delete name:<보관이름> confirm:DELETE
 ```
 
-## 기기 밖 복사 (권장)
+업로드 파일은 Java Edition 월드의 `level.dat`를 정확히 하나 포함해야 합니다.
+봇은 경로 탈출, 링크, 장치 파일, 100GiB 초과 압축 폭탄과 과도한 파일 수를
+거부합니다. 맵 전환 전에도 현재 월드를 자동 백업합니다.
 
-SD카드는 고장 납니다. 주기적으로 아카이브를 다른 곳으로 복사하세요. 예: `rclone`로
-클라우드, 또는 `rsync`로 다른 머신에:
+## HDD 장애와 실제 백업
 
-```cron
-30 5 * * *  rsync -a /home/pi/raspi-mc-server/backups/ backupuser@nas:/backups/mc/
-```
-
-## 복원
-
-```bash
-sudo systemctl stop minecraft.service
-./scripts/restore.sh                       # 최신 백업
-# 또는: ./scripts/restore.sh backups/world_20260709_050000.tar.gz
-sudo systemctl start minecraft.service
-```
-
-`restore.sh`는 서버가 켜져 있으면 실행을 거부하고, 압축을 풀기 전에 현재 월드를
-`world.bak_<타임스탬프>`로 옮겨 둡니다 — 복원을 되돌릴 수 있습니다.
+현재 월드와 백업이 같은 HDD에 있으므로 실수나 월드 손상은 복구할 수 있지만 HDD
+자체 고장에는 대비할 수 없습니다. 중요한 백업은 주기적으로 다른 PC, NAS 또는
+클라우드에도 복사하세요.

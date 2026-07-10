@@ -1,71 +1,73 @@
-# Backups
+# HDD automatic backups, restore, and map management
 
-`scripts/backup.sh` snapshots the world folders (`world`, `world_nether`,
-`world_the_end`) into `backups/` as timestamped `.tar.gz` archives, with
-rotation so the SD card doesn't fill.
+The live world and large files reside on the 500 GB external HDD mounted at
+`/mnt/minecraft`. The bot verifies that this is a real mount point, preventing
+an unplugged HDD from silently filling the microSD.
 
-## Safe backups of a running server
+## Storage layout
 
-If the server is up and RCON is reachable, the script:
-
-1. `save-off` — pauses auto-save so no chunk is written mid-copy.
-2. `save-all flush` — flushes everything to disk.
-3. Archives the world folders.
-4. `save-on` — re-enables auto-save.
-
-If the server is down it just archives the folders directly.
-
-## Run a backup
-
-```bash
-./scripts/backup.sh
+```text
+/mnt/minecraft/
+├── live/          # PaperMC and the live world
+├── backups/       # .tar.gz backups and SHA-256 sidecars
+├── worlds/        # validated uploaded maps
+├── uploads/       # temporary download files
+├── staging/       # safe extraction and restore workspace
+└── quarantine/    # reserved isolation area
 ```
 
-Or from Discord: `/backup` (shows a loading animation, then the result).
+## Automatic policy
 
-## Rotation
+The bot checks the saved policy every minute and backs up every **30 minutes**
+by default. A running server is flushed with `save-off`, `save-all flush`,
+backup, and `save-on`.
 
-Only the newest `BACKUP_KEEP` archives (default **10**) are kept; older ones are
-deleted. Override in `.env`:
+- Keep every backup for the newest 48 hours.
+- Then keep the newest backup per day for 30 days.
+- Stop at 80% HDD usage or below 30 GB free.
+- `/backup configure` persists to `data/backup-settings.json`.
+- The shortest permitted interval is 10 minutes.
 
-```dotenv
-MC_BACKUP_DIR=/home/pi/raspi-mc-server/backups
-BACKUP_KEEP=10
+Inspect and change the policy from Discord:
+
+```text
+/backup settings
+/backup configure interval_minutes:30 retention_hours:48 daily_retention_days:30
+/backup configure max_usage_percent:80 min_free_gb:30
+/backup enabled enabled:false
 ```
 
-On a 32GB SD card, keep an eye on total size — a mature world can be hundreds of
-MB per snapshot. Consider backing up to a USB SSD or copying archives off-device
-(see below).
+## Backup and restore commands
 
-## Schedule with cron
-
-Daily at 05:00:
-
-```bash
-crontab -e
+```text
+/backup create
+/backup list
+/backup download name:<filename>
+/backup restore name:<filename> confirm:RESTORE
+/backup delete name:<filename> confirm:DELETE
 ```
 
-```cron
-0 5 * * *  /home/pi/raspi-mc-server/scripts/backup.sh >> /home/pi/mc-backup.log 2>&1
+A restore first creates an emergency snapshot, only replaces the world after
+Minecraft stops successfully, rolls back a failed directory swap, and starts
+the service again. Files above the guild's actual Discord attachment limit must
+be downloaded from `/mnt/minecraft/backups` over SSH/SFTP.
+
+## Map uploads and switching
+
+```text
+/world upload name:<stored-name> file:<zip/tar.gz/tgz>
+/world list
+/world activate name:<stored-name> confirm:ACTIVATE
+/world download name:<stored-name>
+/world delete name:<stored-name> confirm:DELETE
 ```
 
-## Off-device copies (recommended)
+An upload must contain exactly one Java Edition world with `level.dat`. The bot
+rejects traversal paths, links, device files, archives expanding beyond 100 GiB,
+and excessive file counts. Activating a map also snapshots the live world first.
 
-SD cards fail. Copy archives elsewhere periodically, e.g. with `rclone` to cloud
-storage or `rsync` to another machine:
+## Disk failure is different
 
-```cron
-30 5 * * *  rsync -a /home/pi/raspi-mc-server/backups/ backupuser@nas:/backups/mc/
-```
-
-## Restore
-
-```bash
-sudo systemctl stop minecraft.service
-./scripts/restore.sh                       # newest backup
-# or: ./scripts/restore.sh backups/world_20260709_050000.tar.gz
-sudo systemctl start minecraft.service
-```
-
-`restore.sh` refuses to run while the server is up and moves the current world
-aside as `world.bak_<timestamp>` before extracting, so a restore is reversible.
+Keeping the live world and backups on one HDD protects against mistakes and
+world corruption, not failure of that HDD. Periodically copy important archives
+to another PC, NAS, or cloud destination.

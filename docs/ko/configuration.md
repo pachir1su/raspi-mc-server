@@ -1,6 +1,6 @@
 # 서버 설정
 
-서버는 `server/server.properties`를 읽습니다. 이 저장소는 파이 친화적·친구 전용
+서버는 기본적으로 `/mnt/minecraft/live/server.properties`를 읽습니다. 이 저장소는 파이 친화적·친구 전용
 기본값이 들어간 `server/server.properties.template`을 제공합니다. 아래는 가장
 중요한 항목들이며, 템플릿 주석에 각 항목 설명이 있습니다.
 

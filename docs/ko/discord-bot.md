@@ -70,11 +70,18 @@ sudo journalctl -u mc-discord-bot.service -f
 | `/start` | 마인크래프트 서비스 시작. |
 | `/stop` | 저장 후 서비스 정지. |
 | `/restart` | 서비스 재시작. |
-| `/backup` | 지금 월드 백업(회전). |
+| `/backup create/list/download` | HDD 백업 생성·목록·다운로드. |
+| `/backup restore/delete` | 확인 문자열을 요구하는 복구·삭제. |
+| `/backup settings/configure/enabled` | 30분 주기와 보관·용량 정책 조회/변경. |
+| `/world upload/list/download` | 맵 압축 파일 검증·보관·다운로드. |
+| `/world activate/delete` | 비상 백업 후 맵 전환 또는 보관 맵 삭제. |
+| `/storage` | HDD 마운트와 사용량 확인. |
 | `/logs` | 봇의 현재 로그 파일 첨부. |
 
-`/start`, `/stop`, `/restart`, `/backup`은 실행 중 로딩 애니메이션을 보여주고
+`/start`, `/stop`, `/restart`, `/backup create`, 복구와 맵 전환은 실행 중 로딩 애니메이션을 보여주고
 결과로 메시지를 갱신합니다.
+
+전체 백업·복구 정책과 파일 안전 규칙은 [backup.md](backup.md)를 참고하세요.
 
 ## 보안 메모
 
