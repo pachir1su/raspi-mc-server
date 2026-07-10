@@ -96,7 +96,7 @@ raspi-mc-server/
 ├── deploy/        # systemd units + one-shot Pi provisioning
 ├── bot/           # Discord admin bot (Python, discord.py)
 ├── docs/          # English + Korean docs, and agent prompts
-├── .env.example   # copy to .env and fill in
+├── .env  # copy to .env and fill in
 └── README.md / README.ko.md
 ```
 
