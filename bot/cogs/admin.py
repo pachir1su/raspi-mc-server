@@ -31,6 +31,12 @@ from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
 from bot.player_info import parseOnlinePlayers, summarizeInventory, validatePlayerName
 from bot.rcon import Rcon, RconError
+from bot.system_metrics import (
+    formatDuration,
+    readSystemMetrics,
+    readThrottleFlags,
+    stripMinecraftFormatting,
+)
 from bot.world_storage import StorageError, WorldStorage
 
 _log = log.get("cog.admin")
@@ -604,6 +610,12 @@ class Admin(commands.Cog):
             ephemeral=True,
         )
 
+    @app_commands.command(name="metrics", description="Show Raspberry Pi resources and Paper TPS.")
+    async def metrics(self, interaction: discord.Interaction):
+        """Keyboard shortcut for the same performance card used by the dashboard."""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await interaction.followup.send(embed=await self.panelMetricsEmbed(), ephemeral=True)
+
     async def panelOnlinePlayers(self) -> list[str]:
         """Return validated live player names from Paper's list command."""
         try:
@@ -696,6 +708,66 @@ class Admin(commands.Cog):
             lines.append(f"❌ 저장소: {error}")
         color = ERR_RED if any(line.startswith("❌") for line in lines) else OK_GREEN
         return discord.Embed(title="🩺 서버 상태 진단", description="\n".join(lines), color=color)
+
+    async def panelMetricsEmbed(self) -> discord.Embed:
+        """Combine procfs, Pi firmware, HDD, and Paper TPS in one card."""
+        try:
+            systemMetrics, throttleFlags = await asyncio.gather(
+                asyncio.to_thread(readSystemMetrics),
+                asyncio.to_thread(readThrottleFlags),
+            )
+        except (OSError, RuntimeError, ValueError) as error:
+            return discord.Embed(
+                title="❌ 시스템 지표 조회 실패", description=str(error), color=ERR_RED
+            )
+        usedMemory = systemMetrics.memoryTotalBytes - systemMetrics.memoryAvailableBytes
+        memoryPercent = (
+            usedMemory / systemMetrics.memoryTotalBytes * 100
+            if systemMetrics.memoryTotalBytes else 100
+        )
+        temperatureText = (
+            f"{systemMetrics.temperatureCelsius:.1f}°C"
+            if systemMetrics.temperatureCelsius is not None else "확인 불가"
+        )
+        tpsText = "RCON 조회 실패"
+        try:
+            tpsText = stripMinecraftFormatting(await _rcon("tps"))[:1000]
+        except RconError:
+            pass
+        hddText = "마운트 확인 실패"
+        try:
+            total, used, free = await asyncio.to_thread(self.storage.storageUsage)
+            hddText = f"{self._formatBytes(used)} / {self._formatBytes(total)} (여유 {self._formatBytes(free)})"
+        except StorageError:
+            pass
+        hasCurrentWarning = any(label.startswith("현재") for label in throttleFlags)
+        isHot = (
+            systemMetrics.temperatureCelsius is not None
+            and systemMetrics.temperatureCelsius >= 80
+        )
+        color = ERR_RED if hasCurrentWarning or isHot else (
+            WARN_YELLOW if memoryPercent >= 85 else OK_GREEN
+        )
+        embed = discord.Embed(
+            title="📊 Raspberry Pi · Paper 성능",
+            description=f"**TPS**\n```\n{tpsText}\n```",
+            color=color,
+        )
+        embed.add_field(name="CPU 온도", value=temperatureText, inline=True)
+        embed.add_field(
+            name=f"Load ({systemMetrics.cpuCount} cores)",
+            value=f"{systemMetrics.load1:.2f} / {systemMetrics.load5:.2f} / {systemMetrics.load15:.2f}",
+            inline=True,
+        )
+        embed.add_field(
+            name="메모리",
+            value=f"{self._formatBytes(usedMemory)} / {self._formatBytes(systemMetrics.memoryTotalBytes)} ({memoryPercent:.1f}%)",
+            inline=False,
+        )
+        embed.add_field(name="HDD", value=hddText, inline=False)
+        embed.add_field(name="업타임", value=formatDuration(systemMetrics.uptimeSeconds), inline=True)
+        embed.add_field(name="전원·스로틀", value=", ".join(throttleFlags), inline=False)
+        return embed
 
     async def panelCreateBackup(self, interaction: discord.Interaction):
         """Create a safe manual backup and report through a deferred button response."""
