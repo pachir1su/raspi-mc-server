@@ -24,6 +24,7 @@ from discord.ext import tasks
 
 from bot import log
 from bot import BRAND_BLUE, OK_GREEN, ERR_RED, userTag
+from bot.audit import AuditLog
 from bot.config import cfg
 from bot.backup_settings import SettingsStore
 from bot.loading import animate_while
@@ -60,6 +61,7 @@ class Admin(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.settingsStore = SettingsStore(cfg.state_dir)
+        self.auditLog = AuditLog(cfg.state_dir)
         self.storage = WorldStorage(
             cfg.storage_root, cfg.server_dir, cfg.require_storage_mount
         )
@@ -86,6 +88,40 @@ class Admin(commands.Cog):
         _log.warning("denied command from %s", userTag(interaction.user))
         return False
 
+    async def backupNameAutocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest existing backup basenames and avoid error-prone manual typing."""
+        try:
+            names = [item.name for item in await asyncio.to_thread(self.storage.listBackups)]
+        except StorageError:
+            return []
+        currentLower = current.lower()
+        return [
+            app_commands.Choice(name=name[:100], value=name)
+            for name in names if currentLower in name.lower()
+        ][:25]
+
+    async def worldNameAutocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        """Suggest validated map names stored on the HDD."""
+        try:
+            names = [item.name for item in await asyncio.to_thread(self.storage.listWorlds)]
+        except StorageError:
+            return []
+        currentLower = current.lower()
+        return [
+            app_commands.Choice(name=name[:100], value=name)
+            for name in names if currentLower in name.lower()
+        ][:25]
+
+    async def _audit(self, interaction: discord.Interaction, action: str, outcome: str, detail: str = ""):
+        """Persist privileged actions outside the Discord message history."""
+        await asyncio.to_thread(
+            self.auditLog.record, action, interaction.user.id, outcome, detail
+        )
+
     # --- read-only ------------------------------------------------------
     @app_commands.command(description="Show whether the server is up and who is online.")
     async def status(self, interaction: discord.Interaction):
@@ -109,7 +145,9 @@ class Admin(commands.Cog):
             await _rcon(f"say {message}")
             await interaction.response.send_message(f"📢 Sent: {message}", ephemeral=True)
             _log.info("say by %s: %s", userTag(interaction.user), message)
+            await self._audit(interaction, "server.say", "success")
         except RconError as e:
+            await self._audit(interaction, "server.say", "failed", str(e))
             await interaction.response.send_message(f"❌ {e}", ephemeral=True)
 
     @app_commands.command(name="mc", description="Run ANY server command via RCON (owner cheat channel).")
@@ -126,7 +164,10 @@ class Admin(commands.Cog):
             )
             await interaction.response.send_message(embed=e)
             _log.info("mc by %s: %s", userTag(interaction.user), command)
+            commandName = command.split(maxsplit=1)[0] if command.strip() else "empty"
+            await self._audit(interaction, "server.command", "success", commandName)
         except RconError as e:
+            await self._audit(interaction, "server.command", "failed", str(e))
             await interaction.response.send_message(f"❌ {e}", ephemeral=True)
 
     # --- whitelist ------------------------------------------------------
@@ -145,7 +186,9 @@ class Admin(commands.Cog):
             out = await _rcon(f"whitelist {action} {name}")
             await interaction.response.send_message(f"✅ {out.strip() or f'whitelist {action} {name}'}")
             _log.info("whitelist %s %s by %s", action, name, userTag(interaction.user))
+            await self._audit(interaction, f"whitelist.{action}", "success", name)
         except RconError as e:
+            await self._audit(interaction, f"whitelist.{action}", "failed", str(e))
             await interaction.response.send_message(f"❌ {e}", ephemeral=True)
 
     # --- lifecycle (systemd) -------------------------------------------
@@ -180,6 +223,9 @@ class Admin(commands.Cog):
         )
         await interaction.edit_original_response(embed=e)
         _log.info("%s by %s -> ok=%s", action, userTag(interaction.user), ok)
+        await self._audit(
+            interaction, f"service.{action}", "success" if ok else "failed", out
+        )
 
     # --- HDD backups ----------------------------------------------------
     backupGroup = app_commands.Group(name="backup", description="Manage HDD world backups.")
@@ -219,7 +265,9 @@ class Admin(commands.Cog):
                 )
             )
             _log.info("backup create by %s: %s", userTag(interaction.user), archivePath.name)
+            await self._audit(interaction, "backup.create", "success", archivePath.name)
         except (StorageError, RuntimeError) as error:
+            await self._audit(interaction, "backup.create", "failed", str(error))
             await self._editError(interaction, error)
 
     @backupGroup.command(name="list", description="List the newest HDD backups.")
@@ -237,6 +285,7 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
     @backupGroup.command(name="download", description="Download a backup if it fits Discord's limit.")
+    @app_commands.autocomplete(name=backupNameAutocomplete)
     async def backupDownload(self, interaction: discord.Interaction, name: str):
         try:
             path = self.storage.resolveBackup(name)
@@ -246,6 +295,7 @@ class Admin(commands.Cog):
 
     @backupGroup.command(name="delete", description="Delete one selected backup archive.")
     @app_commands.describe(confirm="Type DELETE to confirm permanent deletion")
+    @app_commands.autocomplete(name=backupNameAutocomplete)
     async def backupDelete(self, interaction: discord.Interaction, name: str, confirm: str):
         if confirm != "DELETE":
             await interaction.response.send_message("❌ Type `DELETE` exactly to confirm.", ephemeral=True)
@@ -253,12 +303,14 @@ class Admin(commands.Cog):
         try:
             await asyncio.to_thread(self.storage.deleteBackup, name)
             await interaction.response.send_message(f"✅ Deleted `{name}`.", ephemeral=True)
+            await self._audit(interaction, "backup.delete", "success", name)
             _log.warning("backup delete by %s: %s", userTag(interaction.user), name)
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
     @backupGroup.command(name="restore", description="Restore a backup after an emergency snapshot.")
     @app_commands.describe(confirm="Type RESTORE to confirm stopping and replacing the live world")
+    @app_commands.autocomplete(name=backupNameAutocomplete)
     async def backupRestore(self, interaction: discord.Interaction, name: str, confirm: str):
         if confirm != "RESTORE":
             await interaction.response.send_message("❌ Type `RESTORE` exactly to confirm.", ephemeral=True)
@@ -284,8 +336,35 @@ class Admin(commands.Cog):
                 embed=discord.Embed(title="✅ World restored", description=f"`{name}`", color=OK_GREEN)
             )
             _log.warning("backup restore by %s: %s", userTag(interaction.user), name)
+            await self._audit(interaction, "backup.restore", "success", name)
         except (StorageError, RuntimeError) as error:
+            await self._audit(interaction, "backup.restore", "failed", f"{name}: {error}")
             await self._editError(interaction, error)
+
+    @backupGroup.command(name="verify", description="Verify a backup checksum and archive structure.")
+    @app_commands.autocomplete(name=backupNameAutocomplete)
+    async def backupVerify(self, interaction: discord.Interaction, name: str):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            digest = await asyncio.to_thread(self.storage.verifyBackup, name)
+            await interaction.followup.send(
+                f"✅ `{name}` is intact.\nSHA-256: `{digest}`", ephemeral=True
+            )
+        except StorageError as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    @backupGroup.command(name="prune", description="Apply the saved retention policy immediately.")
+    async def backupPrune(self, interaction: discord.Interaction):
+        try:
+            settings = self.settingsStore.load()
+            deletedCount = await asyncio.to_thread(self.storage.pruneBackups, settings)
+            await interaction.response.send_message(
+                f"✅ Retention applied; deleted **{deletedCount}** expired backup(s).",
+                ephemeral=True,
+            )
+            await self._audit(interaction, "backup.prune", "success", str(deletedCount))
+        except (StorageError, RuntimeError, OSError) as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
     @backupGroup.command(name="settings", description="Show automatic backup and HDD settings.")
     async def backupSettings(self, interaction: discord.Interaction):
@@ -302,6 +381,16 @@ class Admin(commands.Cog):
                 f"HDD: **{self._formatBytes(used)} / {self._formatBytes(total)}**, "
                 f"free **{self._formatBytes(free)}**"
             )
+            backups = await asyncio.to_thread(self.storage.listBackups)
+            if settings.enabled and backups:
+                nextTimestamp = int(
+                    backups[0].modifiedAt.timestamp() + settings.intervalMinutes * 60
+                )
+                description += f"\nNext due: <t:{nextTimestamp}:R>"
+            elif settings.enabled:
+                description += "\nNext due: **as soon as the scheduler starts**"
+            else:
+                description += "\nNext due: **paused**"
             await interaction.response.send_message(embed=discord.Embed(title="Backup settings", description=description, color=BRAND_BLUE), ephemeral=True)
         except (StorageError, RuntimeError) as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
@@ -329,6 +418,7 @@ class Admin(commands.Cog):
             self.settingsStore.save(settings)
             await interaction.response.send_message("✅ Backup settings saved. Use `/backup settings` to review them.", ephemeral=True)
             _log.warning("backup settings changed by %s", userTag(interaction.user))
+            await self._audit(interaction, "backup.configure", "success", str(changes))
         except (ValueError, RuntimeError, OSError) as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
@@ -338,6 +428,7 @@ class Admin(commands.Cog):
             settings = replace(self.settingsStore.load(), enabled=enabled)
             self.settingsStore.save(settings)
             await interaction.response.send_message(f"✅ Automatic backups: **{enabled}**", ephemeral=True)
+            await self._audit(interaction, "backup.enabled", "success", str(enabled))
         except (ValueError, RuntimeError, OSError) as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
@@ -355,7 +446,9 @@ class Admin(commands.Cog):
                 targetPath = await asyncio.to_thread(self.storage.importWorldArchive, uploadPath, name)
             await interaction.followup.send(f"✅ Map `{targetPath.name}` validated and stored on the HDD.", ephemeral=True)
             _log.info("world upload by %s: %s", userTag(interaction.user), targetPath.name)
+            await self._audit(interaction, "world.upload", "success", targetPath.name)
         except (StorageError, OSError) as error:
+            await self._audit(interaction, "world.upload", "failed", str(error))
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
         finally:
             uploadPath.unlink(missing_ok=True)
@@ -371,6 +464,7 @@ class Admin(commands.Cog):
 
     @worldGroup.command(name="activate", description="Back up the live world and switch to an imported map.")
     @app_commands.describe(confirm="Type ACTIVATE to confirm stopping and replacing the live world")
+    @app_commands.autocomplete(name=worldNameAutocomplete)
     async def worldActivate(self, interaction: discord.Interaction, name: str, confirm: str):
         if confirm != "ACTIVATE":
             await interaction.response.send_message("❌ Type `ACTIVATE` exactly to confirm.", ephemeral=True)
@@ -393,10 +487,13 @@ class Admin(commands.Cog):
             await animate_while(interaction, work(), "Activating the uploaded map")
             await interaction.edit_original_response(embed=discord.Embed(title="✅ Map activated", description=f"`{name}`", color=OK_GREEN))
             _log.warning("world activate by %s: %s", userTag(interaction.user), name)
+            await self._audit(interaction, "world.activate", "success", name)
         except (StorageError, RuntimeError) as error:
+            await self._audit(interaction, "world.activate", "failed", f"{name}: {error}")
             await self._editError(interaction, error)
 
     @worldGroup.command(name="download", description="Download an imported map if it fits Discord's limit.")
+    @app_commands.autocomplete(name=worldNameAutocomplete)
     async def worldDownload(self, interaction: discord.Interaction, name: str):
         await interaction.response.defer(ephemeral=True)
         outputPath = None
@@ -411,6 +508,7 @@ class Admin(commands.Cog):
 
     @worldGroup.command(name="delete", description="Delete one imported map from the HDD.")
     @app_commands.describe(confirm="Type DELETE to confirm permanent deletion")
+    @app_commands.autocomplete(name=worldNameAutocomplete)
     async def worldDelete(self, interaction: discord.Interaction, name: str, confirm: str):
         if confirm != "DELETE":
             await interaction.response.send_message("❌ Type `DELETE` exactly to confirm.", ephemeral=True)
@@ -419,6 +517,7 @@ class Admin(commands.Cog):
             await asyncio.to_thread(self.storage.deleteWorld, name)
             await interaction.response.send_message(f"✅ Deleted imported map `{name}`.", ephemeral=True)
             _log.warning("world delete by %s: %s", userTag(interaction.user), name)
+            await self._audit(interaction, "world.delete", "success", name)
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
@@ -434,6 +533,50 @@ class Admin(commands.Cog):
             )
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+
+    @app_commands.command(name="health", description="Check RCON, HDD, scheduler, and backup freshness.")
+    async def health(self, interaction: discord.Interaction):
+        results = []
+        try:
+            output = await _rcon("list")
+            results.append(f"✅ RCON: `{output[:300]}`")
+        except RconError as error:
+            results.append(f"❌ RCON: {error}")
+        try:
+            total, used, free = await asyncio.to_thread(self.storage.storageUsage)
+            results.append(
+                f"✅ HDD: {self._formatBytes(free)} free of {self._formatBytes(total)}"
+            )
+            settings = self.settingsStore.load()
+            backups = await asyncio.to_thread(self.storage.listBackups)
+            if backups:
+                ageMinutes = int(
+                    (datetime.now(timezone.utc) - backups[0].modifiedAt).total_seconds() / 60
+                )
+                freshnessMark = "✅" if ageMinutes <= settings.intervalMinutes * 2 else "⚠️"
+                results.append(f"{freshnessMark} Latest backup: {ageMinutes} minute(s) old")
+            else:
+                results.append("⚠️ Latest backup: none")
+            results.append(
+                f"{'✅' if settings.enabled else '⏸️'} Scheduler: "
+                f"{'enabled' if settings.enabled else 'paused'} ({settings.intervalMinutes} min)"
+            )
+        except (StorageError, RuntimeError) as error:
+            results.append(f"❌ Storage/scheduler: {error}")
+        await interaction.response.send_message("\n".join(results), ephemeral=True)
+
+    @app_commands.command(name="audit", description="Show recent privileged-operation audit records.")
+    async def audit(self, interaction: discord.Interaction, limit: app_commands.Range[int, 1, 20] = 10):
+        records = await asyncio.to_thread(self.auditLog.recent, limit)
+        lines = [
+            f"`{record.get('timestamp', '?')[:19]}` **{record.get('action', '?')}** "
+            f"({record.get('outcome', '?')}) — user `{record.get('actorId', '?')}` "
+            f"{record.get('detail', '')}"
+            for record in records
+        ]
+        await interaction.response.send_message(
+            "\n".join(lines)[:1900] or "No audit records yet.", ephemeral=True
+        )
 
     @tasks.loop(seconds=60)
     async def backupScheduler(self):
