@@ -88,6 +88,7 @@ Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
 | Raspberry Pi cluster | [cluster](docs/en/cluster.md) | [클러스터](docs/ko/cluster.md) |
 | Bedrock alternative | [bedrock](docs/en/bedrock.md) | [베드락 대안](docs/ko/bedrock.md) |
 | Troubleshooting | [troubleshooting](docs/en/troubleshooting.md) | [문제 해결](docs/ko/troubleshooting.md) |
+| Server owner runbook | [operator runbook](docs/en/operator-runbook.md) | [운영 런북](docs/ko/operator-runbook.md) |
 | Prompts for coding agents | [agent-prompts](docs/prompts/agent-prompts.md) | (same file, bilingual) |
 
 Agent working rules live in [CLAUDE.md](CLAUDE.md) and [AGENTS.md](AGENTS.md).
