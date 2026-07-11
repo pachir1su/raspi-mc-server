@@ -10,9 +10,11 @@ from pathlib import Path
 class AuditLog:
     """Persist compact JSON lines without exposing tokens or RCON credentials."""
 
-    def __init__(self, stateDir: str):
+    def __init__(self, stateDir: str, maxBytes: int = 5 * 1024 * 1024):
         self.stateDir = Path(stateDir).resolve()
         self.path = self.stateDir / "audit.jsonl"
+        self.rotatedPath = self.stateDir / "audit.jsonl.1"
+        self.maxBytes = maxBytes
         self.writeLock = threading.Lock()
 
     def record(
@@ -33,6 +35,9 @@ class AuditLog:
         self.stateDir.mkdir(parents=True, exist_ok=True)
         encoded = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
         with self.writeLock:
+            if self.path.exists() and self.path.stat().st_size + len(encoded) + 1 > self.maxBytes:
+                self.rotatedPath.unlink(missing_ok=True)
+                self.path.replace(self.rotatedPath)
             with self.path.open("a", encoding="utf-8") as auditFile:
                 auditFile.write(encoded + "\n")
                 auditFile.flush()

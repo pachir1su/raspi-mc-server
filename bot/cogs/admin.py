@@ -10,7 +10,6 @@ small private server; loosen the check if you want players to see status.
 """
 
 import asyncio
-import os
 import subprocess
 import uuid
 from dataclasses import replace
@@ -23,11 +22,14 @@ from discord.ext import commands
 from discord.ext import tasks
 
 from bot import log
-from bot import BRAND_BLUE, OK_GREEN, ERR_RED, userTag
+from bot import BRAND_BLUE, OK_GREEN, WARN_YELLOW, ERR_RED, userTag
 from bot.audit import AuditLog
 from bot.config import cfg
 from bot.backup_settings import SettingsStore
+from bot.control_panel import AdminDashboardView, LogPanelView, PlayerPanelView
+from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
+from bot.player_info import parseOnlinePlayers, summarizeInventory, validatePlayerName
 from bot.rcon import Rcon, RconError
 from bot.world_storage import StorageError, WorldStorage
 
@@ -578,6 +580,244 @@ class Admin(commands.Cog):
             "\n".join(lines)[:1900] or "No audit records yet.", ephemeral=True
         )
 
+    # --- button-first control panel ------------------------------------
+    @app_commands.command(name="panel", description="Open the button-first Minecraft admin dashboard.")
+    async def panel(self, interaction: discord.Interaction):
+        """Open routine administration without requiring command arguments."""
+        embed = await self.panelOverviewEmbed()
+        await interaction.response.send_message(
+            embed=embed,
+            view=AdminDashboardView(self, interaction.user.id),
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="players", description="Select an online player and inspect their state.")
+    async def players(self, interaction: discord.Interaction):
+        """Open the live player dropdown directly as a keyboard-friendly shortcut."""
+        players = await self.panelOnlinePlayers()
+        if not players:
+            await interaction.response.send_message("현재 접속 중인 플레이어가 없습니다.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "조회할 플레이어를 선택하세요.",
+            view=PlayerPanelView(self, interaction.user.id, players),
+            ephemeral=True,
+        )
+
+    async def panelOnlinePlayers(self) -> list[str]:
+        """Return validated live player names from Paper's list command."""
+        try:
+            return parseOnlinePlayers(await _rcon("list"))
+        except RconError:
+            return []
+
+    async def panelOverviewEmbed(self) -> discord.Embed:
+        """Build a compact dashboard summary resilient to individual subsystem failures."""
+        players = []
+        online = False
+        try:
+            players = parseOnlinePlayers(await _rcon("list"))
+            online = True
+        except RconError:
+            pass
+        settings = self.settingsStore.load()
+        storageText = "HDD unavailable"
+        try:
+            total, used, free = await asyncio.to_thread(self.storage.storageUsage)
+            storageText = f"{self._formatBytes(free)} free / {self._formatBytes(total)}"
+        except StorageError:
+            pass
+        backups = []
+        try:
+            backups = await asyncio.to_thread(self.storage.listBackups)
+        except StorageError:
+            pass
+        latestText = (
+            f"<t:{int(backups[0].modifiedAt.timestamp())}:R>" if backups else "없음"
+        )
+        embed = discord.Embed(
+            title="🎛️ Minecraft 관리 패널",
+            description="아래 버튼으로 자주 쓰는 작업을 실행하세요.",
+            color=OK_GREEN if online else ERR_RED,
+        )
+        embed.add_field(name="서버", value="🟢 온라인" if online else "🔴 오프라인", inline=True)
+        embed.add_field(
+            name=f"접속자 {len(players)}명",
+            value=", ".join(players)[:1000] if players else "없음",
+            inline=True,
+        )
+        embed.add_field(name="HDD", value=storageText, inline=False)
+        embed.add_field(name="최근 백업", value=latestText, inline=True)
+        embed.add_field(
+            name="자동 백업",
+            value=f"{'켜짐' if settings.enabled else '꺼짐'} / {settings.intervalMinutes}분",
+            inline=True,
+        )
+        return embed
+
+    async def panelStorageEmbed(self) -> discord.Embed:
+        """Build an HDD capacity card for the dashboard."""
+        try:
+            total, used, free = await asyncio.to_thread(self.storage.storageUsage)
+            percent = (used / total * 100) if total else 100
+            description = (
+                f"마운트: `{self.storage.storageRoot}`\n"
+                f"사용: **{self._formatBytes(used)} ({percent:.1f}%)**\n"
+                f"여유: **{self._formatBytes(free)}**\n"
+                f"전체: **{self._formatBytes(total)}**"
+            )
+            return discord.Embed(title="💽 HDD 저장공간", description=description, color=OK_GREEN)
+        except StorageError as error:
+            return discord.Embed(title="❌ HDD 오류", description=str(error), color=ERR_RED)
+
+    async def panelHealthEmbed(self) -> discord.Embed:
+        """Build a no-typing health summary for RCON, storage, and backups."""
+        lines = []
+        try:
+            await _rcon("list")
+            lines.append("✅ RCON 연결")
+        except RconError as error:
+            lines.append(f"❌ RCON: {error}")
+        try:
+            total, used, free = await asyncio.to_thread(self.storage.storageUsage)
+            lines.append(f"✅ HDD 여유 {self._formatBytes(free)}")
+            settings = self.settingsStore.load()
+            backups = await asyncio.to_thread(self.storage.listBackups)
+            if backups:
+                ageMinutes = int(
+                    (datetime.now(timezone.utc) - backups[0].modifiedAt).total_seconds() / 60
+                )
+                mark = "✅" if ageMinutes <= settings.intervalMinutes * 2 else "⚠️"
+                lines.append(f"{mark} 최근 백업 {ageMinutes}분 전")
+            else:
+                lines.append("⚠️ 생성된 백업 없음")
+            lines.append(f"{'✅' if settings.enabled else '⏸️'} 자동 백업 {settings.intervalMinutes}분")
+        except (StorageError, RuntimeError) as error:
+            lines.append(f"❌ 저장소: {error}")
+        color = ERR_RED if any(line.startswith("❌") for line in lines) else OK_GREEN
+        return discord.Embed(title="🩺 서버 상태 진단", description="\n".join(lines), color=color)
+
+    async def panelCreateBackup(self, interaction: discord.Interaction):
+        """Create a safe manual backup and report through a deferred button response."""
+        try:
+            async with self.operationLock:
+                archivePath = await self._safeBackup("panel")
+            await self._audit(interaction, "backup.create", "success", archivePath.name)
+            await interaction.followup.send(f"✅ 백업 완료: `{archivePath.name}`", ephemeral=True)
+        except (StorageError, RuntimeError) as error:
+            await self._audit(interaction, "backup.create", "failed", str(error))
+            await interaction.followup.send(f"❌ 백업 실패: {error}", ephemeral=True)
+
+    async def panelToggleBackup(self, interaction: discord.Interaction) -> bool:
+        """Toggle and persist automatic backups from one dashboard button."""
+        settings = self.settingsStore.load()
+        settings = replace(settings, enabled=not settings.enabled)
+        self.settingsStore.save(settings)
+        await self._audit(interaction, "backup.enabled", "success", str(settings.enabled))
+        return settings.enabled
+
+    async def panelServiceAction(self, interaction: discord.Interaction, action: str):
+        """Run a validated lifecycle action from a button with graceful stop saving."""
+        if action not in {"start", "stop", "restart"}:
+            await interaction.followup.send("❌ 잘못된 서버 작업입니다.", ephemeral=True)
+            return
+        if action == "stop":
+            try:
+                await _rcon("save-all flush")
+            except RconError:
+                pass
+        ok, output = await asyncio.to_thread(_systemctl, action)
+        await self._audit(
+            interaction, f"service.{action}", "success" if ok else "failed", output
+        )
+        mark = "✅" if ok else "❌"
+        await interaction.followup.send(
+            f"{mark} 서버 {action}: `{(output or 'done')[:1400]}`", ephemeral=True
+        )
+
+    async def panelPlayerEmbed(self, player: str, detailType: str) -> discord.Embed:
+        """Query a selected player's allowed read-only entity fields through RCON."""
+        validatePlayerName(player)
+        titleMap = {
+            "inventory": "🎒 인벤토리",
+            "position": "🧭 위치",
+            "stats": "❤️ 체력·경험치",
+            "effects": "✨ 상태 효과",
+        }
+        try:
+            if detailType == "inventory":
+                output = await _rcon(f"data get entity {player} Inventory")
+                description = summarizeInventory(output)
+            elif detailType == "position":
+                position, dimension = await asyncio.gather(
+                    _rcon(f"data get entity {player} Pos"),
+                    _rcon(f"data get entity {player} Dimension"),
+                )
+                description = f"**좌표**\n`{position[:800]}`\n**차원**\n`{dimension[:500]}`"
+            elif detailType == "stats":
+                health, food, level, mode = await asyncio.gather(
+                    _rcon(f"data get entity {player} Health"),
+                    _rcon(f"data get entity {player} foodLevel"),
+                    _rcon(f"data get entity {player} XpLevel"),
+                    _rcon(f"data get entity {player} playerGameType"),
+                )
+                description = (
+                    f"**체력** `{health[:300]}`\n**허기** `{food[:300]}`\n"
+                    f"**경험치 레벨** `{level[:300]}`\n**게임 모드** `{mode[:300]}`"
+                )
+            elif detailType == "effects":
+                description = discordPreview(
+                    await _rcon(f"data get entity {player} active_effects"), 1500
+                )
+            else:
+                raise ValueError("Unknown player detail type")
+            return discord.Embed(
+                title=f"{titleMap[detailType]} — {player}",
+                description=description[:4000],
+                color=BRAND_BLUE,
+            )
+        except (RconError, ValueError) as error:
+            return discord.Embed(
+                title=f"❌ {player} 조회 실패", description=str(error), color=ERR_RED
+            )
+
+    def panelLogPath(self, source: str) -> Path:
+        """Resolve only the two supported operational log files."""
+        if source == "bot":
+            currentPath = log.current_log_file()
+            if not currentPath:
+                raise FileNotFoundError("Bot log file is not ready")
+            return Path(currentPath)
+        if source == "server":
+            return Path(cfg.server_dir) / "logs" / "latest.log"
+        raise ValueError("Unknown log source")
+
+    async def panelLogEmbed(self, source: str, errorsOnly: bool = False) -> discord.Embed:
+        """Preview a bounded log tail or filtered warning/error lines."""
+        try:
+            path = self.panelLogPath(source)
+            text = await asyncio.to_thread(readTail, path)
+            if errorsOnly:
+                text = filterImportant(text)
+            preview = discordPreview(text)
+            title = "⚠️ 최근 경고·오류" if errorsOnly else (
+                "🤖 봇 로그" if source == "bot" else "⛏️ 마인크래프트 로그"
+            )
+            return discord.Embed(
+                title=title,
+                description=f"`{path}`\n```\n{preview}\n```",
+                color=WARN_YELLOW if errorsOnly else BRAND_BLUE,
+            )
+        except (FileNotFoundError, OSError, ValueError) as error:
+            return discord.Embed(title="❌ 로그 조회 실패", description=str(error), color=ERR_RED)
+
+    async def panelLogDownload(self, interaction: discord.Interaction, source: str):
+        """Attach a selected log while respecting the guild's upload limit."""
+        try:
+            await self._sendFile(interaction, self.panelLogPath(source), "Operational log")
+        except (FileNotFoundError, OSError, ValueError) as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+
     @tasks.loop(seconds=60)
     async def backupScheduler(self):
         """Poll the persisted interval and create a due backup without overlap."""
@@ -636,26 +876,13 @@ class Admin(commands.Cog):
             value /= 1024
 
     # --- logs -----------------------------------------------------------
-    @app_commands.command(description="Attach the bot's current log file.")
+    @app_commands.command(description="Open button controls for bot and Minecraft logs.")
     async def logs(self, interaction: discord.Interaction):
-        path = log.current_log_file()
-        if not path or not os.path.exists(path):
-            await interaction.response.send_message("No log file yet.", ephemeral=True)
-            return
-        size = os.path.getsize(path)
-        # Discord's default upload cap is 8MB; send a tail preview if larger.
-        if size <= 7 * 1024 * 1024:
-            await interaction.response.send_message(
-                content="📄 Current bot log:", file=discord.File(path), ephemeral=True
-            )
-        else:
-            tail = log.recent_lines(40)
-            await interaction.response.send_message(
-                content=f"📄 Log too large to attach ({size // 1024}KB). Last 40 lines:\n"
-                f"```\n{tail[-1800:]}\n```",
-                ephemeral=True,
-            )
-        _log.info("logs by %s", userTag(interaction.user))
+        await interaction.response.send_message(
+            "확인할 로그를 선택하세요.",
+            view=LogPanelView(self, interaction.user.id),
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot):
