@@ -19,6 +19,15 @@ class AuditLogTests(unittest.TestCase):
             self.assertEqual("world.activate", records[0]["action"])
             self.assertEqual(11, records[1]["actorId"])
 
+    def testRotatesAtConfiguredLimit(self):
+        """Audit history is bounded instead of growing forever on microSD."""
+        with tempfile.TemporaryDirectory() as stateDir:
+            auditLog = AuditLog(stateDir, maxBytes=180)
+            auditLog.record("backup.create", 11, "success", "x" * 100)
+            auditLog.record("backup.create", 11, "success", "y" * 100)
+            self.assertTrue(auditLog.rotatedPath.is_file())
+            self.assertEqual(1, len(auditLog.recent()))
+
 
 if __name__ == "__main__":
     unittest.main()
