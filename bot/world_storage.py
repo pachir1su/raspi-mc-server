@@ -138,12 +138,13 @@ class WorldStorage:
             raise StorageError("Backup not found")
         return path
 
-    def pruneBackups(self, settings: BackupSettings):
+    def pruneBackups(self, settings: BackupSettings) -> int:
         """Keep all recent backups plus one newest-per-day retention sample."""
         now = datetime.now(timezone.utc)
         denseCutoff = now - timedelta(hours=settings.retentionHours)
         dailyCutoff = now - timedelta(days=settings.dailyRetentionDays)
         dailySeen = set()
+        deletedCount = 0
         for item in self.listBackups():
             if item.modifiedAt >= denseCutoff:
                 continue
@@ -154,6 +155,41 @@ class WorldStorage:
             path = self.resolveBackup(item.name)
             path.unlink(missing_ok=True)
             path.with_suffix(path.suffix + ".sha256").unlink(missing_ok=True)
+            deletedCount += 1
+        return deletedCount
+
+    def verifyBackup(self, name: str) -> str:
+        """Verify SHA-256 and archive structure before a backup can be restored."""
+        self.ensureReady()
+        path = self.resolveBackup(name)
+        checksumPath = path.with_suffix(path.suffix + ".sha256")
+        if not checksumPath.is_file():
+            raise StorageError("Backup checksum sidecar is missing")
+        try:
+            expected = checksumPath.read_text(encoding="ascii").split()[0].lower()
+        except (OSError, IndexError, UnicodeError) as error:
+            raise StorageError(f"Backup checksum is unreadable: {error}") from error
+        if len(expected) != 64 or any(character not in "0123456789abcdef" for character in expected):
+            raise StorageError("Backup checksum has an invalid format")
+        digest = hashlib.sha256()
+        with path.open("rb") as source:
+            for block in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(block)
+        actual = digest.hexdigest()
+        if actual != expected:
+            raise StorageError("Backup checksum mismatch; restore is blocked")
+        try:
+            with tarfile.open(path, "r:gz") as archive:
+                members = archive.getmembers()
+                self._safeMembers([member.name for member in members])
+                self._checkArchiveLimits(len(members), sum(member.size for member in members))
+                if any(member.issym() or member.islnk() or member.isdev() for member in members):
+                    raise StorageError("Backup contains an unsafe archive member")
+                if not any(member.name == "world/level.dat" for member in members):
+                    raise StorageError("Backup does not contain world/level.dat")
+        except (tarfile.TarError, OSError) as error:
+            raise StorageError(f"Backup archive is unreadable: {error}") from error
+        return actual
 
     def _safeMembers(self, names: list[str]):
         """Reject absolute paths, traversal, and suspicious archive members."""
@@ -280,6 +316,7 @@ class WorldStorage:
     def _restoreBackupSync(self, name: str):
         """Validate a backup, stage it, and roll back directory swaps on failure."""
         self.ensureReady()
+        self.verifyBackup(name)
         archivePath = self.resolveBackup(name)
         with tempfile.TemporaryDirectory(dir=self.stagingDir, prefix="restore-") as temporaryDir:
             stagingPath = Path(temporaryDir)

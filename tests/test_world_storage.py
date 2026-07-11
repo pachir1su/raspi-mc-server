@@ -35,9 +35,29 @@ class WorldStorageTests(unittest.TestCase):
         archivePath = asyncio.run(self.storage.createBackup(settings, "test"))
         self.assertTrue(archivePath.is_file())
         self.assertTrue(archivePath.with_suffix(archivePath.suffix + ".sha256").is_file())
+        self.assertEqual(64, len(self.storage.verifyBackup(archivePath.name)))
         (self.serverDir / "world" / "level.dat").write_bytes(b"changed")
         asyncio.run(self.storage.restoreBackup(archivePath.name))
         self.assertEqual(b"level-one", (self.serverDir / "world" / "level.dat").read_bytes())
+
+    def testCorruptBackupBlocksRestore(self):
+        """Changing an archive after creation causes checksum verification to fail."""
+        settings = BackupSettings(minFreeGb=1, maxUsagePercent=95)
+        archivePath = asyncio.run(self.storage.createBackup(settings, "test"))
+        with archivePath.open("ab") as archive:
+            archive.write(b"corruption")
+        with self.assertRaisesRegex(StorageError, "checksum mismatch"):
+            self.storage.verifyBackup(archivePath.name)
+        with self.assertRaises(StorageError):
+            asyncio.run(self.storage.restoreBackup(archivePath.name))
+
+    def testMissingChecksumBlocksRestore(self):
+        """Legacy or incomplete archives without sidecars cannot be restored silently."""
+        settings = BackupSettings(minFreeGb=1, maxUsagePercent=95)
+        archivePath = asyncio.run(self.storage.createBackup(settings, "test"))
+        archivePath.with_suffix(archivePath.suffix + ".sha256").unlink()
+        with self.assertRaisesRegex(StorageError, "sidecar is missing"):
+            self.storage.verifyBackup(archivePath.name)
 
     def testImportsVanillaWorld(self):
         """A single level.dat wrapped in one directory is accepted."""
