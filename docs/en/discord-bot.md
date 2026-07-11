@@ -79,12 +79,56 @@ All commands are **admin-only** (checked against `ADMIN_USER_IDS`).
 | `/storage` | Show HDD mount and capacity status. |
 | `/health` | Check RCON, HDD, backup freshness, and scheduler state. |
 | `/audit [limit]` | Show recent privileged-operation audit records. |
-| `/logs` | Attach the bot's current log file. |
+| `/panel` | Open the button-first combined administration dashboard. |
+| `/players` | Select a live player and inspect inventory, location, stats, or effects. |
+| `/logs` | Open bot and Minecraft log controls. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, restore, and activation show the loading animation while
 they run and then edit the message with the result.
 
 See [backup.md](backup.md) for the complete retention and file-safety model.
+
+## Button-first dashboard
+
+Run `/panel` once, then use buttons without typing command arguments for:
+
+- refreshing server, player, HDD, and latest-backup status
+- creating a safe backup immediately
+- starting, or confirming stop/restart of, the Minecraft service
+- toggling automatic backups
+- storage and health diagnostics
+- the live-player selector
+- bot and Minecraft log controls
+
+The ephemeral panel is visible only to the administrator who opened it and
+expires after ten minutes. Callback failures produce a visible error instead of
+leaving an apparently dead button.
+
+## Player inspection
+
+`/players` or the dashboard **Players** button builds a dropdown from Paper's
+current `list` output. After selecting a player, buttons show:
+
+- **Inventory** — hotbar, normal slots, armour, offhand item, and counts
+- **Position** — coordinates and dimension
+- **Health/XP** — health, food, experience level, and game mode
+- **Effects** — current active-effect data
+
+Names are sourced from the live list and validated again as Java usernames, so
+they cannot be turned into arbitrary RCON input.
+
+## Log panel
+
+`/logs` now opens buttons instead of immediately attaching one file. It reads a
+bounded tail of the bot log or Paper `latest.log` and supports:
+
+- bot or Minecraft previews
+- warning/error-only filtering for each source
+- original attachments within the guild's actual Discord limit
+- an SSH/SFTP hint when a file is too large
+
+The privileged audit JSONL rotates once at 5 MiB instead of growing forever on
+the microSD.
 
 ## Security notes
 
