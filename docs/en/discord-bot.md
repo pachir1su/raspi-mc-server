@@ -71,12 +71,14 @@ All commands are **admin-only** (checked against `ADMIN_USER_IDS`).
 | `/start` | Start the minecraft service. |
 | `/stop` | Save, then stop the service. |
 | `/restart` | Restart the service. |
-| `/backup create/list/download` | Create, list, and download HDD backups. |
+| `/backup create/list/download/verify` | Create, list, download, and verify HDD backups. |
 | `/backup restore/delete` | Restore or delete with explicit confirmation. |
-| `/backup settings/configure/enabled` | Inspect/change interval, retention, and limits. |
+| `/backup settings/configure/enabled/prune` | Inspect/change policy or prune immediately. |
 | `/world upload/list/download` | Validate, store, list, and download map archives. |
 | `/world activate/delete` | Snapshot and switch maps, or delete a stored map. |
 | `/storage` | Show HDD mount and capacity status. |
+| `/health` | Check RCON, HDD, backup freshness, and scheduler state. |
+| `/audit [limit]` | Show recent privileged-operation audit records. |
 | `/logs` | Attach the bot's current log file. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, restore, and activation show the loading animation while

@@ -29,6 +29,7 @@ backup, and `save-on`.
 - The shortest permitted interval is 10 minutes.
 
 Inspect and change the policy from Discord:
+The settings view also shows the next due time based on the newest backup.
 
 ```text
 /backup settings
@@ -43,9 +44,16 @@ Inspect and change the policy from Discord:
 /backup create
 /backup list
 /backup download name:<filename>
+/backup verify name:<filename>
+/backup prune
 /backup restore name:<filename> confirm:RESTORE
 /backup delete name:<filename> confirm:DELETE
 ```
+
+Every backup has a SHA-256 sidecar. `/backup verify` checks the digest, archive
+structure, and `world/level.dat`. Restore requires that verification to pass;
+corrupt backups and archives without a checksum are blocked. `/backup prune`
+applies the saved retention policy immediately.
 
 A restore first creates an emergency snapshot, only replaces the world after
 Minecraft stops successfully, rolls back a failed directory swap, and starts
@@ -65,6 +73,11 @@ be downloaded from `/mnt/minecraft/backups` over SSH/SFTP.
 An upload must contain exactly one Java Edition world with `level.dat`. The bot
 rejects traversal paths, links, device files, archives expanding beyond 100 GiB,
 and excessive file counts. Activating a map also snapshots the live world first.
+
+Backup and map name fields autocomplete actual HDD entries. `/health` checks
+RCON, HDD capacity, backup freshness, and scheduler state. `/audit` displays
+privileged creation, deletion, restore, activation, and settings changes stored
+in `data/audit.jsonl`.
 
 ## Disk failure is different
 

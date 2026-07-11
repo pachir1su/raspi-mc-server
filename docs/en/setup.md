@@ -56,7 +56,7 @@ so the bot may start/stop only the minecraft service (not general root access).
 Two files hold secrets and are **not** committed:
 
 1. `/mnt/minecraft/live/server.properties` — set a strong `rcon.password`.
-2. `.env` (created from `.env.example`) — set:
+2. The tracked placeholder `.env` — replace its values on the Pi:
    - `RCON_PASSWORD` — must match `server.properties`.
    - `DISCORD_TOKEN` — your bot token ([discord-bot.md](discord-bot.md)).
    - `ADMIN_USER_IDS` — **your own Discord user ID** (comma-separated for more).

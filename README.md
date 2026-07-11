@@ -22,7 +22,8 @@ from Discord, SSH, or the web.
   - 💻 **SSH + RCON** (baseline) — a console from anywhere you can SSH in.
   - 🌐 **Cloudflare Tunnel** (optional) — reach the server/console with no port
     forwarding.
-- **30-minute HDD backups**, Discord restore/map upload/switching, **systemd** auto-start, and
+- **30-minute HDD backups**, SHA-256 verification, Discord restore/map
+  upload/switching, health checks, audit logs, **systemd** auto-start, and
   a one-shot **provisioning script**.
 - **Optional Raspberry Pi cluster** guidance for when one Pi isn't enough.
 - **Full docs in English and Korean.**
@@ -101,7 +102,7 @@ raspi-mc-server/
 ├── deploy/        # systemd units + one-shot Pi provisioning
 ├── bot/           # Discord admin bot (Python, discord.py)
 ├── docs/          # English + Korean docs, and agent prompts
-├── .env.example   # copy to .env and fill in
+├── .env           # tracked placeholders; replace locally on the Pi
 └── README.md / README.ko.md
 ```
 
