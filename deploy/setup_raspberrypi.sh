@@ -33,10 +33,10 @@ fi
 
 # --- .env ----------------------------------------------------------------
 if [ ! -f "$REPO_DIR/.env" ]; then
-  cp "$REPO_DIR/.env.example" "$REPO_DIR/.env"
-  chmod 600 "$REPO_DIR/.env"
-  echo "==> Created .env from example (chmod 600). EDIT IT before starting the bot."
+  echo "!! Tracked placeholder .env is missing; restore it from git before setup." >&2
+  exit 1
 fi
+chmod 600 "$REPO_DIR/.env"
 # Load paths selected by the operator before checking the installation target.
 set -a
 . "$REPO_DIR/.env"

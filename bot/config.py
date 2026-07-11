@@ -59,7 +59,7 @@ class Config:
         if missing:
             raise SystemExit(
                 "Missing required config: " + ", ".join(missing) +
-                "\nSet these in .env (see .env.example)."
+                "\nSet these in the tracked placeholder .env on the Pi."
             )
 
 
