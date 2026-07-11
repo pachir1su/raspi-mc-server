@@ -23,12 +23,6 @@ sudo apt-get install -y \
   mcrcon \
   curl tar
 
-# --- Minecraft server ----------------------------------------------------
-if [ ! -f "$REPO_DIR/server/paper.jar" ]; then
-  echo "==> Installing PaperMC..."
-  "$REPO_DIR/scripts/install_server.sh"
-fi
-
 # --- Python venv for the bot --------------------------------------------
 if [ ! -d "$REPO_DIR/.venv" ]; then
   echo "==> Creating Python venv..."
@@ -39,9 +33,27 @@ fi
 
 # --- .env ----------------------------------------------------------------
 if [ ! -f "$REPO_DIR/.env" ]; then
-  cp "$REPO_DIR/.env.example" "$REPO_DIR/.env"
-  chmod 600 "$REPO_DIR/.env"
-  echo "==> Created .env from example (chmod 600). EDIT IT before starting the bot."
+  echo "!! Tracked placeholder .env is missing; restore it from git before setup." >&2
+  exit 1
+fi
+chmod 600 "$REPO_DIR/.env"
+# Load paths selected by the operator before checking the installation target.
+set -a
+. "$REPO_DIR/.env"
+set +a
+
+# --- External HDD --------------------------------------------------------
+if ! mountpoint -q /mnt/minecraft; then
+  echo "!! /mnt/minecraft is not mounted. Prepare the HDD first:" >&2
+  echo "     sudo mkfs.ext4 /dev/sdXN       # DESTRUCTIVE: choose the correct partition" >&2
+  echo "     sudo $REPO_DIR/scripts/setup_hdd.sh /dev/sdXN" >&2
+  exit 1
+fi
+
+# --- Minecraft server ----------------------------------------------------
+if [ ! -f "${MC_SERVER_DIR:-/mnt/minecraft/live}/paper.jar" ]; then
+  echo "==> Installing PaperMC on the HDD..."
+  "$REPO_DIR/scripts/install_server.sh"
 fi
 
 # --- sudoers: let the bot control ONLY the minecraft service -------------
@@ -55,14 +67,19 @@ sudo chmod 440 "$SUDOERS"
 
 # --- systemd units -------------------------------------------------------
 echo "==> Installing systemd units..."
-sudo cp "$REPO_DIR/deploy/minecraft.service" /etc/systemd/system/
-sudo cp "$REPO_DIR/deploy/mc-discord-bot.service" /etc/systemd/system/
+# Render the repository path and service account instead of assuming /home/pi.
+sed -e "s|^User=.*|User=$SERVICE_USER|" \
+    -e "s|/home/pi/raspi-mc-server|$REPO_DIR|g" \
+    "$REPO_DIR/deploy/minecraft.service" | sudo tee /etc/systemd/system/minecraft.service >/dev/null
+sed -e "s|^User=.*|User=$SERVICE_USER|" \
+    -e "s|/home/pi/raspi-mc-server|$REPO_DIR|g" \
+    "$REPO_DIR/deploy/mc-discord-bot.service" | sudo tee /etc/systemd/system/mc-discord-bot.service >/dev/null
 sudo systemctl daemon-reload
 
 cat <<EOF
 
 ==> Provisioning done. Remaining manual steps:
-  1. Edit $REPO_DIR/server/server.properties  -> set a strong rcon.password
+  1. Edit ${MC_SERVER_DIR:-/mnt/minecraft/live}/server.properties -> set a strong rcon.password
   2. Edit $REPO_DIR/.env                       -> DISCORD_TOKEN, ADMIN_USER_IDS,
                                                   RCON_PASSWORD (match server.properties)
   3. Start the server:   sudo systemctl enable --now minecraft.service

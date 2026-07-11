@@ -10,8 +10,8 @@ from Discord, SSH, or the web.
 
 ## What you get
 
-- **PaperMC** server tuned for a Pi 4B 4GB on a 32GB SD card (Aikar GC flags,
-  Pi-friendly view/simulation distance).
+- **PaperMC** tuned for a Pi 4B 4GB with 32GB microSD + 500GB USB HDD (Aikar
+  GC flags and Pi-friendly view/simulation distance).
 - **Whitelist-only, no mods** — a small private world for you and a few friends.
 - **Owner-only cheats.** On a multiplayer server, only *operators* can run
   commands. You op **only yourself**, so nobody else can cheat in-game — but you
@@ -22,7 +22,8 @@ from Discord, SSH, or the web.
   - 💻 **SSH + RCON** (baseline) — a console from anywhere you can SSH in.
   - 🌐 **Cloudflare Tunnel** (optional) — reach the server/console with no port
     forwarding.
-- **Automated backups** with rotation, **systemd** services for auto-start, and
+- **30-minute HDD backups**, SHA-256 verification, Discord restore/map
+  upload/switching, health checks, audit logs, **systemd** auto-start, and
   a one-shot **provisioning script**.
 - **Optional Raspberry Pi cluster** guidance for when one Pi isn't enough.
 - **Full docs in English and Korean.**
@@ -37,14 +38,19 @@ On a 64-bit Raspberry Pi OS, from the Pi:
 git clone https://github.com/pachir1su/raspi-mc-server.git
 cd raspi-mc-server
 
-# 1. Provision everything (Java, PaperMC, Python venv, systemd, sudoers)
+# 1. Identify and prepare the 500GB HDD (/dev/sda1 is an example; format destroys data)
+lsblk -f
+sudo mkfs.ext4 /dev/sda1
+sudo ./scripts/setup_hdd.sh /dev/sda1
+
+# 2. Provision everything (Java, PaperMC, Python venv, systemd, sudoers)
 ./deploy/setup_raspberrypi.sh
 
-# 2. Set your secrets
-#    - server/server.properties -> rcon.password
+# 3. Set your secrets
+#    - /mnt/minecraft/live/server.properties -> rcon.password
 #    - .env                     -> DISCORD_TOKEN, ADMIN_USER_IDS, RCON_PASSWORD
 
-# 3. Start the server, op yourself, start the bot
+# 4. Start the server, op yourself, start the bot
 sudo systemctl enable --now minecraft.service
 sudo systemctl enable --now mc-discord-bot.service
 ```
@@ -96,7 +102,7 @@ raspi-mc-server/
 ├── deploy/        # systemd units + one-shot Pi provisioning
 ├── bot/           # Discord admin bot (Python, discord.py)
 ├── docs/          # English + Korean docs, and agent prompts
-├── .env  # copy to .env and fill in
+├── .env           # tracked placeholders; replace locally on the Pi
 └── README.md / README.ko.md
 ```
 
@@ -105,8 +111,7 @@ raspi-mc-server/
 ## Requirements
 
 - Raspberry Pi 4B (4GB) with **64-bit** Raspberry Pi OS (Bookworm recommended).
-- A 32GB (or larger) SD card — an SSD over USB 3.0 is strongly recommended for
-  world I/O and SD-card longevity.
+- A 32GB microSD plus a 500GB USB 3.0 HDD for PaperMC, worlds, and backups.
 - A Discord application/bot token (for the bot) — see
   [docs/en/discord-bot.md](docs/en/discord-bot.md).
 

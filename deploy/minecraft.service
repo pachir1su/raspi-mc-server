@@ -12,11 +12,13 @@
 Description=PaperMC Minecraft server (raspi-mc-server)
 After=network-online.target
 Wants=network-online.target
+RequiresMountsFor=/mnt/minecraft
 
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/raspi-mc-server/server
+WorkingDirectory=/home/pi/raspi-mc-server
+EnvironmentFile=/home/pi/raspi-mc-server/.env
 ExecStart=/home/pi/raspi-mc-server/scripts/start_server.sh
 # Give the JVM time to save chunks on shutdown before systemd gives up.
 TimeoutStopSec=90

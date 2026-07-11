@@ -39,6 +39,14 @@ class Config:
     # systemd service the bot may start/stop.
     mc_service = os.getenv("MC_SERVICE_NAME", "minecraft.service")
 
+    # Storage paths. Runtime worlds and archives live on the external HDD.
+    storage_root = os.getenv("MC_STORAGE_ROOT", "/mnt/minecraft")
+    server_dir = os.getenv("MC_SERVER_DIR", "/mnt/minecraft/live")
+    require_storage_mount = os.getenv("MC_REQUIRE_STORAGE_MOUNT", "true").lower() in {
+        "1", "true", "yes", "on",
+    }
+    state_dir = os.getenv("MC_STATE_DIR", "data")
+
     def validate(self):
         """Raise if a must-have value is missing — called at startup."""
         missing = []
@@ -51,7 +59,7 @@ class Config:
         if missing:
             raise SystemExit(
                 "Missing required config: " + ", ".join(missing) +
-                "\nSet these in .env (see .env.example)."
+                "\nSet these in the tracked placeholder .env on the Pi."
             )
 
 

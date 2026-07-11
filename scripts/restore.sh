@@ -13,9 +13,16 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ -f "$REPO_DIR/.env" ] && set -a && . "$REPO_DIR/.env" && set +a
 
-SERVER_DIR="${MC_SERVER_DIR:-$REPO_DIR/server}"
-BACKUP_DIR="${MC_BACKUP_DIR:-$REPO_DIR/backups}"
+STORAGE_ROOT="${MC_STORAGE_ROOT:-/mnt/minecraft}"
+SERVER_DIR="${MC_SERVER_DIR:-$STORAGE_ROOT/live}"
+BACKUP_DIR="${MC_BACKUP_DIR:-$STORAGE_ROOT/backups}"
 SERVICE="${MC_SERVICE_NAME:-minecraft.service}"
+
+# Never restore into a microSD directory when the expected HDD is absent.
+if [ "${MC_REQUIRE_STORAGE_MOUNT:-true}" = "true" ] && ! mountpoint -q "$STORAGE_ROOT"; then
+  echo "!! HDD is not mounted at $STORAGE_ROOT" >&2
+  exit 1
+fi
 
 ARCHIVE="${1:-$(ls -1t "$BACKUP_DIR"/world_*.tar.gz 2>/dev/null | head -n1 || true)}"
 if [ -z "${ARCHIVE:-}" ] || [ ! -f "$ARCHIVE" ]; then

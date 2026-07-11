@@ -1,6 +1,6 @@
 # Server configuration
 
-The server reads `server/server.properties`. This repo ships
+The server reads `/mnt/minecraft/live/server.properties` by default. This repo ships
 `server/server.properties.template` with Pi-friendly, friends-only defaults.
 Below are the settings that matter most; the template comments explain each.
 

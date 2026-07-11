@@ -27,6 +27,7 @@ backups/
 
 # Discord bot runtime
 bot/logs/
+data/
 __pycache__/
 *.pyc
 .venv/

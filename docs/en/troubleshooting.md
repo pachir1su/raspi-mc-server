@@ -50,11 +50,11 @@ From Discord, `/logs` attaches the bot's current log file.
 ## Lag / low TPS
 
 See [performance.md](performance.md). Quick wins: lower `simulation-distance`,
-move the world to a USB SSD, ensure the Pi isn't thermally throttling
+move the world to USB 3.0 HDD/SSD storage, ensure the Pi isn't thermally throttling
 (`vcgencmd measure_temp`).
 
 ## "No space left on device"
 
-- Prune backups (`BACKUP_KEEP` in `.env`), delete old `world.bak_*` folders from
+- Shorten retention with `/backup configure`, prune old backups, or
   restores, clear `server/logs/` and `bot/logs/` (retention handles this over
   time), or move backups off-device.

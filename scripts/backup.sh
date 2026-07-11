@@ -4,23 +4,30 @@
 # Safe-by-default: if the server is running and RCON is available, it
 # disables auto-save and flushes to disk before copying, then re-enables
 # it — so backups are never taken mid-write. Old backups beyond
-# BACKUP_KEEP (default 10) are pruned so the 32GB SD card doesn't fill up.
+# BACKUP_KEEP (default 96) are pruned so a manual fallback cannot fill the HDD.
 #
 # Usage:  ./scripts/backup.sh
-# Cron:   0 5 * * *  /home/pi/raspi-mc-server/scripts/backup.sh >> ~/mc-backup.log 2>&1
+# Automatic scheduling is handled by the Discord bot's persistent policy.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ -f "$REPO_DIR/.env" ] && set -a && . "$REPO_DIR/.env" && set +a
 
-SERVER_DIR="${MC_SERVER_DIR:-$REPO_DIR/server}"
-BACKUP_DIR="${MC_BACKUP_DIR:-$REPO_DIR/backups}"
-KEEP="${BACKUP_KEEP:-10}"
+STORAGE_ROOT="${MC_STORAGE_ROOT:-/mnt/minecraft}"
+SERVER_DIR="${MC_SERVER_DIR:-$STORAGE_ROOT/live}"
+BACKUP_DIR="${MC_BACKUP_DIR:-$STORAGE_ROOT/backups}"
+KEEP="${BACKUP_KEEP:-96}"
 RCON_HOST="${RCON_HOST:-127.0.0.1}"
 RCON_PORT="${RCON_PORT:-25575}"
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
 OUT="$BACKUP_DIR/world_$STAMP.tar.gz"
+
+# Never fall through to the microSD when the configured external HDD is absent.
+if [ "${MC_REQUIRE_STORAGE_MOUNT:-true}" = "true" ] && ! mountpoint -q "$STORAGE_ROOT"; then
+  echo "!! HDD is not mounted at $STORAGE_ROOT" >&2
+  exit 1
+fi
 mkdir -p "$BACKUP_DIR"
 
 rcon() {
