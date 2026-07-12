@@ -38,6 +38,16 @@ Paper는 `config/paper-world-defaults.yml`에 조절 항목을 노출합니다. 
 
 ## 모니터링
 
+Discord `/metrics` 또는 `/panel`의 **성능** 버튼은 Paper TPS, Pi CPU 온도,
+1/5/15분 load average, 메모리, HDD, 업타임, 현재·과거 저전압/스로틀링 비트를
+한 화면에 표시합니다.
+
+SSH에서는 다음 명령으로 서비스·HDD·자원·RCON을 함께 확인합니다.
+
+```bash
+./scripts/health_check.sh
+```
+
 - 게임/RCON: `tps`(Paper)로 최근 TPS, `mspt`로 틱당 ms 확인.
 - OS: `htop`, `vcgencmd measure_temp`(온도), `iostat`(디스크).
 - 파이를 **시원하게** — 뜨거우면 스로틀링으로 TPS가 떨어집니다. 특히 케이스에

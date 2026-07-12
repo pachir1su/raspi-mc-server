@@ -87,6 +87,7 @@ sudo systemctl enable --now mc-discord-bot.service
 | 라즈베리파이 클러스터 | [클러스터](docs/ko/cluster.md) | [cluster](docs/en/cluster.md) |
 | 베드락 대안 | [베드락 대안](docs/ko/bedrock.md) | [bedrock](docs/en/bedrock.md) |
 | 문제 해결 | [문제 해결](docs/ko/troubleshooting.md) | [troubleshooting](docs/en/troubleshooting.md) |
+| 서버장 운영 런북 | [운영 런북](docs/ko/operator-runbook.md) | [operator runbook](docs/en/operator-runbook.md) |
 | 코딩 에이전트용 프롬프트 | [agent-prompts](docs/prompts/agent-prompts.md) | (같은 파일, 이중언어) |
 
 에이전트 작업 규칙은 [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md)에 있습니다.

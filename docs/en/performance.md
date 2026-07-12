@@ -38,6 +38,16 @@ Apply changes and restart. Change one thing at a time and watch TPS.
 
 ## Monitoring
 
+Discord `/metrics` or the dashboard **Performance** button combines Paper TPS,
+Pi CPU temperature, 1/5/15-minute load averages, memory, HDD, uptime, and current
+or historical undervoltage/throttle flags.
+
+Over SSH, summarize services, HDD, resources, and RCON together:
+
+```bash
+./scripts/health_check.sh
+```
+
 - In-game / RCON: `tps` (Paper) shows recent TPS; `mspt` shows ms per tick.
 - OS: `htop`, `vcgencmd measure_temp` (thermals), `iostat` (disk).
 - Keep the Pi **cool** — a hot Pi throttles and TPS drops. Use a heatsink + fan,

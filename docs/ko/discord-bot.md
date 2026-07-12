@@ -80,6 +80,7 @@ sudo journalctl -u mc-discord-bot.service -f
 | `/audit [개수]` | 최근 관리자 변경 작업 감사 기록. |
 | `/panel` | 버튼 중심 통합 관리 패널. |
 | `/players` | 접속자를 선택해 인벤토리·위치·체력·효과 조회. |
+| `/metrics` | Pi 온도·부하·메모리·HDD·TPS·스로틀 상태. |
 | `/logs` | 봇·마인크래프트 로그 버튼 패널. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, 복구와 맵 전환은 실행 중 로딩 애니메이션을 보여주고
@@ -96,6 +97,7 @@ sudo journalctl -u mc-discord-bot.service -f
 - 서버 시작, 확인 후 정지·재시작
 - 자동 백업 켜기/끄기
 - 저장공간과 상태 진단
+- CPU 온도, 메모리, TPS, 저전압·스로틀링 성능 카드
 - 플레이어 선택 메뉴
 - 봇·마인크래프트 로그 패널
 

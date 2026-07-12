@@ -81,6 +81,7 @@ All commands are **admin-only** (checked against `ADMIN_USER_IDS`).
 | `/audit [limit]` | Show recent privileged-operation audit records. |
 | `/panel` | Open the button-first combined administration dashboard. |
 | `/players` | Select a live player and inspect inventory, location, stats, or effects. |
+| `/metrics` | Show Pi temperature, load, memory, HDD, TPS, and throttle flags. |
 | `/logs` | Open bot and Minecraft log controls. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, restore, and activation show the loading animation while
@@ -97,6 +98,7 @@ Run `/panel` once, then use buttons without typing command arguments for:
 - starting, or confirming stop/restart of, the Minecraft service
 - toggling automatic backups
 - storage and health diagnostics
+- Pi temperature, memory, TPS, undervoltage, and throttle metrics
 - the live-player selector
 - bot and Minecraft log controls
 

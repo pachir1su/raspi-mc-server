@@ -92,6 +92,12 @@ class AdminDashboardView(OwnerView):
         embed = await self.controller.panelHealthEmbed()
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @discord.ui.button(label="성능", emoji="📊", style=discord.ButtonStyle.secondary, row=1)
+    async def performance(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        embed = await self.controller.panelMetricsEmbed()
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 class ConfirmServiceView(OwnerView):
     """Second-step confirmation for disruptive systemd actions."""
