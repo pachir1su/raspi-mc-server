@@ -44,6 +44,12 @@ RCON_PASSWORD=matches-server.properties
 MC_SERVICE_NAME=minecraft.service
 BOT_LANGUAGE=en
 PUBLIC_COMMANDS_ENABLED=true
+MC_STATE_DIR=/mnt/minecraft/bot-state
+MC_SPAWN_DIMENSION=overworld
+MC_SPAWN_X=0.5
+MC_SPAWN_Y=80
+MC_SPAWN_Z=0.5
+MC_MAP_URL_TEMPLATE=https://map.example.com/?world={dimension}&x={x}&y={y}&z={z}
 MC_PUBLIC_ADDRESS=play.example.com
 MC_PUBLIC_VERSION=Paper Java 1.21.x
 MC_PUBLIC_RULES=Respect builds and items; tell the operator when something breaks.
@@ -69,7 +75,11 @@ Or manually for testing:
 
 ## Commands
 
-`/portal` and `/online` are friend-safe read-only commands. All other management commands are **admin-only** (checked against `ADMIN_USER_IDS`). Set `BOT_LANGUAGE=ko` or `BOT_LANGUAGE=en` to switch the new bot UX language.
+`/portal` and `/online` are friend-safe read-only commands. Approved links also
+unlock the narrow `/rescue`, `/place`, `/diary`, and `/server-score` surface.
+All general management commands remain **admin-only** (checked against
+`ADMIN_USER_IDS`). Set `BOT_LANGUAGE=ko` or `BOT_LANGUAGE=en` to switch the new
+bot UX language.
 
 | Command | What it does |
 |---|---|
@@ -96,12 +106,20 @@ Or manually for testing:
 | `/tuning-report` | Explain current performance risks and Pi-friendly tuning advice. |
 | `/incident day/clear-weather/peaceful/clear-drops` | Accident helpers for day, weather, peaceful mode, and dropped items. `clear-drops` requires `CLEAR` because it deletes every dropped item. |
 | `/portal`, `/online` | Friend-facing server info and online players. |
+| `/link request/status` | Request and inspect your Discord ↔ Minecraft link. |
+| `/link approve/revoke/list` | Admin-only link approval and management. |
+| `/rescue spawn/whereami` | Move only the approved linked player to fixed spawn, or read that player's location. |
+| `/place add/list/show/delete` | Shared coordinate book with durable photos and optional external map links. |
+| `/diary add/recent/show` | Bounded shared server journal with optional photos. |
+| `/server-score` | On-demand 0–100 score from Paper and Pi health metrics. |
 | `/logs` | Open bot and Minecraft log controls. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, restore, and activation show the loading animation while
 they run and then edit the message with the result.
 
 See [backup.md](backup.md) for the complete retention and file-safety model.
+See [friend-tools.md](friend-tools.md) for exact Pi configuration, approval flow,
+runtime files, command examples, and troubleshooting.
 
 ## Button-first dashboard
 

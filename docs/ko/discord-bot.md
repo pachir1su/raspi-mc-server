@@ -43,6 +43,12 @@ RCON_PASSWORD=server.properties와-일치
 MC_SERVICE_NAME=minecraft.service
 BOT_LANGUAGE=ko
 PUBLIC_COMMANDS_ENABLED=true
+MC_STATE_DIR=/mnt/minecraft/bot-state
+MC_SPAWN_DIMENSION=overworld
+MC_SPAWN_X=0.5
+MC_SPAWN_Y=80
+MC_SPAWN_Z=0.5
+MC_MAP_URL_TEMPLATE=https://map.example.com/?world={dimension}&x={x}&y={y}&z={z}
 MC_PUBLIC_ADDRESS=play.example.com
 MC_PUBLIC_VERSION=Paper Java 1.21.x
 MC_PUBLIC_RULES=건축물과 아이템을 존중하고 문제는 서버장에게 알려주세요.
@@ -68,7 +74,10 @@ sudo journalctl -u mc-discord-bot.service -f
 
 ## 명령어
 
-`/portal`, `/online`은 친구도 볼 수 있는 읽기 전용 명령입니다. 나머지 관리 명령은 **관리자 전용**(`ADMIN_USER_IDS` 확인)입니다. `BOT_LANGUAGE=ko` 또는 `BOT_LANGUAGE=en`으로 새 봇 UX의 언어를 바꿀 수 있습니다.
+`/portal`, `/online`은 친구도 볼 수 있는 읽기 전용 명령입니다. 승인된 계정 연동은
+범위가 좁은 `/rescue`, `/place`, `/diary`, `/server-score` 기능도 허용합니다. 일반
+관리 명령은 모두 계속 **관리자 전용**(`ADMIN_USER_IDS` 확인)입니다.
+`BOT_LANGUAGE=ko` 또는 `BOT_LANGUAGE=en`으로 새 봇 UX의 언어를 바꿀 수 있습니다.
 
 | 명령 | 기능 |
 |---|---|
@@ -95,12 +104,20 @@ sudo journalctl -u mc-discord-bot.service -f
 | `/tuning-report` | 현재 성능 위험과 Pi 친화 튜닝 조언. |
 | `/incident day/clear-weather/peaceful/clear-drops` | 낮·날씨·평화 난이도·드롭템 정리 사고 대응. `clear-drops`는 모든 드롭 아이템을 지우므로 `CLEAR` 확인이 필요합니다. |
 | `/portal`, `/online` | 친구용 서버 정보와 접속자 보기. |
+| `/link request/status` | Discord ↔ 마인크래프트 연결 요청과 내 상태 확인. |
+| `/link approve/revoke/list` | 관리자 전용 연결 승인·해제·목록. |
+| `/rescue spawn/whereami` | 승인된 본인 계정만 고정 스폰으로 이동하거나 그 계정 위치 조회. |
+| `/place add/list/show/delete` | 로컬 사진과 선택적 외부 지도 링크가 있는 공유 좌표북. |
+| `/diary add/recent/show` | 사진을 넣을 수 있는 용량 제한 서버 일지. |
+| `/server-score` | Paper와 Pi 지표 기반 요청 시점 0~100점. |
 | `/logs` | 봇·마인크래프트 로그 버튼 패널. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, 복구와 맵 전환은 실행 중 로딩 애니메이션을 보여주고
 결과로 메시지를 갱신합니다.
 
 전체 백업·복구 정책과 파일 안전 규칙은 [backup.md](backup.md)를 참고하세요.
+정확한 Pi 설정, 승인 순서, 런타임 파일, 명령 예시, 문제 해결은
+[friend-tools.md](friend-tools.md)를 참고하세요.
 
 ## 버튼형 관리 패널
 
