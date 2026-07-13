@@ -3,6 +3,7 @@
 import discord
 
 from bot.config import cfg
+from bot.i18n import t
 
 
 class OwnerView(discord.ui.View):
@@ -97,6 +98,77 @@ class AdminDashboardView(OwnerView):
         await interaction.response.defer(ephemeral=True, thinking=True)
         embed = await self.controller.panelMetricsEmbed()
         await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="튜닝 리포트", emoji="🧰", style=discord.ButtonStyle.secondary, row=2)
+    async def tuning(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        warnings, embed = await self.controller._collectPerformanceWarnings()
+        if warnings:
+            embed.add_field(name="Warnings", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="사고 대응", emoji="🚑", style=discord.ButtonStyle.danger, row=2)
+    async def incident(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "자주 쓰는 사고 대응 작업입니다. 서버 상태를 바꿀 수 있습니다.",
+            view=IncidentActionsView(self.controller, self.ownerId),
+            ephemeral=True,
+        )
+
+
+class IncidentActionsView(OwnerView):
+    """One-click emergency shortcuts for common small-server accidents."""
+
+    async def _run(self, interaction: discord.Interaction, command: str, label: str):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller._incidentCommand(interaction, command, label)
+
+    @discord.ui.button(label="낮으로", emoji="☀️", style=discord.ButtonStyle.primary)
+    async def day(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._run(interaction, "time set day", "incident_day")
+
+    @discord.ui.button(label="맑게", emoji="🌤️", style=discord.ButtonStyle.primary)
+    async def clearWeather(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._run(interaction, "weather clear", "incident_clear")
+
+    @discord.ui.button(label="평화 난이도", emoji="🛡️", style=discord.ButtonStyle.danger)
+    async def peaceful(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._run(interaction, "difficulty peaceful", "incident_peaceful")
+
+    @discord.ui.button(label="드롭템 정리", emoji="🧹", style=discord.ButtonStyle.danger)
+    async def clearDrops(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            t("incident_clear_drops_prompt"),
+            view=ConfirmIncidentView(
+                self.controller,
+                self.ownerId,
+                "kill @e[type=item]",
+                "incident_kill_items",
+            ),
+            ephemeral=True,
+        )
+
+
+class ConfirmIncidentView(OwnerView):
+    """Second-step confirmation for destructive incident helpers."""
+
+    def __init__(self, controller, ownerId: int, command: str, label: str):
+        super().__init__(controller, ownerId, timeout=60)
+        self.command = command
+        self.label = label
+        self.confirm.label = t("confirm")
+        self.cancel.label = t("cancel")
+
+    @discord.ui.button(label="확인", emoji="✅", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller._incidentCommand(interaction, self.command, self.label)
+        self.stop()
+
+    @discord.ui.button(label="취소", emoji="✖️", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content=t("cancelled"), view=None)
+        self.stop()
 
 
 class ConfirmServiceView(OwnerView):

@@ -13,7 +13,7 @@ import asyncio
 import subprocess
 import uuid
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import discord
@@ -25,11 +25,13 @@ from bot import log
 from bot import BRAND_BLUE, OK_GREEN, WARN_YELLOW, ERR_RED, userTag
 from bot.audit import AuditLog
 from bot.config import cfg
+from bot.i18n import t
 from bot.backup_settings import SettingsStore
 from bot.control_panel import AdminDashboardView, LogPanelView, PlayerPanelView
 from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
 from bot.player_info import parseOnlinePlayers, summarizeInventory, validatePlayerName
+from bot.performance_report import parseTps, shouldAlert
 from bot.rcon import Rcon, RconError
 from bot.system_metrics import (
     formatDuration,
@@ -40,6 +42,7 @@ from bot.system_metrics import (
 from bot.world_storage import StorageError, WorldStorage
 
 _log = log.get("cog.admin")
+PUBLIC_COMMANDS = {"portal", "online"}
 
 
 def _is_admin(interaction: discord.Interaction) -> bool:
@@ -74,24 +77,30 @@ class Admin(commands.Cog):
             cfg.storage_root, cfg.server_dir, cfg.require_storage_mount
         )
         self.operationLock = asyncio.Lock()
+        self.lastAlertAt: dict[str, datetime] = {}
 
     async def cog_load(self):
         """Start the persistent in-bot scheduler after the cog is ready."""
         self.backupScheduler.start()
+        self.performanceAlerts.start()
 
     def cog_unload(self):
         """Stop scheduler polling when the extension unloads."""
         self.backupScheduler.cancel()
+        self.performanceAlerts.cancel()
 
     # A single guard applied to every command in this cog.
     async def cog_check(self, ctx):  # for prefix commands (unused)
         return True
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        commandName = interaction.command.name if interaction.command else ""
+        if commandName in PUBLIC_COMMANDS and cfg.public_commands_enabled:
+            return True
         if _is_admin(interaction):
             return True
         await interaction.response.send_message(
-            "⛔ You are not authorised to use this bot.", ephemeral=True
+            t("not_authorized"), ephemeral=True
         )
         _log.warning("denied command from %s", userTag(interaction.user))
         return False
@@ -101,7 +110,10 @@ class Admin(commands.Cog):
     ) -> list[app_commands.Choice[str]]:
         """Suggest existing backup basenames and avoid error-prone manual typing."""
         try:
-            names = [item.name for item in await asyncio.to_thread(self.storage.listBackups)]
+            names = [
+                item.name
+                for item in await asyncio.to_thread(self.storage.listBackups)
+            ]
         except StorageError:
             return []
         currentLower = current.lower()
@@ -115,7 +127,10 @@ class Admin(commands.Cog):
     ) -> list[app_commands.Choice[str]]:
         """Suggest validated map names stored on the HDD."""
         try:
-            names = [item.name for item in await asyncio.to_thread(self.storage.listWorlds)]
+            names = [
+                item.name
+                for item in await asyncio.to_thread(self.storage.listWorlds)
+            ]
         except StorageError:
             return []
         currentLower = current.lower()
@@ -124,11 +139,167 @@ class Admin(commands.Cog):
             for name in names if currentLower in name.lower()
         ][:25]
 
-    async def _audit(self, interaction: discord.Interaction, action: str, outcome: str, detail: str = ""):
+    async def _audit(
+        self,
+        interaction: discord.Interaction,
+        action: str,
+        outcome: str,
+        detail: str = "",
+    ):
         """Persist privileged actions outside the Discord message history."""
         await asyncio.to_thread(
             self.auditLog.record, action, interaction.user.id, outcome, detail
         )
+
+    def _statusChannel(self):
+        """Resolve the optional announcement channel for automatic alerts."""
+        if not cfg.status_channel_id:
+            return None
+        try:
+            return self.bot.get_channel(int(cfg.status_channel_id))
+        except ValueError:
+            return None
+
+    async def _collectPerformanceWarnings(self) -> tuple[list[str], discord.Embed]:
+        """Collect actionable Pi/Paper warnings and a detailed report embed."""
+        systemMetrics, throttleFlags = await asyncio.gather(
+            asyncio.to_thread(readSystemMetrics),
+            asyncio.to_thread(readThrottleFlags),
+        )
+        usedMemory = systemMetrics.memoryTotalBytes - systemMetrics.memoryAvailableBytes
+        memoryPercent = (
+            usedMemory / systemMetrics.memoryTotalBytes * 100
+            if systemMetrics.memoryTotalBytes else 100
+        )
+        warnings = []
+        if (
+            systemMetrics.temperatureCelsius is not None
+            and systemMetrics.temperatureCelsius >= cfg.alert_temperature_celsius
+        ):
+            warnings.append(
+                f"CPU temperature {systemMetrics.temperatureCelsius:.1f}°C >= "
+                f"{cfg.alert_temperature_celsius:.0f}°C"
+            )
+        if memoryPercent >= cfg.alert_memory_percent:
+            warnings.append(
+                f"Memory usage {memoryPercent:.1f}% >= "
+                f"{cfg.alert_memory_percent:.0f}%"
+            )
+        if any(
+            label.startswith("현재") or label.startswith("Current")
+            for label in throttleFlags
+        ):
+            warnings.append(
+                "Current undervoltage/throttle flag: " + ", ".join(throttleFlags)
+            )
+        tpsText = "RCON unavailable"
+        tpsValue = None
+        try:
+            tpsText = stripMinecraftFormatting(await _rcon("tps"))
+            tpsValue = parseTps(tpsText)
+            if tpsValue is not None and tpsValue < cfg.alert_tps_threshold:
+                warnings.append(f"TPS {tpsValue:.1f} < {cfg.alert_tps_threshold:.1f}")
+        except RconError:
+            warnings.append("RCON/TPS check failed")
+        hddText = "HDD unavailable"
+        try:
+            total, used, free = await asyncio.to_thread(self.storage.storageUsage)
+            hddText = (
+                f"{self._formatBytes(used)} / {self._formatBytes(total)} "
+                f"(free {self._formatBytes(free)})"
+            )
+            freeGb = free / 1024 ** 3
+            if freeGb < cfg.alert_min_free_gb:
+                warnings.append(f"HDD free {freeGb:.1f} GB < {cfg.alert_min_free_gb:.0f} GB")
+        except StorageError:
+            warnings.append("HDD check failed")
+        recommendations = []
+        if tpsValue is not None and tpsValue < 18:
+            recommendations.append(
+                "Lower view-distance/simulation-distance and check mob farms "
+                "or chunk loaders."
+            )
+        if memoryPercent >= 85:
+            recommendations.append(
+                "Avoid raising MC_MEMORY; first reduce loaded chunks/entities "
+                "or restart during off-hours."
+            )
+        if systemMetrics.temperatureCelsius is not None and systemMetrics.temperatureCelsius >= 75:
+            recommendations.append(
+                "Improve cooling, case airflow, or power supply before "
+                "increasing player load."
+            )
+        if any("전압" in label or "undervoltage" in label.lower() for label in throttleFlags):
+            recommendations.append(
+                "Use a stronger USB-C power supply/cable; undervoltage "
+                "causes lag spikes."
+            )
+        recommendations.append(
+            "For a Pi 4B 4GB, keep 3-4 players, modest farms, and "
+            "conservative render/simulation distance."
+        )
+        embed = discord.Embed(
+            title=t("tuning_title"),
+            description=t("tuning_summary"),
+            color=ERR_RED if warnings else OK_GREEN,
+        )
+        embed.add_field(name="TPS", value=f"```{tpsText[:900]}```", inline=False)
+        embed.add_field(name="CPU", value=f"Temp: {systemMetrics.temperatureCelsius if systemMetrics.temperatureCelsius is not None else 'n/a'}°C\nLoad: {systemMetrics.load1:.2f}/{systemMetrics.load5:.2f}/{systemMetrics.load15:.2f}", inline=True)
+        embed.add_field(name="Memory", value=f"{self._formatBytes(usedMemory)} / {self._formatBytes(systemMetrics.memoryTotalBytes)} ({memoryPercent:.1f}%)", inline=True)
+        embed.add_field(name="HDD", value=hddText, inline=False)
+        embed.add_field(name="Power/throttle", value=", ".join(throttleFlags), inline=False)
+        embed.add_field(name="Recommendations", value="\n".join(f"• {item}" for item in recommendations)[:1000], inline=False)
+        return warnings, embed
+
+    # --- player-facing portal ------------------------------------------
+    @app_commands.command(name="portal", description="Show friend-safe server access info and live status.")
+    async def portal(self, interaction: discord.Interaction):
+        players = []
+        statusText = t("portal_offline")
+        try:
+            listOutput = await _rcon("list")
+            players = parseOnlinePlayers(listOutput)
+            statusText = listOutput
+        except RconError:
+            pass
+        color = OK_GREEN if statusText != t("portal_offline") else WARN_YELLOW
+        embed = discord.Embed(
+            title=t("portal_title"),
+            description=t("portal_description"),
+            color=color,
+        )
+        embed.add_field(
+            name=t("portal_address"),
+            value=cfg.public_address or t("portal_address_missing"),
+            inline=False,
+        )
+        embed.add_field(name=t("portal_version"), value=cfg.public_version, inline=True)
+        embed.add_field(
+            name=t("portal_online"),
+            value=", ".join(players) if players else t("online_none"),
+            inline=False,
+        )
+        embed.add_field(
+            name=t("portal_rules"),
+            value=cfg.public_rules or t("portal_rules_default"),
+            inline=False,
+        )
+        embed.set_footer(text=statusText[:200])
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="online", description="Show who is online without exposing admin controls.")
+    async def online(self, interaction: discord.Interaction):
+        try:
+            players = parseOnlinePlayers(await _rcon("list"))
+            body = "\n".join(f"• {player}" for player in players) or t("online_none")
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title=t("online_title"), description=body, color=OK_GREEN
+                ),
+                ephemeral=True,
+            )
+        except RconError as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
     # --- read-only ------------------------------------------------------
     @app_commands.command(description="Show whether the server is up and who is online.")
@@ -291,6 +462,56 @@ class Admin(commands.Cog):
             )
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+
+    @backupGroup.command(name="timeline", description="Show a compact backup timeline with ages and sizes.")
+    async def backupTimeline(self, interaction: discord.Interaction):
+        try:
+            backups = await asyncio.to_thread(self.storage.listBackups)
+            if not backups:
+                await interaction.response.send_message("No backups yet.", ephemeral=True)
+                return
+            lines = []
+            for index, item in enumerate(backups[:10], start=1):
+                lines.append(
+                    f"**{index}.** `{item.name}` — "
+                    f"{self._formatBytes(item.size)} — "
+                    f"<t:{int(item.modifiedAt.timestamp())}:R>"
+                )
+            await interaction.response.send_message(
+                embed=discord.Embed(
+                    title=t("backup_timeline_title"),
+                    description="\n".join(lines),
+                    color=BRAND_BLUE,
+                ),
+                ephemeral=True,
+            )
+        except StorageError as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+
+    @backupGroup.command(name="restore-preview", description="Verify and preview a backup before restoring it.")
+    @app_commands.autocomplete(name=backupNameAutocomplete)
+    async def backupRestorePreview(self, interaction: discord.Interaction, name: str):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            path = self.storage.resolveBackup(name)
+            digest = await asyncio.to_thread(self.storage.verifyBackup, name)
+            description = (
+                f"{t('restore_preview_ok')}\n"
+                f"File: `{path.name}`\n"
+                f"Size: **{self._formatBytes(path.stat().st_size)}**\n"
+                f"SHA-256: `{digest}`\n\n"
+                "Run `/backup restore` with confirm `RESTORE` only when you are ready to stop and replace the live world."
+            )
+            await interaction.followup.send(
+                embed=discord.Embed(
+                    title=t("restore_preview_title"),
+                    description=description[:4000],
+                    color=OK_GREEN,
+                ),
+                ephemeral=True,
+            )
+        except StorageError as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
     @backupGroup.command(name="download", description="Download a backup if it fits Discord's limit.")
     @app_commands.autocomplete(name=backupNameAutocomplete)
@@ -616,6 +837,71 @@ class Admin(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         await interaction.followup.send(embed=await self.panelMetricsEmbed(), ephemeral=True)
 
+    @app_commands.command(name="tuning-report", description="Explain current performance risks and tuning advice.")
+    async def tuningReport(self, interaction: discord.Interaction):
+        """Turn raw metrics into actionable Pi-friendly tuning advice."""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            warnings, embed = await self._collectPerformanceWarnings()
+            if warnings:
+                embed.add_field(name="Warnings", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except (OSError, RuntimeError, ValueError) as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    incidentGroup = app_commands.Group(
+        name="incident", description="One-click emergency helpers for common accidents."
+    )
+
+    async def _incidentCommand(
+        self, interaction: discord.Interaction, command: str, successKey: str
+    ):
+        try:
+            out = await _rcon(command)
+            await self._audit(
+                interaction, f"incident.{command.split()[0]}", "success", command
+            )
+            message = f"{t(successKey)}\n`{out.strip() or command}`"
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+        except RconError as error:
+            await self._audit(
+                interaction, f"incident.{command.split()[0]}", "failed", str(error)
+            )
+            if interaction.response.is_done():
+                await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+
+    @incidentGroup.command(name="day", description="Set the overworld time to day.")
+    async def incidentDay(self, interaction: discord.Interaction):
+        await self._incidentCommand(interaction, "time set day", "incident_day")
+
+    @incidentGroup.command(name="clear-weather", description="Clear storm/rain after an accident.")
+    async def incidentClearWeather(self, interaction: discord.Interaction):
+        await self._incidentCommand(interaction, "weather clear", "incident_clear")
+
+    @incidentGroup.command(name="peaceful", description="Temporarily switch difficulty to peaceful.")
+    async def incidentPeaceful(self, interaction: discord.Interaction):
+        await self._incidentCommand(interaction, "difficulty peaceful", "incident_peaceful")
+
+    @incidentGroup.command(
+        name="clear-drops",
+        description="Remove dropped item entities to recover from lag.",
+    )
+    @app_commands.describe(
+        confirm="Type CLEAR to confirm deleting every dropped item entity"
+    )
+    async def incidentClearDrops(self, interaction: discord.Interaction, confirm: str):
+        if confirm != "CLEAR":
+            await interaction.response.send_message(
+                t("incident_confirm_clear_drops"), ephemeral=True
+            )
+            return
+        await self._incidentCommand(interaction, "kill @e[type=item]", "incident_kill_items")
+
     async def panelOnlinePlayers(self) -> list[str]:
         """Return validated live player names from Paper's list command."""
         try:
@@ -908,6 +1194,42 @@ class Admin(commands.Cog):
             _log.info("automatic backup complete: %s", archivePath.name)
         except (StorageError, RuntimeError, OSError, RconError):
             _log.exception("automatic backup failed")
+
+    @tasks.loop(seconds=300)
+    async def performanceAlerts(self):
+        """Post cooldown-protected performance/storage warnings to STATUS_CHANNEL_ID."""
+        channel = self._statusChannel()
+        if not channel:
+            return
+        try:
+            warnings, embed = await self._collectPerformanceWarnings()
+        except (OSError, RuntimeError, ValueError):
+            _log.exception("performance alert collection failed")
+            return
+        if not warnings:
+            return
+        now = datetime.now(timezone.utc)
+        fresh = []
+        cooldown = timedelta(minutes=cfg.alert_cooldown_minutes)
+        for warning in warnings:
+            previous = self.lastAlertAt.get(warning)
+            if not shouldAlert(previous, now, cooldown):
+                continue
+            self.lastAlertAt[warning] = now
+            fresh.append(warning)
+        if not fresh:
+            return
+        embed.title = t("alerts_title")
+        embed.add_field(name="New warnings", value="\n".join(f"• {item}" for item in fresh)[:1000], inline=False)
+        try:
+            await channel.send(embed=embed)
+        except discord.HTTPException:
+            _log.exception("failed to send performance alert")
+
+    @performanceAlerts.before_loop
+    async def beforePerformanceAlerts(self):
+        """Wait until Discord is ready before resolving channels."""
+        await self.bot.wait_until_ready()
 
     @backupScheduler.before_loop
     async def beforeBackupScheduler(self):
