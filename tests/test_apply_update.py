@@ -5,9 +5,11 @@ import json
 import tempfile
 import unittest
 import zipfile
+from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
 
-from deploy.apply_update import ApplyError, _loadAndValidateArchive
+from deploy.apply_update import ApplyError, _loadAndValidateArchive, _officialDigest
 
 
 class ApplyUpdateTests(unittest.TestCase):
@@ -50,6 +52,34 @@ class ApplyUpdateTests(unittest.TestCase):
             self._writeArchive(archivePath, "data/player-links.json")
             with self.assertRaises(ApplyError):
                 _loadAndValidateArchive(archivePath, "v2.0.0")
+
+    def testOfficialReleaseDigestIsRequiredForUploads(self):
+        payload = {
+            "assets": [
+                {
+                    "name": "raspi-mc-server-v2.0.0.zip",
+                    "digest": "sha256:" + "a" * 64,
+                }
+            ]
+        }
+        with patch(
+            "deploy.apply_update.urllib.request.urlopen",
+            return_value=BytesIO(json.dumps(payload).encode("utf-8")),
+        ):
+            self.assertEqual("a" * 64, _officialDigest("v2.0.0"))
+
+    def testMissingOfficialDigestIsRejected(self):
+        payload = {
+            "assets": [
+                {"name": "raspi-mc-server-v2.0.0.zip", "digest": None}
+            ]
+        }
+        with patch(
+            "deploy.apply_update.urllib.request.urlopen",
+            return_value=BytesIO(json.dumps(payload).encode("utf-8")),
+        ):
+            with self.assertRaises(ApplyError):
+                _officialDigest("v2.0.0")
 
 
 if __name__ == "__main__":

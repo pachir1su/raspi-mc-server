@@ -118,7 +118,7 @@ clients retain the canonical names below.
 | `/place add/list/show/delete` | Shared coordinate book with durable photos and optional external map links. |
 | `/diary add/recent/show` | Bounded shared server journal with optional photos. |
 | `/server-score` | On-demand 0–100 score from Paper and Pi health metrics. |
-| `/update check/upload/status` | Inspect Releases, install a verified ZIP, and read rollback status (admin). |
+| `/update check/upload/status` | Inspect Releases, install a ZIP matching the official asset SHA-256, and read rollback status (admin). |
 | `/logs` | Open bot and Minecraft log controls. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, restore, and activation show the loading animation while

@@ -52,6 +52,7 @@ def _writeJson(path: Path, payload: dict) -> None:
             outputFile.flush()
             os.fsync(outputFile.fileno())
         os.replace(temporaryPath, path)
+        os.chmod(path, 0o644)
     except Exception:
         try:
             os.unlink(temporaryPath)
@@ -150,6 +151,33 @@ def _download(request: dict, stagingDir: Path) -> Path:
         raise
 
 
+def _officialDigest(tag: str) -> str:
+    """Return the SHA-256 GitHub recorded for the tag's deployment asset."""
+    assetName = f"raspi-mc-server-{tag}.zip"
+    encodedTag = urllib.parse.quote(tag, safe="")
+    apiUrl = f"https://api.github.com/repos/{REPOSITORY}/releases/tags/{encodedTag}"
+    apiRequest = urllib.request.Request(
+        apiUrl,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "raspi-mc-server-updater",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib.request.urlopen(apiRequest, timeout=30) as response:
+            payload = json.load(response)
+    except (OSError, json.JSONDecodeError) as error:
+        raise ApplyError(f"cannot verify the official GitHub Release: {error}") from error
+    for asset in payload.get("assets", []):
+        if asset.get("name") == assetName:
+            digest = str(asset.get("digest") or "")
+            if digest.startswith("sha256:") and len(digest) == 71:
+                return digest.removeprefix("sha256:")
+            raise ApplyError("official Release asset has no SHA-256 digest")
+    raise ApplyError("official Release has no matching deployment ZIP")
+
+
 def _resolveArchive(request: dict, stagingDir: Path) -> Path:
     """Resolve either GitHub download or a Discord-staged local ZIP."""
     if request.get("source") == "github":
@@ -163,6 +191,10 @@ def _resolveArchive(request: dict, stagingDir: Path) -> Path:
         raise ApplyError("uploaded archive is outside HDD staging") from error
     if not archivePath.is_file():
         raise ApplyError("uploaded archive is missing")
+    requestedDigest = str(request.get("sha256", ""))
+    officialDigest = _officialDigest(str(request.get("tag", "")))
+    if requestedDigest != officialDigest:
+        raise ApplyError("uploaded ZIP does not match the official GitHub Release digest")
     return archivePath
 
 
@@ -337,10 +369,19 @@ def main() -> None:
         applyUpdate(args)
     except Exception as error:
         try:
-            _writeJson(
-                statusPath,
-                {"state": "failed", "error": str(error), "finishedAt": datetime.now(timezone.utc).isoformat()},
-            )
+            try:
+                currentStatus = json.loads(statusPath.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                currentStatus = {}
+            if currentStatus.get("state") != "rolled_back":
+                _writeJson(
+                    statusPath,
+                    {
+                        "state": "failed",
+                        "error": str(error),
+                        "finishedAt": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
         except OSError:
             pass
         raise SystemExit(f"update failed: {error}") from error
