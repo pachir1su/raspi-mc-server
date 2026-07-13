@@ -23,9 +23,11 @@ from Discord, SSH, or the web.
   - 🌐 **Cloudflare Tunnel** (optional) — reach the server/console with no port
     forwarding.
 - **30-minute HDD backups**, SHA-256 verification, Discord restore/map
-  upload/switching, a button-first dashboard, live-player inventory inspection,
-  health checks, rotating audit logs, **systemd** auto-start, and
-  a one-shot **provisioning script**.
+  upload/switching, friend portal commands, account links, self-service rescue/spawn
+  teleport, coordinate book/map links, server diary, health score, automatic performance
+  alerts, tuning reports, one-click incident helpers, backup timelines, a button-first dashboard,
+  live-player inventory inspection, health checks, rotating audit logs, **systemd**
+  auto-start, and a one-shot **provisioning script**.
 - **Optional Raspberry Pi cluster** guidance for when one Pi isn't enough.
 - **Full docs in English and Korean.**
 

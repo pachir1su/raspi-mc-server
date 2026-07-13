@@ -42,6 +42,20 @@ RCON_HOST=127.0.0.1
 RCON_PORT=25575
 RCON_PASSWORD=matches-server.properties
 MC_SERVICE_NAME=minecraft.service
+BOT_LANGUAGE=en
+PUBLIC_COMMANDS_ENABLED=true
+MC_PUBLIC_ADDRESS=play.example.com
+MC_PUBLIC_VERSION=Paper Java 1.21.x
+MC_PUBLIC_RULES=Respect builds and items; tell the operator when something breaks.
+MC_MAP_URL=https://map.example.com
+MC_SPAWN_X=0
+MC_SPAWN_Y=80
+MC_SPAWN_Z=0
+STATUS_CHANNEL_ID=123456789012345678
+ALERT_TPS_THRESHOLD=18.0
+ALERT_MEMORY_PERCENT=85
+ALERT_TEMPERATURE_CELSIUS=80
+ALERT_MIN_FREE_GB=20
 ```
 
 ## 4. Run
@@ -59,7 +73,7 @@ Or manually for testing:
 
 ## Commands
 
-All commands are **admin-only** (checked against `ADMIN_USER_IDS`).
+`/portal` and `/online` are friend-safe read-only commands. All other management commands are **admin-only** (checked against `ADMIN_USER_IDS`). Set `BOT_LANGUAGE=ko` or `BOT_LANGUAGE=en` to switch the new bot UX language.
 
 | Command | What it does |
 |---|---|
@@ -72,6 +86,7 @@ All commands are **admin-only** (checked against `ADMIN_USER_IDS`).
 | `/stop` | Save, then stop the service. |
 | `/restart` | Restart the service. |
 | `/backup create/list/download/verify` | Create, list, download, and verify HDD backups. |
+| `/backup timeline/restore-preview` | Show a recent-backup timeline and verify before restoring. |
 | `/backup restore/delete` | Restore or delete with explicit confirmation. |
 | `/backup settings/configure/enabled/prune` | Inspect/change policy or prune immediately. |
 | `/world upload/list/download` | Validate, store, list, and download map archives. |
@@ -82,6 +97,15 @@ All commands are **admin-only** (checked against `ADMIN_USER_IDS`).
 | `/panel` | Open the button-first combined administration dashboard. |
 | `/players` | Select a live player and inspect inventory, location, stats, or effects. |
 | `/metrics` | Show Pi temperature, load, memory, HDD, TPS, and throttle flags. |
+| `/tuning-report` | Explain current performance risks and Pi-friendly tuning advice. |
+| `/incident day/clear-weather/peaceful/clear-drops` | Accident helpers for day, weather, peaceful mode, and dropped items. `clear-drops` requires `CLEAR` because it deletes every dropped item. |
+| `/portal`, `/online` | Friend-facing server info and online players. |
+| `/link request/me`, `/link approve/list` | Request and approve Discord-to-Minecraft account links. |
+| `/rescue spawn/whereami` | Self-service spawn teleport and position lookup for approved linked users. |
+| `/place add/list/show/delete` | Coordinate book with optional image attachment and web-map links. Delete is admin-only. |
+| `/map` | Link to the configured squaremap/Dynmap-style web map from `MC_MAP_URL`. |
+| `/diary recent` | Lightweight server-life diary for rescue, place, and operator events. |
+| `/server-score` | Health score from TPS, temperature, memory, HDD, and backup age. |
 | `/logs` | Open bot and Minecraft log controls. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, restore, and activation show the loading animation while
@@ -98,7 +122,8 @@ Run `/panel` once, then use buttons without typing command arguments for:
 - starting, or confirming stop/restart of, the Minecraft service
 - toggling automatic backups
 - storage and health diagnostics
-- Pi temperature, memory, TPS, undervoltage, and throttle metrics
+- Pi temperature, memory, TPS, undervoltage, throttle metrics, and tuning report
+- emergency buttons for day, weather, peaceful difficulty, and dropped-item cleanup. Dropped-item cleanup asks for confirmation because it can delete friends' items.
 - the live-player selector
 - bot and Minecraft log controls
 
@@ -149,3 +174,15 @@ replace it. So for slow actions the bot sends its **own** embed first and edits
 it on a timer with a progress bar that eases toward ~96% (never 100% until the
 real result replaces it). Failed frame edits are ignored — the animation is
 cosmetic and never blocks the actual work. See `bot/loading.py`.
+
+## Automatic performance alerts and language
+
+When `STATUS_CHANNEL_ID` is set, the bot checks TPS, memory, CPU temperature, power/throttle flags, and HDD free space every five minutes. It posts only new threshold warnings after the `ALERT_COOLDOWN_MINUTES` cooldown. `BOT_LANGUAGE=ko` or `BOT_LANGUAGE=en` switches the new portal, alert, report, and incident-response text. Some older fixed operational strings can be migrated to the same i18n helper over time.
+
+## Rescue, places, map, and diary
+
+Friends request an account link with `/link request <minecraft-name>`, and an admin approves it with `/link approve`. Approved friends can run `/rescue spawn` to teleport only their linked Minecraft player to `MC_SPAWN_X/Y/Z`. `/place add` saves coordinates plus an optional Discord attachment URL, and place cards include a map link when `MC_MAP_URL` is set. For live full-map rendering and player markers, prefer a Paper web-map plugin such as squaremap instead of rendering maps inside the Discord bot; this keeps Raspberry Pi performance overhead low. `/diary recent` records lightweight server-life events such as rescues and saved places.
+
+## Death Box note
+
+Creating a chest at the death location and preserving all items is not safe to implement with RCON alone because items can burn, explode, or despawn before the bot can collect them. A Paper plugin or datapack should own that mechanic. This PR keeps the low-lag Discord/RCON features separate and leaves Death Box for a focused follow-up plugin/datapack change.
