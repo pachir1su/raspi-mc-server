@@ -19,6 +19,7 @@ from bot import log
 from bot import userTag
 from bot.app_settings import ensureFirstRunSetup
 from bot.crossplay import CrossplayManager
+from bot.command_i18n import CommandTranslator
 
 _log = log.get("main")
 cfg = None
@@ -32,6 +33,8 @@ class McBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
+        # Discord chooses these localizations from each user's client language.
+        await self.tree.set_translator(CommandTranslator())
         await self.load_extension("bot.cogs.admin")
         await self.load_extension("bot.cogs.friend")
         if cfg.guild_id:
