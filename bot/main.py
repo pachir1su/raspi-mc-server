@@ -1,4 +1,4 @@
-"""Entry point for the Discord admin bot.
+"""Single entry point for first setup, crossplay, and the Discord bot.
 
 Run with:  python -m bot.main   (or via the systemd unit)
 
@@ -7,17 +7,22 @@ set, commands sync to that guild instantly (best for a private server);
 otherwise they sync globally (can take up to ~1 hour to appear).
 """
 
-import asyncio
+import argparse
+import os
+import sys
 
 import discord
 from discord.ext import commands
+from dotenv import load_dotenv
 
 from bot import log
 from bot import userTag
-from bot.config import cfg
-from bot.i18n import t
+from bot.app_settings import ensureFirstRunSetup
+from bot.crossplay import CrossplayManager
 
 _log = log.get("main")
+cfg = None
+t = None
 
 
 class McBot(commands.Bot):
@@ -46,6 +51,39 @@ class McBot(commands.Bot):
 
 
 def main():
+    """Complete setup if needed, prepare crossplay, and run every bot cog."""
+    parser = argparse.ArgumentParser(description="raspi-mc-server launcher")
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="reopen the language and server-mode setup menu",
+    )
+    args = parser.parse_args()
+
+    # Secrets and machine-specific paths stay in .env; user choices do not.
+    load_dotenv()
+    stateDir = os.getenv("MC_STATE_DIR", "data")
+    settings = ensureFirstRunSetup(
+        stateDir,
+        force=args.setup,
+        interactive=sys.stdin.isatty(),
+    )
+
+    # Download and configure crossplay only when it is selected or incomplete.
+    serverDir = os.getenv("MC_SERVER_DIR", "/mnt/minecraft/live")
+    serviceName = os.getenv("MC_SERVICE_NAME", "minecraft.service")
+    try:
+        CrossplayManager(serverDir, serviceName).ensure(settings)
+    except RuntimeError as error:
+        raise SystemExit(f"Crossplay setup failed: {error}") from error
+
+    # Import config after the menu writes app-settings.json.
+    global cfg, t
+    from bot.config import cfg as loadedConfig
+    from bot.i18n import t as translate
+
+    cfg = loadedConfig
+    t = translate
     log.setup()
     cfg.validate()
     _log.info("starting bot (admins: %d)", len(cfg.admin_ids))

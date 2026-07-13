@@ -9,9 +9,19 @@ import os
 
 from dotenv import load_dotenv
 
+from bot.app_settings import AppSettingsStore
+
 # Load .env from the repo root if present. On the Pi, systemd also injects
 # these via EnvironmentFile — load_dotenv won't clobber existing vars.
 load_dotenv()
+
+
+def _storedLanguage(stateDir: str) -> str:
+    """Read the menu-selected language, defaulting only before first setup."""
+    store = AppSettingsStore(stateDir)
+    if not store.exists():
+        return "ko"
+    return store.load().language
 
 
 def _int_set(raw: str):
@@ -25,12 +35,15 @@ def _int_set(raw: str):
 
 
 class Config:
+    # Runtime data path is needed before loading menu-managed settings.
+    state_dir = os.getenv("MC_STATE_DIR", "data")
+
     # Discord
     token = os.getenv("DISCORD_TOKEN", "")
     guild_id = os.getenv("DISCORD_GUILD_ID", "").strip() or None
     admin_ids = _int_set(os.getenv("ADMIN_USER_IDS", ""))
     status_channel_id = os.getenv("STATUS_CHANNEL_ID", "").strip() or None
-    language = os.getenv("BOT_LANGUAGE", os.getenv("LANGUAGE", "ko")).strip().lower()
+    language = _storedLanguage(state_dir)
     public_address = os.getenv("MC_PUBLIC_ADDRESS", "").strip()
     public_version = os.getenv("MC_PUBLIC_VERSION", "Paper / Java").strip()
     public_rules = os.getenv("MC_PUBLIC_RULES", "").strip()
@@ -62,7 +75,6 @@ class Config:
     require_storage_mount = os.getenv("MC_REQUIRE_STORAGE_MOUNT", "true").lower() in {
         "1", "true", "yes", "on",
     }
-    state_dir = os.getenv("MC_STATE_DIR", "data")
 
     def rescueDestination(self):
         """Return the explicitly configured friend rescue destination."""
@@ -90,8 +102,6 @@ class Config:
             missing.append("RCON_PASSWORD")
         if not self.admin_ids:
             missing.append("ADMIN_USER_IDS (at least your own ID)")
-        if self.language not in {"ko", "en"}:
-            missing.append("BOT_LANGUAGE (ko or en)")
         if missing:
             raise SystemExit(
                 "Missing required config: " + ", ".join(missing) +
