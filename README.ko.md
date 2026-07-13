@@ -38,6 +38,11 @@
 
 ## 빠른 시작
 
+디스플레이와 키보드 없이 설치한다면
+**[SD카드부터 서버 가동까지의 완전 헤드리스 문서](docs/ko/headless-setup.md)**를
+먼저 보세요. Windows Raspberry Pi Imager, SSH, HDD 안전 확인, 최초 실행, 공유기 포트,
+친구 승인, 재부팅 시험, 복구까지 순서대로 설명합니다.
+
 64비트 라즈베리파이 OS에서, 파이에 접속해:
 
 ```bash
@@ -84,6 +89,7 @@ sudo systemctl enable minecraft.service mc-discord-bot.service
 
 | 주제 | 한국어 | English |
 |---|---|---|
+| 무화면 SD카드 → 서버 가동 | [헤드리스 전체 설치](docs/ko/headless-setup.md) | [headless setup](docs/en/headless-setup.md) |
 | 설치 & 첫 실행 | [설치](docs/ko/setup.md) | [setup](docs/en/setup.md) |
 | 서버 설정 | [설정](docs/ko/configuration.md) | [configuration](docs/en/configuration.md) |
 | 치트와 관리자 | [치트와 관리자](docs/ko/cheats-and-ops.md) | [cheats-and-ops](docs/en/cheats-and-ops.md) |
