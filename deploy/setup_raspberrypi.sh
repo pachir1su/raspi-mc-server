@@ -69,7 +69,7 @@ echo "==> Installing narrow sudoers rule at $SUDOERS"
 sudo tee "$SUDOERS" >/dev/null <<EOF
 # Allow $SERVICE_USER to manage only the minecraft service without a password.
 $SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl start minecraft.service, /bin/systemctl stop minecraft.service, /bin/systemctl restart minecraft.service, /bin/systemctl is-active minecraft.service
-$SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl start raspi-mc-updater.service, /bin/systemctl is-active raspi-mc-updater.service
+$SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl start --no-block raspi-mc-updater.service, /bin/systemctl is-active raspi-mc-updater.service
 EOF
 sudo chmod 440 "$SUDOERS"
 

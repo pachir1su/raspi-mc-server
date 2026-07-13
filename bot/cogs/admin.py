@@ -39,6 +39,14 @@ from bot.system_metrics import (
     readThrottleFlags,
     stripMinecraftFormatting,
 )
+from bot.update_manager import (
+    MAX_ARCHIVE_BYTES,
+    ReleaseInfo,
+    UpdateError,
+    UpdateStore,
+    fetchLatestRelease,
+)
+from bot.update_ui import UpdateConfirmView
 from bot.world_storage import StorageError, WorldStorage
 
 _log = log.get("cog.admin")
@@ -68,6 +76,20 @@ def _systemctl(action: str) -> tuple[bool, str]:
         return False, str(e)
 
 
+def _startUpdater() -> tuple[bool, str]:
+    """Queue only the fixed updater unit without waiting for bot restart."""
+    try:
+        result = subprocess.run(
+            ["sudo", "systemctl", "start", "--no-block", "raspi-mc-updater.service"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return result.returncode == 0, (result.stdout + result.stderr).strip()
+    except (OSError, subprocess.SubprocessError) as error:
+        return False, str(error)
+
+
 class Admin(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -76,6 +98,7 @@ class Admin(commands.Cog):
         self.storage = WorldStorage(
             cfg.storage_root, cfg.server_dir, cfg.require_storage_mount
         )
+        self.updateStore = UpdateStore(cfg.state_dir, cfg.storage_root)
         self.operationLock = asyncio.Lock()
         self.lastAlertAt: dict[str, datetime] = {}
 
@@ -104,6 +127,11 @@ class Admin(commands.Cog):
         )
         _log.warning("denied command from %s", userTag(interaction.user))
         return False
+
+    @staticmethod
+    def isAdmin(interaction: discord.Interaction) -> bool:
+        """Expose the central ADMIN_USER_IDS check to owner-bound views."""
+        return _is_admin(interaction)
 
     async def backupNameAutocomplete(
         self, interaction: discord.Interaction, current: str
@@ -848,6 +876,137 @@ class Admin(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
         except (OSError, RuntimeError, ValueError) as error:
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    # --- application updates -------------------------------------------
+    updateGroup = app_commands.Group(
+        name="update", description="Manage safe Raspberry Pi application updates."
+    )
+
+    @updateGroup.command(
+        name="check",
+        description="Check the newest GitHub Release without installing it.",
+    )
+    async def updateCheck(self, interaction: discord.Interaction) -> None:
+        """Show the official release and require a second button confirmation."""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            release = await asyncio.to_thread(fetchLatestRelease)
+            status = await asyncio.to_thread(self.updateStore.readStatus)
+            currentTag = status.get("tag", "설치 기록 없음")
+            embed = discord.Embed(
+                title="⬆️ 프로그램 업데이트 확인",
+                description=(
+                    f"**현재 기록:** `{currentTag}`\n"
+                    f"**최신 Release:** [`{release.tag}`]({release.pageUrl})\n"
+                    f"**파일:** `{release.assetName}` ({self._formatBytes(release.size)})\n\n"
+                    "설치를 누르면 ZIP을 라즈베리파이가 GitHub에서 직접 받아 검증합니다. "
+                    "마인크래프트 월드는 정지하지 않고 봇만 잠시 재시작합니다."
+                ),
+                color=BRAND_BLUE,
+            )
+            await interaction.followup.send(
+                embed=embed,
+                view=UpdateConfirmView(self, interaction.user.id, release, release.tag),
+                ephemeral=True,
+            )
+        except UpdateError as error:
+            await interaction.followup.send(f"❌ 업데이트 확인 실패: {error}", ephemeral=True)
+
+    @updateGroup.command(
+        name="upload",
+        description="Upload a trusted release ZIP and open a confirmation panel.",
+    )
+    async def updateUpload(
+        self, interaction: discord.Interaction, file: discord.Attachment
+    ) -> None:
+        """Stage one bounded Discord ZIP on the HDD after full manifest checks."""
+        if not file.filename.lower().endswith(".zip"):
+            await interaction.response.send_message("❌ ZIP 파일만 업로드할 수 있습니다.", ephemeral=True)
+            return
+        if file.size <= 0 or file.size > MAX_ARCHIVE_BYTES:
+            await interaction.response.send_message("❌ 업데이트 ZIP은 50 MiB 이하여야 합니다.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        temporaryPath = None
+        try:
+            self.updateStore.stagingDir.mkdir(parents=True, exist_ok=True)
+            temporaryPath = self.updateStore.stagingDir / f".discord-{uuid.uuid4().hex}.zip"
+            await file.save(temporaryPath)
+            stagedPayload = await asyncio.to_thread(
+                self.updateStore.stageUploadedArchive, temporaryPath
+            )
+            temporaryPath = None
+            await interaction.followup.send(
+                content=(
+                    f"✅ `{stagedPayload['tag']}` ZIP 검증을 통과했습니다. "
+                    "아래 버튼을 눌러야 실제 설치됩니다."
+                ),
+                view=UpdateConfirmView(
+                    self, interaction.user.id, stagedPayload, stagedPayload["tag"]
+                ),
+                ephemeral=True,
+            )
+        except (UpdateError, OSError, discord.HTTPException) as error:
+            await interaction.followup.send(f"❌ ZIP 준비 실패: {error}", ephemeral=True)
+        finally:
+            if temporaryPath is not None:
+                temporaryPath.unlink(missing_ok=True)
+
+    @updateGroup.command(
+        name="status", description="Show the most recent updater result."
+    )
+    async def updateStatus(self, interaction: discord.Interaction) -> None:
+        """Read the updater result written outside the restarted bot process."""
+        status = await asyncio.to_thread(self.updateStore.readStatus)
+        if not status:
+            await interaction.response.send_message("아직 업데이트 실행 기록이 없습니다.", ephemeral=True)
+            return
+        stateLabels = {
+            "preparing": "준비 중",
+            "success": "성공",
+            "rolled_back": "실패 후 자동 복구됨",
+            "failed": "실패",
+        }
+        state = str(status.get("state", "unknown"))
+        lines = [
+            f"**상태:** {stateLabels.get(state, state)}",
+            f"**버전:** `{status.get('tag', '알 수 없음')}`",
+        ]
+        if status.get("finishedAt"):
+            lines.append(f"**완료:** `{status['finishedAt']}`")
+        if status.get("error"):
+            lines.append(f"**오류:** `{str(status['error'])[:1200]}`")
+        await interaction.response.send_message("\n".join(lines), ephemeral=True)
+
+    async def startPreparedUpdate(
+        self, interaction: discord.Interaction, payload: ReleaseInfo | dict
+    ) -> None:
+        """Persist one validated request and launch the fixed privileged service."""
+        try:
+            if isinstance(payload, ReleaseInfo):
+                await asyncio.to_thread(self.updateStore.requestRelease, payload)
+                tag = payload.tag
+                source = "github"
+            else:
+                await asyncio.to_thread(self.updateStore.requestUpload, payload)
+                tag = str(payload.get("tag", "unknown"))
+                source = "upload"
+            ok, output = await asyncio.to_thread(_startUpdater)
+            if not ok:
+                raise UpdateError(output or "updater service did not start")
+            await self._audit(interaction, "app.update", "queued", f"{tag} via {source}")
+            _log.info(
+                "application update queued by %s: %s via %s",
+                userTag(interaction.user),
+                tag,
+                source,
+            )
+        except (OSError, UpdateError) as error:
+            await self._audit(interaction, "app.update", "failed", str(error))
+            try:
+                await interaction.followup.send(f"❌ 업데이트 시작 실패: {error}", ephemeral=True)
+            except discord.HTTPException:
+                _log.exception("could not report updater start failure")
 
     incidentGroup = app_commands.Group(
         name="incident", description="One-click emergency helpers for common accidents."
