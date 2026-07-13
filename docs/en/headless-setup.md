@@ -168,6 +168,11 @@ Keep the repository on microSD and place only large Minecraft data on the HDD.
 
 ## 7. Prepare the 500GB HDD
 
+If the reported `100 × 700 mm` means approximately `100 × 70 mm`, it is likely
+a 2.5-inch disk. “7 versus 10” normally means 7mm versus 9.5mm height, not
+inches. Read [HDD form factor, enclosure, and power](hdd-hardware.md) before
+buying the enclosure or choosing bus power.
+
 ### 7.1 Power down and attach storage
 
 ```bash
@@ -454,6 +459,28 @@ runs can corrupt the world or microSD.
 
 ## 15. Safe update
 
+### Discord and GitHub Release updater (recommended)
+
+Install this feature once with the manual procedure below and rerun
+provisioning. For later versions, publishing a GitHub Release automatically
+attaches `raspi-mc-server-vX.Y.Z.zip` plus its SHA-256 file.
+
+Run `/update check` and press **Install update**. The Pi downloads the official
+Release asset directly and verifies its manifest and every file's SHA-256. Only
+the Discord bot restarts; Paper and the world keep running.
+
+If the Release ZIP is already on your PC, `/update upload file:<ZIP>` is the
+recovery path. Use the deployment ZIP attached by the workflow, not GitHub's
+automatic `Source code (zip)` or a repacked archive; those lack the verification
+manifest. Use `/update check` when Discord's attachment limit is too small.
+
+The updater preserves `.env`, `/mnt/minecraft/live`, bot state (links, places,
+journal), photos, and logs. It prepares a new Python environment first and
+rolls code and dependencies back if the bot fails its startup check. Inspect
+the result after restart with `/update status`.
+
+### First installation or bot unavailable
+
 ```bash
 cd ~/raspi-mc-server
 git status --short
@@ -462,11 +489,13 @@ git switch main
 git pull --ff-only
 .venv/bin/pip install -r requirements.txt
 sudo ./deploy/setup_raspberrypi.sh
-sudo systemctl restart minecraft.service mc-discord-bot.service
+sudo systemctl restart mc-discord-bot.service
 ./scripts/health_check.sh
 ```
 
 Back up unexpected local changes rather than overwriting them.
+Normal application updates do not restart `minecraft.service`, reducing lag
+and player disconnects because Minecraft data is outside the code release.
 
 ## 16. Troubleshooting without a screen
 

@@ -81,6 +81,10 @@ KOREAN_NAMES = {
     "file": "파일",
     "confirm": "확인문구",
     "interval_minutes": "간격분",
+    "retention_hours": "단기보관시간",
+    "daily_retention_days": "일일보관일",
+    "max_usage_percent": "최대사용률",
+    "min_free_gb": "최소여유기가",
     "retention_count": "보관개수",
     "enabled": "활성화",
 }

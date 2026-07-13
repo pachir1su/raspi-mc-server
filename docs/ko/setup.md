@@ -113,8 +113,8 @@ mcrcon -H 127.0.0.1 -P 25575 -p '<내 RCON 비밀번호>' 'op 내마크닉네임
 ## 5. 친구의 접속 요청 승인
 
 ```text
-친구:   /link request minecraft_name:<닉네임> edition:<Java 또는 Bedrock>
-서버장: /link approve user:<Discord 멤버>
+친구:   /연동 요청 마크닉:<닉네임> 에디션:<Java 또는 Bedrock>
+서버장: /연동 승인 사용자:<Discord 멤버>
 ```
 
 승인하면 Java 또는 Floodgate 화이트리스트에도 자동으로 추가됩니다. 친구에게 op를
