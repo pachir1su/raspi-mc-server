@@ -42,7 +42,6 @@ RCON_HOST=127.0.0.1
 RCON_PORT=25575
 RCON_PASSWORD=matches-server.properties
 MC_SERVICE_NAME=minecraft.service
-BOT_LANGUAGE=en
 PUBLIC_COMMANDS_ENABLED=true
 MC_STATE_DIR=/mnt/minecraft/bot-state
 MC_SPAWN_DIMENSION=overworld
@@ -63,14 +62,16 @@ ALERT_MIN_FREE_GB=20
 ## 4. Run
 
 ```bash
-sudo systemctl enable --now mc-discord-bot.service
-sudo journalctl -u mc-discord-bot.service -f
+.venv/bin/python -m bot.main
 ```
 
-Or manually for testing:
+The first terminal run asks for language and Java/Bedrock mode, prepares Paper,
+and starts the bot. Stop it with Ctrl+C only when you are ready to hand over to
+systemd:
 
 ```bash
-.venv/bin/python -m bot.main
+sudo systemctl enable --now mc-discord-bot.service
+sudo journalctl -u mc-discord-bot.service -f
 ```
 
 ## Commands
@@ -78,8 +79,8 @@ Or manually for testing:
 `/portal` and `/online` are friend-safe read-only commands. Approved links also
 unlock the narrow `/rescue`, `/place`, `/diary`, and `/server-score` surface.
 All general management commands remain **admin-only** (checked against
-`ADMIN_USER_IDS`). Set `BOT_LANGUAGE=ko` or `BOT_LANGUAGE=en` to switch the new
-bot UX language.
+`ADMIN_USER_IDS`). Reopen the stored language/server menu with
+`.venv/bin/python -m bot.main --setup`.
 
 | Command | What it does |
 |---|---|
@@ -185,4 +186,9 @@ cosmetic and never blocks the actual work. See `bot/loading.py`.
 
 ## Automatic performance alerts and language
 
-When `STATUS_CHANNEL_ID` is set, the bot checks TPS, memory, CPU temperature, power/throttle flags, and HDD free space every five minutes. It posts only new threshold warnings after the `ALERT_COOLDOWN_MINUTES` cooldown. `BOT_LANGUAGE=ko` or `BOT_LANGUAGE=en` switches the new portal, alert, report, and incident-response text. Some older fixed operational strings can be migrated to the same i18n helper over time.
+When `STATUS_CHANNEL_ID` is set, the bot checks TPS, memory, CPU temperature,
+power/throttle flags, and HDD free space every five minutes. It posts only new
+threshold warnings after the `ALERT_COOLDOWN_MINUTES` cooldown. The first-run
+menu stores the portal, alert, report, and incident-response language outside
+`.env`. Some older fixed operational strings can be migrated to the same i18n
+helper over time.

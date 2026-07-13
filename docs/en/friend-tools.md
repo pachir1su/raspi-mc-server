@@ -64,7 +64,7 @@ sudo journalctl -u mc-discord-bot.service -n 100 --no-pager
 The friend runs:
 
 ```text
-/link request minecraft_name:<exact Java name>
+/link request minecraft_name:<exact name> edition:<Java or Bedrock>
 ```
 
 The owner reviews pending requests:
@@ -80,12 +80,13 @@ The owner selects that Discord user and approves:
 ```
 
 The friend verifies the result with `/link status`. Use `/link revoke` if the
-Discord account or Minecraft name changes. A Minecraft name can belong to only
-one Discord account, comparison is case-insensitive, and only valid 1–16
-character Java names are accepted.
+Discord account or Minecraft name changes. Java names follow the normal 1–16
+character format. Bedrock gamertags may also contain spaces. Unsafe command
+characters are rejected in both cases.
 
-Approval does **not** add the player to the Minecraft whitelist. Continue to use
-the admin `/whitelist add` command for server admission.
+Approval runs `whitelist add` for Java or Floodgate's `fwhitelist add` for
+Bedrock before recording approval. This is a server mutation, so `/link approve`
+remains behind `ADMIN_USER_IDS`. The friend needs no second admission step.
 
 ## 3. Rescue only the linked account
 
@@ -156,7 +157,8 @@ your host-level HDD backup. They are ignored by Git.
 | Friend sees the feature-disabled message | Set `PUBLIC_COMMANDS_ENABLED=true`, then restart the bot. |
 | Link remains pending | Owner runs `/link list`, then `/link approve`. |
 | Rescue says spawn is not configured | Set all four `MC_SPAWN_DIMENSION/X/Y/Z` values and restart. |
-| Rescue or whereami cannot find the player | The exact linked Java name must currently be online. |
+| Bedrock approval says the whitelist command is unknown | Re-run `python -m bot.main --setup`, select Java+Bedrock, and check both plugin configs were generated. |
+| Rescue or whereami cannot find the player | The exact linked Java/Floodgate account must currently be online. |
 | Photo upload fails | Use a supported image type below 5 MiB and check `MC_STATE_DIR` permissions/free space. |
 | Map link is missing | Set `MC_MAP_URL_TEMPLATE`; no map plugin means no live map link. |
 | Map link opens the wrong place | Match the template to the deployed map's actual URL format. |

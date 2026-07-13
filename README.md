@@ -1,6 +1,7 @@
 # raspi-mc-server
 
-A complete, friends-only **Minecraft (Java) server for the Raspberry Pi 4B (4GB)**,
+A complete, friends-only **Minecraft Java + optional Bedrock crossplay server for
+the Raspberry Pi 4B (4GB)**,
 built for **3–4 players**, with **owner-only cheats** and **remote administration**
 from Discord, SSH, or the web.
 
@@ -13,6 +14,9 @@ from Discord, SSH, or the web.
 - **PaperMC** tuned for a Pi 4B 4GB with 32GB microSD + 500GB USB HDD (Aikar
   GC flags and Pi-friendly view/simulation distance).
 - **Whitelist-only, no mods** — a small private world for you and a few friends.
+- **One Paper world for Java and Bedrock** — optional Geyser + Floodgate lets
+  Java PC, iPhone/iPad, Android, and Minecraft for Windows play together with
+  no friend-side mod. Friends save the address once and tap it afterward.
 - **Owner-only cheats.** On a multiplayer server, only *operators* can run
   commands. You op **only yourself**, so nobody else can cheat in-game — but you
   always can, remotely, through any admin channel.
@@ -54,9 +58,10 @@ sudo ./scripts/setup_hdd.sh /dev/sda1
 #    - /mnt/minecraft/live/server.properties -> rcon.password
 #    - .env                     -> DISCORD_TOKEN, ADMIN_USER_IDS, RCON_PASSWORD
 
-# 4. Start the server, op yourself, start the bot
-sudo systemctl enable --now minecraft.service
-sudo systemctl enable --now mc-discord-bot.service
+# 4. Enable reboot startup, then run the one entry point
+sudo systemctl enable minecraft.service mc-discord-bot.service
+.venv/bin/python -m bot.main
+# Choose language and Java-only or Java+Bedrock on the first run.
 ```
 
 Full walkthrough: **[docs/en/setup.md](docs/en/setup.md)**.
@@ -91,7 +96,7 @@ Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
 | Backups | [backup](docs/en/backup.md) | [백업](docs/ko/backup.md) |
 | Performance tuning | [performance](docs/en/performance.md) | [성능 튜닝](docs/ko/performance.md) |
 | Raspberry Pi cluster | [cluster](docs/en/cluster.md) | [클러스터](docs/ko/cluster.md) |
-| Bedrock alternative | [bedrock](docs/en/bedrock.md) | [베드락 대안](docs/ko/bedrock.md) |
+| Java + Bedrock crossplay | [bedrock](docs/en/bedrock.md) | [자바+베드락](docs/ko/bedrock.md) |
 | Troubleshooting | [troubleshooting](docs/en/troubleshooting.md) | [문제 해결](docs/ko/troubleshooting.md) |
 | Server owner runbook | [operator runbook](docs/en/operator-runbook.md) | [운영 런북](docs/ko/operator-runbook.md) |
 | Prompts for coding agents | [agent-prompts](docs/prompts/agent-prompts.md) | (same file, bilingual) |

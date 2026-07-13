@@ -41,7 +41,6 @@ RCON_HOST=127.0.0.1
 RCON_PORT=25575
 RCON_PASSWORD=server.properties와-일치
 MC_SERVICE_NAME=minecraft.service
-BOT_LANGUAGE=ko
 PUBLIC_COMMANDS_ENABLED=true
 MC_STATE_DIR=/mnt/minecraft/bot-state
 MC_SPAWN_DIMENSION=overworld
@@ -62,14 +61,15 @@ ALERT_MIN_FREE_GB=20
 ## 4. 실행
 
 ```bash
-sudo systemctl enable --now mc-discord-bot.service
-sudo journalctl -u mc-discord-bot.service -f
+.venv/bin/python -m bot.main
 ```
 
-테스트용 수동 실행:
+최초 터미널 실행에서 언어와 Java/Bedrock 모드를 고르면 Paper 준비와 봇 시작까지
+처리합니다. systemd로 넘길 준비가 됐을 때만 Ctrl+C로 종료합니다.
 
 ```bash
-.venv/bin/python -m bot.main
+sudo systemctl enable --now mc-discord-bot.service
+sudo journalctl -u mc-discord-bot.service -f
 ```
 
 ## 명령어
@@ -77,7 +77,7 @@ sudo journalctl -u mc-discord-bot.service -f
 `/portal`, `/online`은 친구도 볼 수 있는 읽기 전용 명령입니다. 승인된 계정 연동은
 범위가 좁은 `/rescue`, `/place`, `/diary`, `/server-score` 기능도 허용합니다. 일반
 관리 명령은 모두 계속 **관리자 전용**(`ADMIN_USER_IDS` 확인)입니다.
-`BOT_LANGUAGE=ko` 또는 `BOT_LANGUAGE=en`으로 새 봇 UX의 언어를 바꿀 수 있습니다.
+`.venv/bin/python -m bot.main --setup`으로 저장된 언어/서버 메뉴를 다시 엽니다.
 
 | 명령 | 기능 |
 |---|---|
@@ -179,4 +179,8 @@ sudo journalctl -u mc-discord-bot.service -f
 
 ## 자동 성능 알림과 언어
 
-`STATUS_CHANNEL_ID`를 설정하면 봇이 5분마다 TPS, 메모리, CPU 온도, 전원/스로틀, HDD 여유 공간을 확인하고 임계값을 넘은 새 경고만 쿨다운(`ALERT_COOLDOWN_MINUTES`)을 두고 게시합니다. `BOT_LANGUAGE=ko` 또는 `BOT_LANGUAGE=en`은 새 포털·알림·리포트·사고 대응 메시지의 기본 언어를 바꿉니다. 기존 운영 명령 중 일부 고정 문구는 점진적으로 같은 i18n 헬퍼로 옮길 수 있습니다.
+`STATUS_CHANNEL_ID`를 설정하면 봇이 5분마다 TPS, 메모리, CPU 온도, 전원/스로틀,
+HDD 여유 공간을 확인하고 임계값을 넘은 새 경고만
+쿨다운(`ALERT_COOLDOWN_MINUTES`)을 두고 게시합니다. 최초 실행 메뉴는 포털·알림·
+리포트·사고 대응 언어를 `.env` 밖에 저장합니다. 기존 운영 명령 중 일부 고정 문구는
+점진적으로 같은 i18n 헬퍼로 옮길 수 있습니다.

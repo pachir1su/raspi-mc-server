@@ -1,6 +1,7 @@
 # raspi-mc-server (한국어)
 
-**라즈베리파이 4B(4GB)**에서 돌리는 **친구용 마인크래프트(자바) 서버**입니다.
+**라즈베리파이 4B(4GB)**에서 돌리는 **친구용 마인크래프트 Java + 선택형 Bedrock
+크로스플레이 서버**입니다.
 **3~4명** 규모, **소유자만 치트 사용**, 그리고 **디스코드·SSH·웹으로 원격 관리**를
 목표로 합니다.
 
@@ -13,6 +14,9 @@
 - **PaperMC** 서버 — Pi 4B(4GB)·32GB microSD + 500GB USB HDD에 맞춘 튜닝
   (Aikar GC 플래그, 파이 친화적인 렌더/시뮬레이션 거리).
 - **화이트리스트 전용, 모드 없음** — 나와 친구 몇 명만 들어오는 작은 사설 월드.
+- **Java와 Bedrock이 Paper 월드 하나에서 함께 접속** — 선택형 Geyser + Floodgate로
+  자바 PC, 아이폰·아이패드, 안드로이드, Minecraft for Windows가 같이 플레이합니다.
+  친구는 모드 없이 주소를 한 번 저장한 뒤 다음부터 탭하면 됩니다.
 - **소유자만 치트.** 멀티플레이 서버에서는 *관리자(op)*만 명령어를 쓸 수 있습니다.
   **나만 op**로 지정하면 게임 안에서는 아무도 치트를 못 쓰고, 나는 어떤 관리
   경로로든 언제나 원격으로 치트를 쓸 수 있습니다.
@@ -52,9 +56,10 @@ sudo ./scripts/setup_hdd.sh /dev/sda1
 #    - /mnt/minecraft/live/server.properties -> rcon.password
 #    - .env                     -> DISCORD_TOKEN, ADMIN_USER_IDS, RCON_PASSWORD
 
-# 4. 서버 시작, 나 op 지정, 봇 시작
-sudo systemctl enable --now minecraft.service
-sudo systemctl enable --now mc-discord-bot.service
+# 4. 재부팅 자동 시작 등록 후 단일 진입점 실행
+sudo systemctl enable minecraft.service mc-discord-bot.service
+.venv/bin/python -m bot.main
+# 최초 실행에서 언어와 Java 전용 또는 Java+Bedrock 선택
 ```
 
 자세한 과정: **[docs/ko/setup.md](docs/ko/setup.md)**.
@@ -89,7 +94,7 @@ sudo systemctl enable --now mc-discord-bot.service
 | 백업 | [백업](docs/ko/backup.md) | [backup](docs/en/backup.md) |
 | 성능 튜닝 | [성능 튜닝](docs/ko/performance.md) | [performance](docs/en/performance.md) |
 | 라즈베리파이 클러스터 | [클러스터](docs/ko/cluster.md) | [cluster](docs/en/cluster.md) |
-| 베드락 대안 | [베드락 대안](docs/ko/bedrock.md) | [bedrock](docs/en/bedrock.md) |
+| Java + Bedrock 크로스플레이 | [자바+베드락](docs/ko/bedrock.md) | [bedrock](docs/en/bedrock.md) |
 | 문제 해결 | [문제 해결](docs/ko/troubleshooting.md) | [troubleshooting](docs/en/troubleshooting.md) |
 | 서버장 운영 런북 | [운영 런북](docs/ko/operator-runbook.md) | [operator runbook](docs/en/operator-runbook.md) |
 | 코딩 에이전트용 프롬프트 | [agent-prompts](docs/prompts/agent-prompts.md) | (같은 파일, 이중언어) |
