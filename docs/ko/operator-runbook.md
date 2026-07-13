@@ -4,6 +4,21 @@
 점검·업데이트·장애 대응 순서입니다. 평소에는 Discord `/panel`을 사용하고,
 Discord나 봇이 작동하지 않을 때만 SSH 명령을 사용합니다.
 
+SD카드 작성, Wi-Fi/SSH 최초 설정, 화면 없이 Pi 찾기는
+[headless-setup.md](headless-setup.md)를 참고합니다.
+
+## 화면 없는 Pi에 접속
+
+같은 LAN의 Windows PowerShell에서:
+
+```powershell
+ssh mcadmin@mc-pi.local
+```
+
+mDNS 이름이 안 되면 공유기의 연결 기기 목록에서 예약된 IP를 찾아 접속합니다.
+게스트 Wi-Fi는 기기 간 통신을 막는 경우가 많습니다. 공유기에서 Pi의 DHCP 주소를
+예약해 포트포워딩과 비상 SSH 주소가 바뀌지 않게 합니다.
+
 ## 일상 점검
 
 Discord에서 `/panel`을 열고 다음을 확인합니다.
@@ -42,6 +57,19 @@ sudo systemctl restart mc-discord-bot.service
 
 정지 버튼은 먼저 `save-all flush`를 시도합니다. 강제 종료나 정전 뒤에는 최신
 로그와 백업 무결성을 확인한 후 플레이를 재개하세요.
+
+## 물리 전원 안전하게 끄기
+
+Paper가 실행 중일 때 Pi나 HDD 전원을 뽑지 않습니다. 장치를 분리해야 하면 SSH에서:
+
+```bash
+sudo systemctl stop mc-discord-bot.service
+sudo systemctl stop minecraft.service
+sudo poweroff
+```
+
+SSH가 끊기고 활동 LED가 멈춘 뒤 전원을 분리합니다. 시작할 때는 HDD 케이스 전원을
+Pi보다 먼저 켜고, HDD를 분리할 때는 Pi를 먼저 완전히 종료합니다.
 
 ## 플레이어 지원
 

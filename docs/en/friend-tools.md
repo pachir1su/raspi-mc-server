@@ -164,5 +164,28 @@ your host-level HDD backup. They are ignored by Git.
 | Map link opens the wrong place | Match the template to the deployed map's actual URL format. |
 | Score reports zero HDD free | Confirm `/mnt/minecraft` is mounted; the bot treats a missing required mount as unhealthy. |
 
+### First login for a brand-new Bedrock account
+
+Floodgate documents that `fwhitelist add <gamertag>` can resolve only accounts
+that have previously joined a Geyser server. A completely new Xbox account can
+therefore fail its first approval before it is known to Floodgate.
+
+Prefer doing this on LAN before public Bedrock port forwarding is enabled. In a
+short maintenance window, with the exact friend ready to connect:
+
+```text
+whitelist off
+# Friend attempts one Bedrock login so Floodgate learns the account.
+fwhitelist add ExactGamertag
+whitelist on
+whitelist reload
+```
+
+Run these through local RCON or the admin-only `/mc`; never delegate them to the
+friend. Re-enable the whitelist immediately even if another step fails, verify
+it with `whitelist list`, and then run `/link approve` again. Do not operate the
+server with the whitelist left off. See the official
+[Geyser whitelist FAQ](https://geysermc.org/wiki/geyser/faq/).
+
 Death Box is deliberately separate. See [death-box-design.md](death-box-design.md)
 for the Paper plugin design and its test plan.
