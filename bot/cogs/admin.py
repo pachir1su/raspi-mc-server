@@ -42,6 +42,7 @@ from bot.system_metrics import (
 from bot.world_storage import StorageError, WorldStorage
 
 _log = log.get("cog.admin")
+PUBLIC_COMMANDS = {"portal", "online"}
 
 
 def _is_admin(interaction: discord.Interaction) -> bool:
@@ -94,8 +95,7 @@ class Admin(commands.Cog):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         commandName = interaction.command.name if interaction.command else ""
-        publicCommands = {"portal", "online"}
-        if commandName in publicCommands and cfg.public_commands_enabled:
+        if commandName in PUBLIC_COMMANDS and cfg.public_commands_enabled:
             return True
         if _is_admin(interaction):
             return True
@@ -110,7 +110,10 @@ class Admin(commands.Cog):
     ) -> list[app_commands.Choice[str]]:
         """Suggest existing backup basenames and avoid error-prone manual typing."""
         try:
-            names = [item.name for item in await asyncio.to_thread(self.storage.listBackups)]
+            names = [
+                item.name
+                for item in await asyncio.to_thread(self.storage.listBackups)
+            ]
         except StorageError:
             return []
         currentLower = current.lower()
@@ -124,7 +127,10 @@ class Admin(commands.Cog):
     ) -> list[app_commands.Choice[str]]:
         """Suggest validated map names stored on the HDD."""
         try:
-            names = [item.name for item in await asyncio.to_thread(self.storage.listWorlds)]
+            names = [
+                item.name
+                for item in await asyncio.to_thread(self.storage.listWorlds)
+            ]
         except StorageError:
             return []
         currentLower = current.lower()
@@ -133,7 +139,13 @@ class Admin(commands.Cog):
             for name in names if currentLower in name.lower()
         ][:25]
 
-    async def _audit(self, interaction: discord.Interaction, action: str, outcome: str, detail: str = ""):
+    async def _audit(
+        self,
+        interaction: discord.Interaction,
+        action: str,
+        outcome: str,
+        detail: str = "",
+    ):
         """Persist privileged actions outside the Discord message history."""
         await asyncio.to_thread(
             self.auditLog.record, action, interaction.user.id, outcome, detail
@@ -160,12 +172,26 @@ class Admin(commands.Cog):
             if systemMetrics.memoryTotalBytes else 100
         )
         warnings = []
-        if systemMetrics.temperatureCelsius is not None and systemMetrics.temperatureCelsius >= cfg.alert_temperature_celsius:
-            warnings.append(f"CPU temperature {systemMetrics.temperatureCelsius:.1f}°C >= {cfg.alert_temperature_celsius:.0f}°C")
+        if (
+            systemMetrics.temperatureCelsius is not None
+            and systemMetrics.temperatureCelsius >= cfg.alert_temperature_celsius
+        ):
+            warnings.append(
+                f"CPU temperature {systemMetrics.temperatureCelsius:.1f}°C >= "
+                f"{cfg.alert_temperature_celsius:.0f}°C"
+            )
         if memoryPercent >= cfg.alert_memory_percent:
-            warnings.append(f"Memory usage {memoryPercent:.1f}% >= {cfg.alert_memory_percent:.0f}%")
-        if any(label.startswith("현재") or label.startswith("Current") for label in throttleFlags):
-            warnings.append("Current undervoltage/throttle flag: " + ", ".join(throttleFlags))
+            warnings.append(
+                f"Memory usage {memoryPercent:.1f}% >= "
+                f"{cfg.alert_memory_percent:.0f}%"
+            )
+        if any(
+            label.startswith("현재") or label.startswith("Current")
+            for label in throttleFlags
+        ):
+            warnings.append(
+                "Current undervoltage/throttle flag: " + ", ".join(throttleFlags)
+            )
         tpsText = "RCON unavailable"
         tpsValue = None
         try:
@@ -178,7 +204,10 @@ class Admin(commands.Cog):
         hddText = "HDD unavailable"
         try:
             total, used, free = await asyncio.to_thread(self.storage.storageUsage)
-            hddText = f"{self._formatBytes(used)} / {self._formatBytes(total)} (free {self._formatBytes(free)})"
+            hddText = (
+                f"{self._formatBytes(used)} / {self._formatBytes(total)} "
+                f"(free {self._formatBytes(free)})"
+            )
             freeGb = free / 1024 ** 3
             if freeGb < cfg.alert_min_free_gb:
                 warnings.append(f"HDD free {freeGb:.1f} GB < {cfg.alert_min_free_gb:.0f} GB")
@@ -186,14 +215,29 @@ class Admin(commands.Cog):
             warnings.append("HDD check failed")
         recommendations = []
         if tpsValue is not None and tpsValue < 18:
-            recommendations.append("Lower view-distance/simulation-distance and check mob farms or chunk loaders.")
+            recommendations.append(
+                "Lower view-distance/simulation-distance and check mob farms "
+                "or chunk loaders."
+            )
         if memoryPercent >= 85:
-            recommendations.append("Avoid raising MC_MEMORY; first reduce loaded chunks/entities or restart during off-hours.")
+            recommendations.append(
+                "Avoid raising MC_MEMORY; first reduce loaded chunks/entities "
+                "or restart during off-hours."
+            )
         if systemMetrics.temperatureCelsius is not None and systemMetrics.temperatureCelsius >= 75:
-            recommendations.append("Improve cooling, case airflow, or power supply before increasing player load.")
+            recommendations.append(
+                "Improve cooling, case airflow, or power supply before "
+                "increasing player load."
+            )
         if any("전압" in label or "undervoltage" in label.lower() for label in throttleFlags):
-            recommendations.append("Use a stronger USB-C power supply/cable; undervoltage causes lag spikes.")
-        recommendations.append("For a Pi 4B 4GB, keep 3-4 players, modest farms, and conservative render/simulation distance.")
+            recommendations.append(
+                "Use a stronger USB-C power supply/cable; undervoltage "
+                "causes lag spikes."
+            )
+        recommendations.append(
+            "For a Pi 4B 4GB, keep 3-4 players, modest farms, and "
+            "conservative render/simulation distance."
+        )
         embed = discord.Embed(
             title=t("tuning_title"),
             description=t("tuning_summary"),
@@ -218,10 +262,11 @@ class Admin(commands.Cog):
             statusText = listOutput
         except RconError:
             pass
+        color = OK_GREEN if statusText != t("portal_offline") else WARN_YELLOW
         embed = discord.Embed(
             title=t("portal_title"),
             description=t("portal_description"),
-            color=OK_GREEN if players or statusText != t("portal_offline") else WARN_YELLOW,
+            color=color,
         )
         embed.add_field(
             name=t("portal_address"),
@@ -248,7 +293,9 @@ class Admin(commands.Cog):
             players = parseOnlinePlayers(await _rcon("list"))
             body = "\n".join(f"• {player}" for player in players) or t("online_none")
             await interaction.response.send_message(
-                embed=discord.Embed(title=t("online_title"), description=body, color=OK_GREEN),
+                embed=discord.Embed(
+                    title=t("online_title"), description=body, color=OK_GREEN
+                ),
                 ephemeral=True,
             )
         except RconError as error:
@@ -426,7 +473,9 @@ class Admin(commands.Cog):
             lines = []
             for index, item in enumerate(backups[:10], start=1):
                 lines.append(
-                    f"**{index}.** `{item.name}` — {self._formatBytes(item.size)} — <t:{int(item.modifiedAt.timestamp())}:R>"
+                    f"**{index}.** `{item.name}` — "
+                    f"{self._formatBytes(item.size)} — "
+                    f"<t:{int(item.modifiedAt.timestamp())}:R>"
                 )
             await interaction.response.send_message(
                 embed=discord.Embed(
@@ -454,7 +503,11 @@ class Admin(commands.Cog):
                 "Run `/backup restore` with confirm `RESTORE` only when you are ready to stop and replace the live world."
             )
             await interaction.followup.send(
-                embed=discord.Embed(title=t("restore_preview_title"), description=description[:4000], color=OK_GREEN),
+                embed=discord.Embed(
+                    title=t("restore_preview_title"),
+                    description=description[:4000],
+                    color=OK_GREEN,
+                ),
                 ephemeral=True,
             )
         except StorageError as error:
@@ -796,19 +849,27 @@ class Admin(commands.Cog):
         except (OSError, RuntimeError, ValueError) as error:
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
-    incidentGroup = app_commands.Group(name="incident", description="One-click emergency helpers for common accidents.")
+    incidentGroup = app_commands.Group(
+        name="incident", description="One-click emergency helpers for common accidents."
+    )
 
-    async def _incidentCommand(self, interaction: discord.Interaction, command: str, successKey: str):
+    async def _incidentCommand(
+        self, interaction: discord.Interaction, command: str, successKey: str
+    ):
         try:
             out = await _rcon(command)
-            await self._audit(interaction, f"incident.{command.split()[0]}", "success", command)
+            await self._audit(
+                interaction, f"incident.{command.split()[0]}", "success", command
+            )
             message = f"{t(successKey)}\n`{out.strip() or command}`"
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=True)
             else:
                 await interaction.response.send_message(message, ephemeral=True)
         except RconError as error:
-            await self._audit(interaction, f"incident.{command.split()[0]}", "failed", str(error))
+            await self._audit(
+                interaction, f"incident.{command.split()[0]}", "failed", str(error)
+            )
             if interaction.response.is_done():
                 await interaction.followup.send(f"❌ {error}", ephemeral=True)
             else:
@@ -826,11 +887,18 @@ class Admin(commands.Cog):
     async def incidentPeaceful(self, interaction: discord.Interaction):
         await self._incidentCommand(interaction, "difficulty peaceful", "incident_peaceful")
 
-    @incidentGroup.command(name="clear-drops", description="Remove dropped item entities to recover from lag.")
-    @app_commands.describe(confirm="Type CLEAR to confirm deleting every dropped item entity")
+    @incidentGroup.command(
+        name="clear-drops",
+        description="Remove dropped item entities to recover from lag.",
+    )
+    @app_commands.describe(
+        confirm="Type CLEAR to confirm deleting every dropped item entity"
+    )
     async def incidentClearDrops(self, interaction: discord.Interaction, confirm: str):
         if confirm != "CLEAR":
-            await interaction.response.send_message(t("incident_confirm_clear_drops"), ephemeral=True)
+            await interaction.response.send_message(
+                t("incident_confirm_clear_drops"), ephemeral=True
+            )
             return
         await self._incidentCommand(interaction, "kill @e[type=item]", "incident_kill_items")
 

@@ -139,7 +139,12 @@ class IncidentActionsView(OwnerView):
     async def clearDrops(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             t("incident_clear_drops_prompt"),
-            view=ConfirmIncidentView(self.controller, self.ownerId, "kill @e[type=item]", "incident_kill_items"),
+            view=ConfirmIncidentView(
+                self.controller,
+                self.ownerId,
+                "kill @e[type=item]",
+                "incident_kill_items",
+            ),
             ephemeral=True,
         )
 
