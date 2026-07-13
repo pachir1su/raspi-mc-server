@@ -28,6 +28,7 @@ class McBot(commands.Bot):
 
     async def setup_hook(self):
         await self.load_extension("bot.cogs.admin")
+        await self.load_extension("bot.cogs.friend")
         if cfg.guild_id:
             guild = discord.Object(id=int(cfg.guild_id))
             self.tree.copy_global_to(guild=guild)

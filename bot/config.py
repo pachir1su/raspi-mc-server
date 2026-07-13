@@ -37,6 +37,11 @@ class Config:
     public_commands_enabled = os.getenv("PUBLIC_COMMANDS_ENABLED", "true").lower() in {
         "1", "true", "yes", "on",
     }
+    map_url_template = os.getenv("MC_MAP_URL_TEMPLATE", "").strip()
+    spawn_dimension = os.getenv("MC_SPAWN_DIMENSION", "overworld").strip().lower()
+    spawn_x = os.getenv("MC_SPAWN_X", "").strip()
+    spawn_y = os.getenv("MC_SPAWN_Y", "").strip()
+    spawn_z = os.getenv("MC_SPAWN_Z", "").strip()
     alert_cooldown_minutes = int(os.getenv("ALERT_COOLDOWN_MINUTES", "30"))
     alert_tps_threshold = float(os.getenv("ALERT_TPS_THRESHOLD", "18.0"))
     alert_memory_percent = float(os.getenv("ALERT_MEMORY_PERCENT", "85"))
@@ -58,6 +63,23 @@ class Config:
         "1", "true", "yes", "on",
     }
     state_dir = os.getenv("MC_STATE_DIR", "data")
+
+    def rescueDestination(self):
+        """Return the explicitly configured friend rescue destination."""
+        # Keep coordinates unset by default so a wrong hard-coded spawn is never used.
+        if not all((self.spawn_x, self.spawn_y, self.spawn_z)):
+            raise ValueError("Set MC_SPAWN_X, MC_SPAWN_Y, and MC_SPAWN_Z in .env")
+        from bot.rescue import validateDestination
+
+        try:
+            return validateDestination(
+                self.spawn_dimension,
+                float(self.spawn_x),
+                float(self.spawn_y),
+                float(self.spawn_z),
+            )
+        except ValueError as error:
+            raise ValueError(f"Invalid rescue spawn configuration: {error}") from error
 
     def validate(self):
         """Raise if a must-have value is missing — called at startup."""
