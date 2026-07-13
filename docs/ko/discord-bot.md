@@ -41,6 +41,16 @@ RCON_HOST=127.0.0.1
 RCON_PORT=25575
 RCON_PASSWORD=server.properties와-일치
 MC_SERVICE_NAME=minecraft.service
+BOT_LANGUAGE=ko
+PUBLIC_COMMANDS_ENABLED=true
+MC_PUBLIC_ADDRESS=play.example.com
+MC_PUBLIC_VERSION=Paper Java 1.21.x
+MC_PUBLIC_RULES=건축물과 아이템을 존중하고 문제는 서버장에게 알려주세요.
+STATUS_CHANNEL_ID=123456789012345678
+ALERT_TPS_THRESHOLD=18.0
+ALERT_MEMORY_PERCENT=85
+ALERT_TEMPERATURE_CELSIUS=80
+ALERT_MIN_FREE_GB=20
 ```
 
 ## 4. 실행
@@ -58,7 +68,7 @@ sudo journalctl -u mc-discord-bot.service -f
 
 ## 명령어
 
-모든 명령은 **관리자 전용**(`ADMIN_USER_IDS` 확인)입니다.
+`/portal`, `/online`은 친구도 볼 수 있는 읽기 전용 명령입니다. 나머지 관리 명령은 **관리자 전용**(`ADMIN_USER_IDS` 확인)입니다. `BOT_LANGUAGE=ko` 또는 `BOT_LANGUAGE=en`으로 새 봇 UX의 언어를 바꿀 수 있습니다.
 
 | 명령 | 기능 |
 |---|---|
@@ -71,6 +81,7 @@ sudo journalctl -u mc-discord-bot.service -f
 | `/stop` | 저장 후 서비스 정지. |
 | `/restart` | 서비스 재시작. |
 | `/backup create/list/download/verify` | HDD 백업 생성·목록·다운로드·무결성 검사. |
+| `/backup timeline/restore-preview` | 최근 백업 타임라인과 복구 전 검증 미리보기. |
 | `/backup restore/delete` | 확인 문자열을 요구하는 복구·삭제. |
 | `/backup settings/configure/enabled/prune` | 30분 주기와 보관·용량 정책 조회/변경/즉시 정리. |
 | `/world upload/list/download` | 맵 압축 파일 검증·보관·다운로드. |
@@ -81,6 +92,9 @@ sudo journalctl -u mc-discord-bot.service -f
 | `/panel` | 버튼 중심 통합 관리 패널. |
 | `/players` | 접속자를 선택해 인벤토리·위치·체력·효과 조회. |
 | `/metrics` | Pi 온도·부하·메모리·HDD·TPS·스로틀 상태. |
+| `/tuning-report` | 현재 성능 위험과 Pi 친화 튜닝 조언. |
+| `/incident day/clear-weather/peaceful/clear-drops` | 낮·날씨·평화 난이도·드롭템 정리 사고 대응. `clear-drops`는 모든 드롭 아이템을 지우므로 `CLEAR` 확인이 필요합니다. |
+| `/portal`, `/online` | 친구용 서버 정보와 접속자 보기. |
 | `/logs` | 봇·마인크래프트 로그 버튼 패널. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, 복구와 맵 전환은 실행 중 로딩 애니메이션을 보여주고
@@ -97,7 +111,8 @@ sudo journalctl -u mc-discord-bot.service -f
 - 서버 시작, 확인 후 정지·재시작
 - 자동 백업 켜기/끄기
 - 저장공간과 상태 진단
-- CPU 온도, 메모리, TPS, 저전압·스로틀링 성능 카드
+- CPU 온도, 메모리, TPS, 저전압·스로틀링 성능 카드와 튜닝 리포트
+- 낮/날씨/평화 난이도/드롭템 정리 사고 대응 버튼. 드롭템 정리는 친구 아이템 삭제 위험 때문에 한 번 더 확인합니다.
 - 플레이어 선택 메뉴
 - 봇·마인크래프트 로그 패널
 
@@ -144,3 +159,7 @@ sudo journalctl -u mc-discord-bot.service -f
 수렴(작업이 끝나 실제 결과가 대체하기 전까지 100%가 되지 않음)하도록 타이머로
 편집합니다. 프레임 편집이 실패해도 무시합니다 — 애니메이션은 장식일 뿐 실제 작업을
 막지 않습니다. `bot/loading.py` 참고.
+
+## 자동 성능 알림과 언어
+
+`STATUS_CHANNEL_ID`를 설정하면 봇이 5분마다 TPS, 메모리, CPU 온도, 전원/스로틀, HDD 여유 공간을 확인하고 임계값을 넘은 새 경고만 쿨다운(`ALERT_COOLDOWN_MINUTES`)을 두고 게시합니다. `BOT_LANGUAGE=ko` 또는 `BOT_LANGUAGE=en`은 새 포털·알림·리포트·사고 대응 메시지의 기본 언어를 바꿉니다. 기존 운영 명령 중 일부 고정 문구는 점진적으로 같은 i18n 헬퍼로 옮길 수 있습니다.

@@ -15,6 +15,7 @@ from discord.ext import commands
 from bot import log
 from bot import userTag
 from bot.config import cfg
+from bot.i18n import t
 
 _log = log.get("main")
 
@@ -39,7 +40,7 @@ class McBot(commands.Bot):
     async def on_ready(self):
         _log.info("logged in as %s", userTag(self.user))
         await self.change_presence(
-            activity=discord.Game(name="Raspberry Pi Minecraft")
+            activity=discord.Game(name=t("presence"))
         )
 
 
