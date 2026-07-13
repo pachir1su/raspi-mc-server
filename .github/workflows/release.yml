@@ -1,0 +1,63 @@
+name: Build deployment release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub Release tag
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        env:
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          MANUAL_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${EVENT_TAG:-${MANUAL_TAG:-}}"
+          test -n "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the released tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Build manifest-verified ZIP
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 scripts/build_release.py \
+            --repo . \
+            --output "dist/raspi-mc-server-${TAG}.zip" \
+            --tag "$TAG" \
+            --commit "$GITHUB_SHA"
+          cd dist
+          sha256sum "raspi-mc-server-${TAG}.zip" > SHA256SUMS
+
+      - name: Attach deployment files to the GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            "dist/raspi-mc-server-${TAG}.zip" \
+            dist/SHA256SUMS \
+            --clobber
