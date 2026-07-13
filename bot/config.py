@@ -30,6 +30,18 @@ class Config:
     guild_id = os.getenv("DISCORD_GUILD_ID", "").strip() or None
     admin_ids = _int_set(os.getenv("ADMIN_USER_IDS", ""))
     status_channel_id = os.getenv("STATUS_CHANNEL_ID", "").strip() or None
+    language = os.getenv("BOT_LANGUAGE", os.getenv("LANGUAGE", "ko")).strip().lower()
+    public_address = os.getenv("MC_PUBLIC_ADDRESS", "").strip()
+    public_version = os.getenv("MC_PUBLIC_VERSION", "Paper / Java").strip()
+    public_rules = os.getenv("MC_PUBLIC_RULES", "").strip()
+    public_commands_enabled = os.getenv("PUBLIC_COMMANDS_ENABLED", "true").lower() in {
+        "1", "true", "yes", "on",
+    }
+    alert_cooldown_minutes = int(os.getenv("ALERT_COOLDOWN_MINUTES", "30"))
+    alert_tps_threshold = float(os.getenv("ALERT_TPS_THRESHOLD", "18.0"))
+    alert_memory_percent = float(os.getenv("ALERT_MEMORY_PERCENT", "85"))
+    alert_temperature_celsius = float(os.getenv("ALERT_TEMPERATURE_CELSIUS", "80"))
+    alert_min_free_gb = float(os.getenv("ALERT_MIN_FREE_GB", "20"))
 
     # RCON
     rcon_host = os.getenv("RCON_HOST", "127.0.0.1")
@@ -56,6 +68,8 @@ class Config:
             missing.append("RCON_PASSWORD")
         if not self.admin_ids:
             missing.append("ADMIN_USER_IDS (at least your own ID)")
+        if self.language not in {"ko", "en"}:
+            missing.append("BOT_LANGUAGE (ko or en)")
         if missing:
             raise SystemExit(
                 "Missing required config: " + ", ".join(missing) +
