@@ -54,15 +54,25 @@ class ImageStore:
         path.write_bytes(content)
         return str(path)
 
-    @staticmethod
-    def remove(imagePath: str | None) -> None:
-        """Best-effort removal for a replaced or deleted coordinate image."""
+    def safePath(self, imagePath: str | None) -> Path | None:
+        """Resolve only files that remain inside the managed media directory."""
         if not imagePath:
-            return
+            return None
         try:
-            Path(imagePath).unlink(missing_ok=True)
-        except OSError:
-            pass
+            path = Path(imagePath).resolve()
+            path.relative_to(self.root.resolve())
+            return path
+        except (OSError, ValueError):
+            return None
+
+    def remove(self, imagePath: str | None) -> None:
+        """Best-effort removal without trusting a path loaded from runtime JSON."""
+        path = self.safePath(imagePath)
+        if path:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 class PlaceStore:

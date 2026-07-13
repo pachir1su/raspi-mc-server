@@ -146,13 +146,19 @@ class Friend(commands.Cog):
     async def _sendPlace(self, interaction: discord.Interaction, place: Place) -> None:
         """Send a place card and re-upload its durable local image when present."""
         embed = self._placeEmbed(place)
-        imagePath = Path(place.imagePath) if place.imagePath else None
+        imagePath = self.imageStore.safePath(place.imagePath)
         if imagePath and imagePath.is_file():
             file = discord.File(imagePath, filename=imagePath.name)
             embed.set_image(url=f"attachment://{imagePath.name}")
-            await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send(embed=embed, file=file, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
             return
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @staticmethod
     def _diaryEmbed(entry: DiaryEntry) -> discord.Embed:
@@ -170,13 +176,19 @@ class Friend(commands.Cog):
     ) -> None:
         """Send one journal entry with its durable local image if available."""
         embed = self._diaryEmbed(entry)
-        imagePath = Path(entry.imagePath) if entry.imagePath else None
+        imagePath = self.imageStore.safePath(entry.imagePath)
         if imagePath and imagePath.is_file():
             file = discord.File(imagePath, filename=imagePath.name)
             embed.set_image(url=f"attachment://{imagePath.name}")
-            await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send(embed=embed, file=file, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, file=file, ephemeral=True)
             return
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        if interaction.response.is_done():
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # --- Discord ↔ Minecraft links ------------------------------------
     @linkGroup.command(name="request", description="Request a link to your Minecraft name.")
@@ -257,6 +269,7 @@ class Friend(commands.Cog):
         link = await self._approvedLink(interaction)
         if not link:
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             destination = cfg.rescueDestination()
             output = await _rcon(buildSpawnCommand(link.minecraftName, destination))
@@ -266,32 +279,33 @@ class Friend(commands.Cog):
                 f"{link.minecraftName} returned to configured spawn.",
                 interaction.user.id,
             )
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"✅ `{link.minecraftName}`만 스폰으로 이동했습니다.\n`{output.strip() or 'done'}`",
                 ephemeral=True,
             )
             _log.info("self rescue by %s -> %s", userTag(interaction.user), link.minecraftName)
         except (ValueError, RconError, OSError, RuntimeError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
     @rescueGroup.command(name="whereami", description="Show your linked player's current location.")
     async def rescueWhereAmI(self, interaction: discord.Interaction) -> None:
         link = await self._approvedLink(interaction)
         if not link:
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             positionOutput, dimensionOutput = await asyncio.gather(
                 _rcon(f"data get entity {link.minecraftName} Pos"),
                 _rcon(f"data get entity {link.minecraftName} Dimension"),
             )
             dimension, x, y, z = parsePosition(positionOutput, dimensionOutput)
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"📍 `{link.minecraftName}` · `{dimension}` · "
                 f"`{x:.1f} {y:.1f} {z:.1f}`",
                 ephemeral=True,
             )
         except (ValueError, RconError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
     # --- coordinate book ----------------------------------------------
     @placeGroup.command(name="add", description="Save or replace a shared coordinate.")
@@ -315,7 +329,9 @@ class Friend(commands.Cog):
     ) -> None:
         if not await self._requireFriendAccess(interaction):
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         imagePath = None
+        stored = False
         try:
             imagePath = await self._saveAttachment(photo)
             place, previous = await asyncio.to_thread(
@@ -329,6 +345,7 @@ class Friend(commands.Cog):
                 imagePath,
                 interaction.user.id,
             )
+            stored = True
             if previous and previous.imagePath != imagePath:
                 await asyncio.to_thread(self.imageStore.remove, previous.imagePath)
             await asyncio.to_thread(
@@ -339,9 +356,9 @@ class Friend(commands.Cog):
             )
             await self._sendPlace(interaction, place)
         except (ValueError, OSError, RuntimeError, discord.HTTPException) as error:
-            await asyncio.to_thread(self.imageStore.remove, imagePath)
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            if not stored:
+                await asyncio.to_thread(self.imageStore.remove, imagePath)
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
     @placeGroup.command(name="list", description="List shared coordinate names.")
     async def placeList(self, interaction: discord.Interaction) -> None:
@@ -402,7 +419,9 @@ class Friend(commands.Cog):
     ) -> None:
         if not await self._requireFriendAccess(interaction):
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         imagePath = None
+        stored = False
         try:
             imagePath = await self._saveAttachment(photo)
             entry = await asyncio.to_thread(
@@ -412,11 +431,12 @@ class Friend(commands.Cog):
                 interaction.user.id,
                 imagePath,
             )
+            stored = True
             await self._sendDiaryEntry(interaction, entry)
         except (ValueError, OSError, RuntimeError, discord.HTTPException) as error:
-            await asyncio.to_thread(self.imageStore.remove, imagePath)
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            if not stored:
+                await asyncio.to_thread(self.imageStore.remove, imagePath)
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
     @diaryGroup.command(name="recent", description="Show recent server-life entries.")
     async def diaryRecent(

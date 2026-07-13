@@ -51,6 +51,10 @@ class PlaceStoreTests(unittest.TestCase):
             self.assertTrue(Path(path).is_file())
             with self.assertRaises(ValueError):
                 store.save(b"text", "note.txt", "text/plain")
+            outsidePath = Path(stateDir, "outside.png")
+            outsidePath.write_bytes(b"keep")
+            store.remove(str(outsidePath))
+            self.assertTrue(outsidePath.exists())
             store.remove(path)
             self.assertFalse(Path(path).exists())
 
