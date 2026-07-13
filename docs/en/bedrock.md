@@ -26,7 +26,17 @@ Choose a display language, then `Java + mobile/Windows Bedrock`. The launcher:
 
 Normal launches do not poll for plugin updates or restart a healthy configured
 server. This keeps Pi CPU, storage, and startup-network work low. To reopen the
-menu later, run `.venv/bin/python -m bot.main --setup` in a terminal.
+menu later, stop the bot service and run the setup command in a terminal:
+
+```bash
+sudo systemctl stop mc-discord-bot.service
+.venv/bin/python -m bot.main --setup
+```
+
+Selecting Java-only renames the two crossplay jars to `.disabled` and restarts
+Paper once. Selecting crossplay later restores those jars without downloading
+them again. Stop the foreground process with Ctrl+C, then restart the bot
+service when the new mode has been verified.
 
 ## Friend setup: save once, tap afterward
 

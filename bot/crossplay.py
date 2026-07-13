@@ -43,12 +43,43 @@ def _replaceYamlValue(text: str, key: str, value: str) -> tuple[str, bool]:
     return updated, updated != text
 
 
+def _replaceYamlSectionValue(
+    text: str, section: str, key: str, value: str
+) -> tuple[str, bool]:
+    """Replace a direct child key only inside the named YAML section."""
+    lines = text.splitlines(keepends=True)
+    sectionPattern = re.compile(rf"^(?P<indent>\s*){re.escape(section)}\s*:\s*(?:#.*)?$")
+    keyPattern = re.compile(rf"^(?P<indent>\s*){re.escape(key)}\s*:\s*.*$")
+    sectionIndent = None
+    for index, line in enumerate(lines):
+        sectionMatch = sectionPattern.match(line.rstrip("\r\n"))
+        if sectionMatch:
+            sectionIndent = len(sectionMatch.group("indent"))
+            continue
+        if sectionIndent is None:
+            continue
+        stripped = line.strip()
+        lineIndent = len(line) - len(line.lstrip())
+        if stripped and not stripped.startswith("#") and lineIndent <= sectionIndent:
+            break
+        keyMatch = keyPattern.match(line.rstrip("\r\n"))
+        if keyMatch and len(keyMatch.group("indent")) > sectionIndent:
+            newline = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
+            replacement = f"{keyMatch.group('indent')}{key}: {value}{newline}"
+            changed = replacement != line
+            lines[index] = replacement
+            return "".join(lines), changed
+    raise RuntimeError(f"Could not find `{section}.{key}` in generated plugin config")
+
+
 def patchGeyserConfig(path: str, bedrockPort: int) -> bool:
     """Set the Bedrock UDP listener and Floodgate authentication."""
     try:
         with open(path, "r", encoding="utf-8") as configFile:
             text = configFile.read()
-        updated, portChanged = _replaceYamlValue(text, "port", str(bedrockPort))
+        updated, portChanged = _replaceYamlSectionValue(
+            text, "bedrock", "port", str(bedrockPort)
+        )
         updated, authChanged = _replaceYamlValue(updated, "auth-type", "floodgate")
         if portChanged or authChanged:
             _atomicWriteText(path, updated)
@@ -109,17 +140,22 @@ class CrossplayManager:
     def ensure(self, settings: AppSettings) -> bool:
         """Install missing plugins and make generated configs match choices."""
         if settings.serverMode != "java_bedrock":
-            return False
+            return self._disablePlugins()
         os.makedirs(self.pluginsDir, exist_ok=True)
         installed = False
+        activated = False
         for plugin in PLUGIN_SPECS:
             jarPath = os.path.join(self.pluginsDir, plugin.localName)
+            disabledPath = jarPath + ".disabled"
+            if not os.path.isfile(jarPath) and os.path.isfile(disabledPath):
+                os.replace(disabledPath, jarPath)
+                activated = True
             if not os.path.isfile(jarPath):
                 self._downloadPlugin(plugin, jarPath)
                 installed = True
 
         configPaths = [os.path.join(self.pluginsDir, *item.configParts) for item in PLUGIN_SPECS]
-        if installed or not all(os.path.isfile(path) for path in configPaths):
+        if installed or activated or not all(os.path.isfile(path) for path in configPaths):
             self._restartMinecraft()
             self._waitForConfigs(configPaths)
 
@@ -129,7 +165,19 @@ class CrossplayManager:
         ) or changed
         if changed:
             self._restartMinecraft()
-        return installed or changed
+        return installed or activated or changed
+
+    def _disablePlugins(self) -> bool:
+        """Reversibly disable crossplay jars when Java-only mode is selected."""
+        changed = False
+        for plugin in PLUGIN_SPECS:
+            jarPath = os.path.join(self.pluginsDir, plugin.localName)
+            if os.path.isfile(jarPath):
+                os.replace(jarPath, jarPath + ".disabled")
+                changed = True
+        if changed:
+            self._restartMinecraft()
+        return changed
 
     def ensureMinecraftRunning(self) -> bool:
         """Start Paper when needed so main.py is the only routine entry point."""

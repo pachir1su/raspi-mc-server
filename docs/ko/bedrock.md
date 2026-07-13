@@ -25,7 +25,16 @@ cd ~/raspi-mc-server
 
 평소 실행 때는 플러그인 업데이트를 조회하지 않고, 이미 정상 설정된 서버를 재시작하지
 않습니다. Pi의 CPU·저장장치·부팅 네트워크 부하를 줄이기 위한 동작입니다. 메뉴를 다시
-열려면 터미널에서 `.venv/bin/python -m bot.main --setup`을 실행하세요.
+열려면 봇 서비스를 멈춘 뒤 터미널에서 실행합니다.
+
+```bash
+sudo systemctl stop mc-discord-bot.service
+.venv/bin/python -m bot.main --setup
+```
+
+Java 전용을 선택하면 크로스플레이 jar 두 개를 `.disabled`로 바꾸고 Paper를 한 번
+재시작합니다. 나중에 크로스플레이를 선택하면 다시 다운로드하지 않고 jar를 복원합니다.
+새 모드를 확인한 뒤 Ctrl+C로 포그라운드 프로세스를 끝내고 봇 서비스를 재시작하세요.
 
 ## 친구 설정: 한 번 저장하고 다음부터 딸깍
 

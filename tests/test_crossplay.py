@@ -18,7 +18,10 @@ class CrossplayTests(unittest.TestCase):
             geyserPath = os.path.join(serverDir, "geyser.yml")
             floodgatePath = os.path.join(serverDir, "floodgate.yml")
             with open(geyserPath, "w", encoding="utf-8") as configFile:
-                configFile.write("bedrock:\n  port: 19132\nremote:\n  auth-type: online\n")
+                configFile.write(
+                    "java:\n  port: 25565\nbedrock:\n  port: 19132\n"
+                    "remote:\n  auth-type: online\n"
+                )
             with open(floodgatePath, "w", encoding="utf-8") as configFile:
                 configFile.write("username-prefix: '*'\n")
 
@@ -30,6 +33,7 @@ class CrossplayTests(unittest.TestCase):
                 floodgateText = configFile.read()
 
         self.assertIn("port: 19133", geyserText)
+        self.assertIn("port: 25565", geyserText)
         self.assertIn("auth-type: floodgate", geyserText)
         self.assertIn('username-prefix: "."', floodgateText)
 
@@ -80,6 +84,28 @@ class CrossplayTests(unittest.TestCase):
         self.assertTrue(manager.ensureMinecraftRunning())
         self.assertEqual("is-active", commands[0][2])
         self.assertEqual("start", commands[1][2])
+
+    def testJavaModeReversiblyDisablesInstalledPlugins(self):
+        """Changing the menu to Java-only stops Bedrock without deleting jars."""
+        commands = []
+        with tempfile.TemporaryDirectory() as serverDir:
+            pluginsDir = os.path.join(serverDir, "plugins")
+            os.makedirs(pluginsDir)
+            for jarName in ("Geyser-Spigot.jar", "floodgate-spigot.jar"):
+                with open(os.path.join(pluginsDir, jarName), "wb") as jarFile:
+                    jarFile.write(b"existing")
+            manager = CrossplayManager(
+                serverDir,
+                "minecraft.service",
+                commandRunner=lambda command, **_kwargs: commands.append(command),
+            )
+            changed = manager.ensure(AppSettings(serverMode="java"))
+
+            self.assertTrue(changed)
+            self.assertTrue(
+                os.path.isfile(os.path.join(pluginsDir, "Geyser-Spigot.jar.disabled"))
+            )
+        self.assertEqual("restart", commands[0][2])
 
 
 if __name__ == "__main__":
