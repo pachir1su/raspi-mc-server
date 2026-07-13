@@ -73,7 +73,9 @@ def main():
     serverDir = os.getenv("MC_SERVER_DIR", "/mnt/minecraft/live")
     serviceName = os.getenv("MC_SERVICE_NAME", "minecraft.service")
     try:
-        CrossplayManager(serverDir, serviceName).ensure(settings)
+        crossplayManager = CrossplayManager(serverDir, serviceName)
+        crossplayManager.ensure(settings)
+        crossplayManager.ensureMinecraftRunning()
     except RuntimeError as error:
         raise SystemExit(f"Crossplay setup failed: {error}") from error
 

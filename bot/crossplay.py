@@ -131,6 +131,28 @@ class CrossplayManager:
             self._restartMinecraft()
         return installed or changed
 
+    def ensureMinecraftRunning(self) -> bool:
+        """Start Paper when needed so main.py is the only routine entry point."""
+        try:
+            status = self.commandRunner(
+                ["sudo", "systemctl", "is-active", self.serviceName],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if status.returncode == 0:
+                return False
+            self.commandRunner(
+                ["sudo", "systemctl", "start", self.serviceName],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return True
+        except (OSError, subprocess.CalledProcessError) as error:
+            detail = getattr(error, "stderr", "") or str(error)
+            raise RuntimeError(f"Could not start {self.serviceName}: {detail.strip()}") from error
+
     def _downloadPlugin(self, plugin: PluginSpec, destination: str):
         """Download a latest official Spigot jar and verify its published hash."""
         metadataUrl = (

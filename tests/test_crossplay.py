@@ -3,6 +3,7 @@
 import os
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 from bot.app_settings import AppSettings
 from bot.crossplay import CrossplayManager, patchFloodgateConfig, patchGeyserConfig
@@ -66,6 +67,19 @@ class CrossplayTests(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(serverDir, "plugins")))
 
         self.assertFalse(changed)
+
+    def testStartsMinecraftOnlyWhenInactive(self):
+        """The main launcher starts Paper without restarting a healthy service."""
+        commands = []
+
+        def commandRunner(command, **_kwargs):
+            commands.append(command)
+            return SimpleNamespace(returncode=3 if "is-active" in command else 0)
+
+        manager = CrossplayManager(".", "minecraft.service", commandRunner=commandRunner)
+        self.assertTrue(manager.ensureMinecraftRunning())
+        self.assertEqual("is-active", commands[0][2])
+        self.assertEqual("start", commands[1][2])
 
 
 if __name__ == "__main__":
