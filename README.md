@@ -23,8 +23,10 @@ from Discord, SSH, or the web.
   - 🌐 **Cloudflare Tunnel** (optional) — reach the server/console with no port
     forwarding.
 - **30-minute HDD backups**, SHA-256 verification, Discord restore/map
-  upload/switching, friend portal commands, automatic performance alerts, tuning
-  reports, one-click incident helpers, backup timelines, a button-first dashboard,
+  upload/switching, approved Discord↔Minecraft links, self-rescue, a photo
+  coordinate book, server diary, on-demand health score, friend portal commands,
+  automatic performance alerts, tuning reports, one-click incident helpers,
+  backup timelines, a button-first dashboard,
   live-player inventory inspection, health checks, rotating audit logs, **systemd**
   auto-start, and a one-shot **provisioning script**.
 - **Optional Raspberry Pi cluster** guidance for when one Pi isn't enough.
@@ -83,6 +85,8 @@ Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
 | Server configuration | [configuration](docs/en/configuration.md) | [설정](docs/ko/configuration.md) |
 | Cheats & operators | [cheats-and-ops](docs/en/cheats-and-ops.md) | [치트와 관리자](docs/ko/cheats-and-ops.md) |
 | Discord bot | [discord-bot](docs/en/discord-bot.md) | [디스코드 봇](docs/ko/discord-bot.md) |
+| Friend links, rescue & journal | [friend-tools](docs/en/friend-tools.md) | [친구 도구](docs/ko/friend-tools.md) |
+| Death Box plugin design | [death-box-design](docs/en/death-box-design.md) | [Death Box 설계](docs/ko/death-box-design.md) |
 | Remote access (RCON / Cloudflare) | [remote-access](docs/en/remote-access.md) | [원격 접속](docs/ko/remote-access.md) |
 | Backups | [backup](docs/en/backup.md) | [백업](docs/ko/backup.md) |
 | Performance tuning | [performance](docs/en/performance.md) | [성능 튜닝](docs/ko/performance.md) |
