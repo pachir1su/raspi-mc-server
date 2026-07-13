@@ -3,6 +3,21 @@
 Use this checklist for the Raspberry Pi 4B + 32GB microSD + 500GB USB HDD
 deployment. Prefer Discord `/panel`; use SSH when Discord or the bot is down.
 
+For initial imaging, Wi-Fi/SSH setup, and finding the Pi without a display, see
+[headless-setup.md](headless-setup.md).
+
+## Reach a headless Pi
+
+From Windows PowerShell on the same LAN:
+
+```powershell
+ssh mcadmin@mc-pi.local
+```
+
+If mDNS does not resolve, use the router's connected-device list and connect to
+the reserved IP. Guest Wi-Fi commonly blocks device-to-device traffic. Keep a
+DHCP reservation for the Pi so port forwarding and emergency SSH do not move.
+
 ## Daily check
 
 Open `/panel` and verify server status, HDD free space, backup freshness, and the
@@ -37,6 +52,21 @@ sudo systemctl restart mc-discord-bot.service
 
 The stop button attempts `save-all flush` first. After forced shutdown or power
 loss, inspect logs and backup integrity before regular play resumes.
+
+## Safe physical shutdown
+
+Never remove Pi or HDD power while Paper is running. When the device must be
+unplugged, use SSH:
+
+```bash
+sudo systemctl stop mc-discord-bot.service
+sudo systemctl stop minecraft.service
+sudo poweroff
+```
+
+Wait until SSH closes and activity LEDs stop before disconnecting power. Power
+the HDD enclosure before the Pi at startup, and power the Pi down before
+disconnecting the HDD.
 
 ## Player support
 

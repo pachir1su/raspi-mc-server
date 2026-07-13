@@ -3,6 +3,12 @@
 This walks you through a fresh Raspberry Pi 4B (4GB) to a running, whitelisted
 PaperMC server with the Discord admin bot.
 
+> **No monitor or keyboard?** Start with the complete
+> [headless SD-card installation guide](headless-setup.md). It includes every
+> Raspberry Pi Imager field, first SSH login from Windows, HDD identification
+> and formatting safeguards, router ports, reboot testing, and recovery. Return
+> here only when you need the shorter server-software reference.
+
 ## 0. Prerequisites
 
 - Raspberry Pi 4B (4GB), **64-bit Raspberry Pi OS** (Bookworm recommended).
@@ -10,6 +16,9 @@ PaperMC server with the Discord admin bot.
   PaperMC, live worlds, backups, and uploaded maps live on the HDD.
 - Network: the Pi on your LAN, and (for friends outside your LAN) either port
   forwarding or a tunnel — see [remote-access.md](remote-access.md).
+- Headless operation: configure hostname, user, network, and SSH in Raspberry Pi
+  Imager before first boot. Do not rely on the removed Bookworm-era
+  `wpa_supplicant.conf` boot-partition workaround.
 
 Update the OS first:
 

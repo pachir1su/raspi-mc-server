@@ -40,6 +40,11 @@ from Discord, SSH, or the web.
 
 ## Quick start
 
+For a Raspberry Pi with no display or keyboard, use the complete
+**[headless SD-card-to-server guide](docs/en/headless-setup.md)**. It begins on
+Windows with Raspberry Pi Imager and includes SSH, HDD safety, first launch,
+router ports, friend admission, reboot testing, and recovery.
+
 On a 64-bit Raspberry Pi OS, from the Pi:
 
 ```bash
@@ -86,6 +91,7 @@ Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
 
 | Topic | English | 한국어 |
 |---|---|---|
+| Headless SD card → running server | [headless setup](docs/en/headless-setup.md) | [무화면 전체 설치](docs/ko/headless-setup.md) |
 | Setup & first run | [setup](docs/en/setup.md) | [설치](docs/ko/setup.md) |
 | Server configuration | [configuration](docs/en/configuration.md) | [설정](docs/ko/configuration.md) |
 | Cheats & operators | [cheats-and-ops](docs/en/cheats-and-ops.md) | [치트와 관리자](docs/ko/cheats-and-ops.md) |
