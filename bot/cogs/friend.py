@@ -10,6 +10,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from bot import BRAND_BLUE, ERR_RED, OK_GREEN, WARN_YELLOW, log, userTag
+from bot.app_settings import AppSettingsStore
 from bot.config import cfg
 from bot.diary import DiaryEntry, DiaryStore
 from bot.health_score import HealthInputs, calculateHealthScore
@@ -21,7 +22,12 @@ from bot.places import (
     PlaceStore,
     buildMapLink,
 )
-from bot.player_links import PlayerLink, PlayerLinkStore
+from bot.player_links import (
+    PlayerLink,
+    PlayerLinkStore,
+    buildWhitelistCommand,
+    serverPlayerName,
+)
 from bot.rcon import Rcon, RconError
 from bot.rescue import buildSpawnCommand, parsePosition
 from bot.system_metrics import readSystemMetrics, readThrottleFlags
@@ -60,6 +66,7 @@ class Friend(commands.Cog):
         # Keep every friend-facing store outside the large admin cog.
         self.bot = bot
         self.linkStore = PlayerLinkStore(cfg.state_dir)
+        self.appSettings = AppSettingsStore(cfg.state_dir).load()
         self.placeStore = PlaceStore(cfg.state_dir)
         self.diaryStore = DiaryStore(cfg.state_dir)
         self.imageStore = ImageStore(cfg.state_dir)
@@ -192,16 +199,34 @@ class Friend(commands.Cog):
 
     # --- Discord ↔ Minecraft links ------------------------------------
     @linkGroup.command(name="request", description="Request a link to your Minecraft name.")
-    @app_commands.describe(minecraft_name="Your exact Java Edition player name")
+    @app_commands.describe(
+        minecraft_name="Your exact in-game name or Xbox gamertag",
+        edition="The Minecraft edition you use to join",
+    )
+    @app_commands.choices(
+        edition=[
+            app_commands.Choice(name="Java Edition (PC)", value="java"),
+            app_commands.Choice(name="Bedrock (mobile / Minecraft for Windows)", value="bedrock"),
+        ]
+    )
     async def linkRequest(
-        self, interaction: discord.Interaction, minecraft_name: str
+        self,
+        interaction: discord.Interaction,
+        minecraft_name: str,
+        edition: app_commands.Choice[str],
     ) -> None:
         try:
+            if edition.value == "bedrock" and self.appSettings.serverMode != "java_bedrock":
+                raise ValueError("This server is currently configured for Java only")
             link = await asyncio.to_thread(
-                self.linkStore.request, interaction.user.id, minecraft_name
+                self.linkStore.request,
+                interaction.user.id,
+                minecraft_name,
+                edition.value,
             )
             await interaction.response.send_message(
-                f"✅ `{link.minecraftName}` 연동을 요청했습니다. 관리자 승인을 기다려 주세요.",
+                f"✅ `{link.minecraftName}` ({link.edition}) 연동을 요청했습니다. "
+                "관리자 승인을 기다려 주세요.",
                 ephemeral=True,
             )
             _log.info("link requested by %s -> %s", userTag(interaction.user), link.minecraftName)
@@ -216,7 +241,9 @@ class Friend(commands.Cog):
             return
         state = "승인됨" if link.approved else "승인 대기"
         await interaction.response.send_message(
-            f"**마크닉:** `{link.minecraftName}`\n**상태:** {state}", ephemeral=True
+            f"**마크닉:** `{link.minecraftName}`\n"
+            f"**에디션:** `{link.edition}`\n**상태:** {state}",
+            ephemeral=True,
         )
 
     @linkGroup.command(name="approve", description="Approve one pending player link (admin).")
@@ -226,15 +253,27 @@ class Friend(commands.Cog):
         if not await self._requireAdmin(interaction):
             return
         try:
+            pending = await asyncio.to_thread(self.linkStore.get, user.id)
+            if not pending:
+                raise KeyError("No pending link request for that Discord user")
+            if pending.edition == "bedrock" and self.appSettings.serverMode != "java_bedrock":
+                raise ValueError("Enable Java + Bedrock mode before approving this link")
+            whitelistOutput = await _rcon(buildWhitelistCommand(pending))
+            loweredOutput = whitelistOutput.casefold()
+            if "unknown command" in loweredOutput or "unknown or incomplete" in loweredOutput:
+                raise RuntimeError(
+                    "Minecraft rejected the whitelist command; check the crossplay setup"
+                )
             link = await asyncio.to_thread(
                 self.linkStore.approve, user.id, interaction.user.id
             )
             await interaction.response.send_message(
-                f"✅ {user.mention} ↔ `{link.minecraftName}` 연동을 승인했습니다.",
+                f"✅ {user.mention} ↔ `{link.minecraftName}` ({link.edition}) 연동을 "
+                f"승인하고 접속 허용 목록에 추가했습니다.\n`{whitelistOutput.strip() or 'done'}`",
                 ephemeral=True,
             )
             _log.info("link approved by %s for %s", userTag(interaction.user), user.id)
-        except (KeyError, ValueError, OSError, RuntimeError) as error:
+        except (KeyError, ValueError, OSError, RuntimeError, RconError) as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
     @linkGroup.command(name="revoke", description="Revoke a player link (admin).")
@@ -254,7 +293,8 @@ class Friend(commands.Cog):
             return
         links = await asyncio.to_thread(self.linkStore.list)
         lines = [
-            f"{'✅' if item.approved else '⏳'} <@{item.discordUserId}> ↔ `{item.minecraftName}`"
+            f"{'✅' if item.approved else '⏳'} <@{item.discordUserId}> ↔ "
+            f"`{item.minecraftName}` ({item.edition})"
             for item in links[:40]
         ]
         if len(links) > 40:
@@ -272,11 +312,14 @@ class Friend(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             destination = cfg.rescueDestination()
-            output = await _rcon(buildSpawnCommand(link.minecraftName, destination))
+            playerName = serverPlayerName(
+                link, self.appSettings.bedrockUsernamePrefix
+            )
+            output = await _rcon(buildSpawnCommand(playerName, destination))
             await asyncio.to_thread(
                 self.diaryStore.record,
                 "rescue",
-                f"{link.minecraftName} returned to configured spawn.",
+                f"{playerName} returned to configured spawn.",
                 interaction.user.id,
             )
             await interaction.followup.send(
@@ -294,9 +337,12 @@ class Friend(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
+            playerName = serverPlayerName(
+                link, self.appSettings.bedrockUsernamePrefix
+            )
             positionOutput, dimensionOutput = await asyncio.gather(
-                _rcon(f"data get entity {link.minecraftName} Pos"),
-                _rcon(f"data get entity {link.minecraftName} Dimension"),
+                _rcon(f"data get entity {playerName} Pos"),
+                _rcon(f"data get entity {playerName} Dimension"),
             )
             dimension, x, y, z = parsePosition(positionOutput, dimensionOutput)
             await interaction.followup.send(

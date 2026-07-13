@@ -1,64 +1,83 @@
-# Bedrock alternative
+# Java and Bedrock in one world
 
-This repo implements a **Java Edition (PaperMC)** server, which is the best fit
-for RCON-based remote admin, whitelisting, and the op-based "owner-only cheats"
-model. If your players are on phones/consoles/Windows 10+, you may prefer
-**Bedrock**. Here's how the pieces map — and what changes.
+This project can keep **Paper Java Edition as the one server and one world**
+while Geyser translates Bedrock traffic and Floodgate authenticates Bedrock
+players. Java PC, iPhone/iPad, Android, and Minecraft for Windows can therefore
+play together. Friends install no client mod, plugin, or helper app.
 
-## When to choose Bedrock
+## What the first-run choice does
 
-- Your friends play on **mobile / console / Windows (Bedrock) editions**.
-- You want the lightest possible load on the Pi (Bedrock's server is leaner).
+Run the project entry point after Pi provisioning and `.env` secret setup:
 
-## Trade-offs vs the Java setup here
+```bash
+cd ~/raspi-mc-server
+.venv/bin/python -m bot.main
+```
 
-| Aspect | Java (this repo) | Bedrock |
-|---|---|---|
-| Performance on Pi | Good with tuning | Generally lighter |
-| **RCON** | ✅ built in | ❌ not supported |
-| Remote commands | RCON (bot/CLI) | Need `stdin`/wrapper or an add-on |
-| Cheats/ops model | op level (clean) | `permissions.json` + `allow-cheats` in `server.properties` |
-| Plugins | Paper plugins | Behaviour packs / limited server addons |
-| Cross-play | Java only (or Geyser) | Bedrock devices natively |
+Choose a display language, then `Java + mobile/Windows Bedrock`. The launcher:
 
-## Getting Bedrock on a Pi
+1. stores the non-secret choice in `MC_STATE_DIR/app-settings.json`;
+2. downloads the latest official Geyser-Spigot and Floodgate-Spigot jars only
+   when they are missing;
+3. verifies each published SHA-256 before installing it;
+4. configures Geyser for Floodgate and the chosen UDP port (default `19132`);
+5. starts/restarts Paper only when setup requires it; and
+6. starts the Discord bot and all of its cogs.
 
-The official Bedrock Dedicated Server (BDS) is **x86-only**, so on ARM you use
-one of:
+Normal launches do not poll for plugin updates or restart a healthy configured
+server. This keeps Pi CPU, storage, and startup-network work low. To reopen the
+menu later, stop the bot service and run the setup command in a terminal:
 
-- **[PocketMine-MP](https://pmmp.io/)** (PHP) — runs natively on ARM, supports
-  plugins, and has a console you can drive.
-- **BDS via `box64`** (x86 emulation) — works but adds overhead; not ideal on a
-  Pi.
+```bash
+sudo systemctl stop mc-discord-bot.service
+.venv/bin/python -m bot.main --setup
+```
 
-PocketMine is the usual ARM choice.
+Selecting Java-only renames the two crossplay jars to `.disabled` and restarts
+Paper once. Selecting crossplay later restores those jars without downloading
+them again. Stop the foreground process with Ctrl+C, then restart the bot
+service when the new mode has been verified.
 
-## Owner-only cheats on Bedrock
+## Friend setup: save once, tap afterward
 
-Bedrock's model differs from Java:
+The owner must expose both game ports when players are outside the LAN:
 
-- `server.properties` has `allow-cheats` and `default-player-permission-level`.
-- Set `default-player-permission-level=member` so normal players can't use
-  commands, and grant yourself **operator** in `permissions.json` (by XUID).
-- The server console (and PocketMine's console/plugins) can always run commands
-  — that's your remote cheat channel.
+- Java: `25565/TCP`
+- Bedrock: `19132/UDP` (or the port selected in the menu)
 
-## Remote administration without RCON
+Java friends open Multiplayer, add the server address once, and join normally.
+On iPhone/iPad, Android, or Minecraft for Windows, the friend does this once:
 
-Since Bedrock has no RCON, adapt the remote-admin approach:
+1. Open **Play → Servers → Add Server**.
+2. Enter the owner's address and Bedrock port `19132`.
+3. Save it and join with the normal Microsoft/Xbox account.
 
-- **PocketMine**: use a console-bridge plugin or its command API; a Discord bot
-  can talk to a plugin's local socket/HTTP instead of RCON.
-- **BDS**: wrap the server so you can write to its **stdin** (e.g. a `tmux`/
-  `screen` session or a small supervisor), and have the bot send commands there.
+After that, the saved server is a tap away. There is no Geyser/Floodgate setup
+on the friend's device. Xbox, PlayStation, and Switch use Bedrock too, but their
+custom-server UI is restricted and is not part of this one-tap support target.
 
-The Discord bot in this repo is RCON-based; to support Bedrock you'd swap
-`bot/rcon.py` for a stdin/plugin transport and keep the rest (admin gating,
-loading animation, logs) the same.
+## Discord link and admission
 
-## Cross-play option (keep Java + let Bedrock join)
+The friend runs `/link request`, enters the exact Java name or Xbox gamertag,
+and selects the edition. The owner runs `/link approve`. Approval also runs the
+correct Paper/Floodgate whitelist command, so no second whitelist step is
+needed. Floodgate names use a `.` prefix internally to avoid colliding with a
+Java account of the same name; the friend still types the ordinary gamertag.
 
-If you like the Java setup but have Bedrock friends, add
-**[Geyser](https://geysermc.org/)** (+ Floodgate) as a Paper plugin. Bedrock
-clients then connect to your Java server. This keeps RCON, ops, and everything
-in this repo — usually the best of both worlds for a mixed friend group.
+## Network warning
+
+Ordinary Cloudflare Tunnel/HTTP proxying does not carry the Bedrock UDP game
+port. For the lowest friend setup, forward `25565/TCP` and `19132/UDP` on the
+router. A VPN avoids public ports but requires each friend to install/join it.
+Never expose RCON `25575`.
+
+## Native Bedrock is a different design
+
+Running a separate native Bedrock server would create a separate server/world
+and would not use this Paper/RCON bot design. Geyser + Floodgate is the supported
+mixed-device route here. Gameplay translation has occasional Java/Bedrock
+differences, but all players remain in the same Paper world.
+
+Official references: [Geyser setup](https://geysermc.org/wiki/geyser/setup/),
+[Floodgate setup](https://geysermc.org/wiki/floodgate/setup/paper-spigot/), and
+[current limitations](https://geysermc.org/wiki/geyser/current-limitations/).

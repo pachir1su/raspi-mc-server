@@ -66,22 +66,25 @@ Then connect with `cloudflared access ssh --hostname mc-admin.example.com`.
 ### b) Player traffic
 
 Minecraft's Java protocol is raw TCP, not HTTP, so the free Cloudflare HTTP
-proxy does **not** carry the game port. Options for players:
+proxy does **not** carry the game port. Geyser Bedrock traffic is UDP and is not
+carried by ordinary Cloudflare Tunnel either. Options for players:
 
 - **Cloudflare Tunnel TCP** via `cloudflared access tcp` on each player's side
   (works but requires every player to run cloudflared — clunky for friends).
-- **Port forwarding** `25565/tcp` on your router to the Pi (simplest for
-  players; exposes only the game port).
+- **Port forwarding** `25565/TCP` and, for Bedrock, `19132/UDP` on your router
+  to the Pi (simplest for friends; exposes only game ports).
 - A **VPN** like Tailscale/WireGuard: add friends to your tailnet and they
   connect to the Pi's VPN IP — no public exposure at all. This is often the
   nicest option for a 3–4 player friends server.
 
-> Recommendation: use **Tailscale** (or port-forward `25565` only) for players,
-> and **Cloudflare Access + the Discord bot** for administration.
+> Recommendation: for near-zero friend setup, forward `25565/TCP` and
+> `19132/UDP`; use **Tailscale** when installing a VPN on each friend device is
+> acceptable. Use **Cloudflare Access + the Discord bot** for administration.
 
 ## Security summary
 
-- Expose **only** the game port (25565) to players, or keep it private via VPN.
+- Expose only game ports (`25565/TCP`, optionally `19132/UDP`) to players, or
+  keep them private via VPN.
 - Never expose RCON (25575) or SSH directly; tunnel/VPN them and gate with
   Access or keys.
 - Use strong, unique passwords for RCON and never commit them.

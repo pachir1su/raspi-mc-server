@@ -18,6 +18,15 @@ POSITION_PATTERN = re.compile(
     r"(-?\d+(?:\.\d+)?)[dDfF]?\s*\]"
 )
 DIMENSION_PATTERN = re.compile(r"minecraft:(overworld|the_nether|the_end)")
+FLOODGATE_PLAYER_PATTERN = re.compile(r"\.[A-Za-z0-9_]{1,32}")
+
+
+def validateServerPlayerName(playerName: str) -> str:
+    """Accept either a Java name or a dot-prefixed Floodgate entity name."""
+    cleanedName = (playerName or "").strip()
+    if FLOODGATE_PLAYER_PATTERN.fullmatch(cleanedName):
+        return cleanedName
+    return validatePlayerName(cleanedName)
 
 
 @dataclass(frozen=True)
@@ -49,7 +58,7 @@ def validateDestination(
 
 def buildSpawnCommand(playerName: str, destination: RescueDestination) -> str:
     """Build only the fixed self-teleport command accepted by the friend cog."""
-    safeName = validatePlayerName(playerName)
+    safeName = validateServerPlayerName(playerName)
     dimensionId = DIMENSION_IDS[destination.dimension]
     coordinates = " ".join(f"{value:g}" for value in (destination.x, destination.y, destination.z))
     return f"execute in {dimensionId} run tp {safeName} {coordinates}"

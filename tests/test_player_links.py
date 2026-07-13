@@ -3,7 +3,12 @@
 import tempfile
 import unittest
 
-from bot.player_links import PlayerLinkStore
+from bot.player_links import (
+    PlayerLink,
+    PlayerLinkStore,
+    buildWhitelistCommand,
+    serverPlayerName,
+)
 
 
 class PlayerLinkStoreTests(unittest.TestCase):
@@ -39,6 +44,31 @@ class PlayerLinkStoreTests(unittest.TestCase):
             store.request(200, "Alpha")
             store.approve(100, 999)
             self.assertEqual(["Alpha", "Zulu"], [item.minecraftName for item in store.list()])
+
+    def testBedrockNamesRemainDistinctAndCommandSafe(self):
+        """Floodgate names may contain spaces but cannot inject an RCON command."""
+        with tempfile.TemporaryDirectory() as stateDir:
+            store = PlayerLinkStore(stateDir)
+            javaLink = store.request(100, "Alex", "java")
+            bedrockLink = store.request(200, "Alex", "bedrock")
+            spacedLink = store.request(300, "Pocket Friend", "bedrock")
+            with self.assertRaises(ValueError):
+                store.request(400, "bad;op", "bedrock")
+
+        self.assertEqual("Alex", serverPlayerName(javaLink))
+        self.assertEqual(".Alex", serverPlayerName(bedrockLink))
+        self.assertEqual(".Pocket_Friend", serverPlayerName(spacedLink))
+        self.assertEqual("fwhitelist add Pocket Friend", buildWhitelistCommand(spacedLink))
+
+    def testOldJavaRecordLoadsWithoutEdition(self):
+        """Links created before crossplay continue to represent Java accounts."""
+        link = PlayerLink(
+            discordUserId=100,
+            minecraftName="Legacy",
+            approved=True,
+            requestedAt="2026-01-01T00:00:00+00:00",
+        )
+        self.assertEqual("java", link.edition)
 
 
 if __name__ == "__main__":

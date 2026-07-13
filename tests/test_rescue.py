@@ -16,6 +16,14 @@ class RescueTests(unittest.TestCase):
             buildSpawnCommand("Friend_1", destination),
         )
 
+    def testBuildsFloodgateSelfTeleport(self):
+        """A linked Bedrock entity can use the same bounded rescue command."""
+        destination = validateDestination("overworld", 0, 80, 0)
+        self.assertEqual(
+            "execute in minecraft:overworld run tp .Pocket_Friend 0 80 0",
+            buildSpawnCommand(".Pocket_Friend", destination),
+        )
+
     def testRejectsInjectionAndInvalidDestination(self):
         """Free-form RCON text and invalid dimensions cannot reach the builder."""
         destination = validateDestination("overworld", 0, 80, 0)

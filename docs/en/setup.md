@@ -62,53 +62,72 @@ Two files hold secrets and are **not** committed:
    - `ADMIN_USER_IDS` — **your own Discord user ID** (comma-separated for more).
    - `MC_MEMORY` — leave at `2600M` for a 4GB Pi unless tuning.
 
+Language and Java/Bedrock mode are no longer environment variables. The first
+`main.py` run asks for them and stores them in `MC_STATE_DIR/app-settings.json`.
+An old `BOT_LANGUAGE` line in `.env` is ignored and may be removed locally.
+
 ```bash
 nano /mnt/minecraft/live/server.properties   # rcon.password=...
 nano .env                        # RCON_PASSWORD / DISCORD_TOKEN / ADMIN_USER_IDS
 chmod 600 .env
 ```
 
-## 4. First start & op yourself
+## 4. Enable reboot startup and run the single launcher
 
 ```bash
-sudo systemctl enable --now minecraft.service
-sudo journalctl -u minecraft.service -f   # watch it boot; Ctrl+C to stop watching
+sudo systemctl enable minecraft.service mc-discord-bot.service
+.venv/bin/python -m bot.main
 ```
 
-Once you see `Done (…)! For help, type "help"`, op **only yourself**. From the
-console (or the Discord `/mc` command once the bot is up):
+On the first run, choose Korean or English and then choose Java-only or
+Java+Bedrock. For mixed devices, accept Bedrock UDP port `19132` unless your
+network requires another port. This one command installs/configures missing
+crossplay plugins, starts Paper, and starts every Discord feature. Leave it
+running while you use the server. Later boots use systemd and the saved choices.
 
+If you stopped the foreground launcher with Ctrl+C, start its service with:
+
+```bash
+sudo systemctl start mc-discord-bot.service
+sudo journalctl -u mc-discord-bot.service -f
 ```
-op YourMinecraftName
+
+Once Paper reports `Done (…)!`, op **only yourself** with local RCON:
+
+```bash
+mcrcon -H 127.0.0.1 -P 25575 -p '<your RCON password>' 'op YourMinecraftName'
 ```
 
 This is what makes you the only in-game cheater. See
 [cheats-and-ops.md](cheats-and-ops.md).
 
-## 5. Whitelist your friends
+## 5. Let a friend request access
 
+```text
+Friend: /link request minecraft_name:<name> edition:<Java or Bedrock>
+Owner:  /link approve user:<Discord member>
 ```
-whitelist add Friend1
-whitelist add Friend2
-```
 
-Whitelist is already **on** in the template, so only listed players can join.
+Approval adds the account to the appropriate Java or Floodgate whitelist. The
+friend is not made op and can rescue only their own linked player.
 
-## 6. Start the Discord bot
+## 6. Reopen setup later
 
 ```bash
-sudo systemctl enable --now mc-discord-bot.service
-sudo journalctl -u mc-discord-bot.service -f
+.venv/bin/python -m bot.main --setup
 ```
 
-The bot registers slash commands. If you set `DISCORD_GUILD_ID`, they appear
-instantly in that server; otherwise global sync can take up to ~1 hour.
+Run this interactively, not through systemd. Normal `python -m bot.main` loads
+the saved choices without asking again. If `DISCORD_GUILD_ID` is set, slash
+commands appear immediately in that server; global sync can take up to ~1 hour.
 
 ## 7. Connect
 
-Players use **Java Edition** and connect to your Pi's LAN IP (e.g.
-`192.168.0.42`) on the default port `25565`. For friends outside your network,
-set up [remote-access.md](remote-access.md).
+Java uses the server address on `25565/TCP`. iPhone/iPad, Android, and Minecraft
+for Windows use the same address on `19132/UDP`, save it once under
+**Play → Servers → Add Server**, then tap it on later visits. No friend-side mod
+or plugin is required. See [bedrock.md](bedrock.md) and
+[remote-access.md](remote-access.md).
 
 ## Next
 

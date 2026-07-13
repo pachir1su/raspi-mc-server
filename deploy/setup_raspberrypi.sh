@@ -82,9 +82,11 @@ cat <<EOF
   1. Edit ${MC_SERVER_DIR:-/mnt/minecraft/live}/server.properties -> set a strong rcon.password
   2. Edit $REPO_DIR/.env                       -> DISCORD_TOKEN, ADMIN_USER_IDS,
                                                   RCON_PASSWORD (match server.properties)
-  3. Start the server:   sudo systemctl enable --now minecraft.service
-  4. Op yourself once:   (console) op <YourName>
-  5. Start the bot:      sudo systemctl enable --now mc-discord-bot.service
+  3. Enable reboot start: sudo systemctl enable minecraft.service mc-discord-bot.service
+  4. Run everything:     $REPO_DIR/.venv/bin/python -m bot.main
+     The first run asks for language and Java-only or Java+Bedrock mode.
+  5. Op yourself once:   mcrcon -H 127.0.0.1 -P 25575 -p '<RCON_PASSWORD>' \
+                           'op <YourName>'
 
 See docs/en/setup.md (English) or docs/ko/setup.md (한국어) for details.
 EOF
