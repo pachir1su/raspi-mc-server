@@ -6,7 +6,8 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-[ -f "$REPO_DIR/.env" ] && set -a && . "$REPO_DIR/.env" && set +a
+. "$REPO_DIR/scripts/lib.sh"
+load_env_file "$REPO_DIR/.env"
 
 RCON_HOST="${RCON_HOST:-127.0.0.1}"
 RCON_PORT="${RCON_PORT:-25575}"

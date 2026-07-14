@@ -1,7 +1,6 @@
-# Secrets & local config
-.env
+# Environment variants; the root .env is a tracked placeholder template.
 *.env
-!.env.example
+!/.env
 
 # Minecraft server runtime (do not commit world data or the server jar)
 server/world/

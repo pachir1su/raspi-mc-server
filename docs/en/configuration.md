@@ -4,6 +4,23 @@ The server reads `/mnt/minecraft/live/server.properties` by default. This repo s
 `server/server.properties.template` with Pi-friendly, friends-only defaults.
 Below are the settings that matter most; the template comments explain each.
 
+## `.env` shell syntax
+
+Operational scripts load the repository's `.env` as Bash syntax. Values containing
+spaces or shell-special characters such as `;` must be enclosed in double quotes:
+
+```dotenv
+MC_PUBLIC_VERSION="Paper Java 1.21.x"
+MC_PUBLIC_RULES="Respect builds and items; ask the operator when something breaks."
+```
+
+Keep the tracked `.env` limited to placeholders. Put real secrets only in the Pi's
+operational copy, and verify its syntax before restarting services:
+
+```bash
+bash -c 'set -euo pipefail; set -a; . ./.env; set +a'
+```
+
 ## Access control
 
 | Key | Default | Why |

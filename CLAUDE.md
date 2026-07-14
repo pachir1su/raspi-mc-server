@@ -10,8 +10,9 @@ These override default behaviour — follow them exactly.
   Raspberry Pi 4B (4GB), 3–4 players, with owner-only cheats and remote
   administration (Discord bot, SSH+RCON, optional Cloudflare Tunnel).
 - This repository is **public**. Never commit secrets, real tokens, RCON
-  passwords, world data, or personal config. `.env` holds real values and is
-  git-ignored; `.env.example` holds placeholders only.
+  passwords, world data, or personal config. The tracked `.env` contains
+  placeholders only; put real values only in the Pi's operational copy.
+  Do not create a separate `.env.example` file.
 - Documentation is written in **both English and Korean**. `README.md` is
   English (default); `README.ko.md` is Korean. Docs live in `docs/en` and
   `docs/ko` and should stay in sync.
@@ -37,10 +38,12 @@ These override default behaviour — follow them exactly.
 
 ## Secrets & runtime data
 
-- Treat `.env`, `server/server.properties` (contains the RCON password on the
-  Pi), `server/world*/`, `bot/logs/`, and `backups/` as operational data.
-- If a new setting is needed, tell the user what to add to `.env` — don't
-  invent real values or commit them.
+- Treat the Pi's populated `.env`, `server/server.properties` (contains the
+  RCON password on the Pi), `server/world*/`, `bot/logs/`, and `backups/` as
+  operational data.
+- If a new setting is needed, keep only a placeholder in the tracked `.env`
+  and tell the user what real value to set on the Pi. Never invent or commit
+  real values, and do not add `.env.example`.
 
 ## Verify
 

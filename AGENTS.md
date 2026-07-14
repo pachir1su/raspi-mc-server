@@ -10,8 +10,9 @@ intent as [CLAUDE.md](CLAUDE.md) — kept here so agents that look for
   Raspberry Pi 4B (4GB), 3–4 players, owner-only cheats, remote admin (Discord
   bot / SSH+RCON / optional Cloudflare Tunnel).
 - **Public repository.** Never commit secrets, tokens, RCON passwords, world
-  data, or personal config. Real values live in `.env` (git-ignored);
-  `.env.example` has placeholders only.
+  data, or personal config. The tracked `.env` contains placeholders only;
+  real values belong only in the Pi's operational copy. Do not create
+  `.env.example`.
 - Docs are bilingual: English in `docs/en` + `README.md`, Korean in `docs/ko` +
   `README.ko.md`. Keep both in sync.
 

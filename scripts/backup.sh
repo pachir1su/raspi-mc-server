@@ -11,7 +11,8 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-[ -f "$REPO_DIR/.env" ] && set -a && . "$REPO_DIR/.env" && set +a
+. "$REPO_DIR/scripts/lib.sh"
+load_env_file "$REPO_DIR/.env"
 
 STORAGE_ROOT="${MC_STORAGE_ROOT:-/mnt/minecraft}"
 SERVER_DIR="${MC_SERVER_DIR:-$STORAGE_ROOT/live}"
@@ -30,6 +31,17 @@ if [ "${MC_REQUIRE_STORAGE_MOUNT:-true}" = "true" ] && ! mountpoint -q "$STORAGE
 fi
 mkdir -p "$BACKUP_DIR"
 
+# Serialize bot-scheduled and manual backups at the filesystem boundary.
+if ! command -v flock >/dev/null 2>&1; then
+  echo "!! flock is required for safe backups (install util-linux)." >&2
+  exit 1
+fi
+exec 9>"$BACKUP_DIR/.backup.lock"
+if ! flock -n 9; then
+  echo "==> Another backup is already running; skipping."
+  exit 0
+fi
+
 rcon() {
   command -v mcrcon >/dev/null 2>&1 && [ -n "${RCON_PASSWORD:-}" ] || return 1
   mcrcon -H "$RCON_HOST" -P "$RCON_PORT" -p "$RCON_PASSWORD" "$@" >/dev/null 2>&1
@@ -41,6 +53,8 @@ if rcon "list"; then RUNNING=1; fi
 if [ "$RUNNING" -eq 1 ]; then
   echo "==> Server up: flushing world before backup..."
   rcon "say §7Backing up the world..." || true
+  # Always restore auto-save if any later backup step exits unexpectedly.
+  trap 'rcon "save-on" || true' EXIT
   rcon "save-off" || true
   rcon "save-all flush" || true
   sleep 3
