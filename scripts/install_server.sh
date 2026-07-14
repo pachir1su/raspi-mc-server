@@ -62,6 +62,14 @@ java_major_version() {
   fi
 }
 
+# Point operators to Paper's supported Java installation path.
+print_java_install_help() {
+  local requiredJava="$1"
+  echo "   Paper Java guide: https://docs.papermc.io/misc/java-install/" >&2
+  echo "   After adding its Corretto apt repository, install with:" >&2
+  echo "   sudo apt-get install -y java-$requiredJava-amazon-corretto-jdk libxi6 libxtst6 libxrender1" >&2
+}
+
 if ! command -v jq >/dev/null 2>&1; then
   echo "!! jq is required to read the Paper Fill API." >&2
   echo "   Install it with: sudo apt install jq" >&2
@@ -124,8 +132,7 @@ fi
 if ! command -v java >/dev/null 2>&1; then
   if [ -n "$REQUIRED_JAVA" ] && [ "$REQUIRED_JAVA" -gt 21 ]; then
     echo "!! Paper $MC_VERSION requires Java $REQUIRED_JAVA, but Java is not installed." >&2
-    echo "   Install a Java $REQUIRED_JAVA JRE, then rerun this script." >&2
-    echo "   If your OS provides it: sudo apt install openjdk-$REQUIRED_JAVA-jre-headless" >&2
+    print_java_install_help "$REQUIRED_JAVA"
     exit 1
   fi
   echo "==> Installing OpenJDK 21 (headless)..."
@@ -141,8 +148,7 @@ fi
 echo "==> Java present: $(java -version 2>&1 | head -n1)"
 if [ -n "$REQUIRED_JAVA" ] && [ "$CURRENT_JAVA" -lt "$REQUIRED_JAVA" ]; then
   echo "!! Paper $MC_VERSION requires Java $REQUIRED_JAVA; Java $CURRENT_JAVA is active." >&2
-  echo "   Install/select Java $REQUIRED_JAVA, then rerun this script." >&2
-  echo "   If your OS provides it: sudo apt install openjdk-$REQUIRED_JAVA-jre-headless" >&2
+  print_java_install_help "$REQUIRED_JAVA"
   exit 1
 fi
 
