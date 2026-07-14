@@ -10,7 +10,7 @@ Operational scripts load the repository's `.env` as Bash syntax. Values containi
 spaces or shell-special characters such as `;` must be enclosed in double quotes:
 
 ```dotenv
-MC_PUBLIC_VERSION="Paper Java 1.21.x"
+MC_PUBLIC_VERSION="Paper Java 26.1.x"
 MC_PUBLIC_RULES="Respect builds and items; ask the operator when something breaks."
 ```
 

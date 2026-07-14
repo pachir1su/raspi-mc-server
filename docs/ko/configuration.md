@@ -10,7 +10,7 @@
 셸 특수문자가 들어간 값은 반드시 큰따옴표로 감싸세요:
 
 ```dotenv
-MC_PUBLIC_VERSION="Paper Java 1.21.x"
+MC_PUBLIC_VERSION="Paper Java 26.1.x"
 MC_PUBLIC_RULES="Respect builds and items; ask the operator when something breaks."
 ```
 

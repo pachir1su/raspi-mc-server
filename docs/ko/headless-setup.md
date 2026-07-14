@@ -243,9 +243,10 @@ cd ~/raspi-mc-server
 ./deploy/setup_raspberrypi.sh
 ```
 
-이 스크립트는 Java 21, Python 가상환경, Paper, systemd 서비스, Minecraft 서비스만
-제어할 수 있는 좁은 sudoers 규칙을 설치합니다. 여러 번 실행해도 되도록 설계되어
-있습니다.
+이 스크립트는 기본 Java 21 패키지, Python 가상환경, Paper, systemd 서비스,
+Minecraft 서비스만 제어할 수 있는 좁은 sudoers 규칙을 설치합니다. 현재 Paper
+26.1에는 Java 25가 필요하므로 [설치 문서](setup.md#paper-261용-java-25)에 따라 먼저
+설치하세요. 스크립트는 여러 번 실행해도 되도록 설계되어 있습니다.
 
 ## 9. RCON과 Discord 비밀값 설정
 
@@ -291,7 +292,7 @@ MC_SERVER_DIR=/mnt/minecraft/live
 MC_REQUIRE_STORAGE_MOUNT=true
 MC_STATE_DIR=/mnt/minecraft/bot-state
 MC_PUBLIC_ADDRESS=<친구에게 줄 주소 또는 공인 IP>
-MC_PUBLIC_VERSION="Paper Java 1.21.x + Bedrock"
+MC_PUBLIC_VERSION="Paper Java 26.1.x + Bedrock"
 MC_PUBLIC_RULES="건축물과 아이템을 존중하고 문제는 서버장에게 알려주세요."
 ```
 

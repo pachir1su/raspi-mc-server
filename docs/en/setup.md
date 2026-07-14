@@ -26,6 +26,31 @@ Update the OS first:
 sudo apt update && sudo apt full-upgrade -y && sudo reboot
 ```
 
+Minecraft's release names changed in 2026 to **year.drop.patch**. For example,
+`26.1.2` is the second patch of the first 2026 drop; do not look for a `1.22`
+release. When `MC_VERSION` is unset, the installer chooses the newest Paper
+version that has a **STABLE** build and ignores experimental-only releases.
+
+### Java 25 for Paper 26.1
+
+Paper 26.1+ requires Java 25. Raspberry Pi OS may not provide it in the default
+repository, so install Paper's recommended Amazon Corretto build before running
+the provisioner. These commands follow Paper's Debian/Ubuntu Java guide:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates apt-transport-https gnupg wget
+wget -O - https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
+sudo apt-get update
+sudo apt-get install -y java-25-amazon-corretto-jdk libxi6 libxtst6 libxrender1
+java -version
+```
+
+Confirm that `java -version` reports Java 25 and `64-Bit`. For later Paper
+releases, install at least the version reported by `install_server.sh`; see the
+[Paper Java installation guide](https://docs.papermc.io/misc/java-install/).
+
 ## 1. Clone and prepare the HDD
 
 ```bash
@@ -53,12 +78,15 @@ tree. Do not format a disk containing data; back it up and plan migration first.
 ./deploy/setup_raspberrypi.sh
 ```
 
-`setup_raspberrypi.sh` installs Java 21, downloads PaperMC, creates the Python
-venv for the bot, installs the systemd units, and adds a **narrow sudoers rule**
-so the bot may start/stop only the minecraft service (not general root access).
+`setup_raspberrypi.sh` installs the base Java 21 package for older Paper
+versions, downloads PaperMC, creates the Python venv for the bot, installs the
+systemd units, and adds a **narrow sudoers rule** so the bot may start/stop only
+the minecraft service (not general root access). Current Paper 26.1 still uses
+the Java 25 installation above.
 
 > To install just the server without the bot/systemd, run
-> `MC_VERSION=1.21.4 ./scripts/install_server.sh` instead.
+> `./scripts/install_server.sh` for the newest STABLE version, or
+> `MC_VERSION=26.1.2 ./scripts/install_server.sh` to select that STABLE version.
 
 ## 3. Set your secrets
 
