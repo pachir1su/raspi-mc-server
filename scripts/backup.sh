@@ -31,6 +31,17 @@ if [ "${MC_REQUIRE_STORAGE_MOUNT:-true}" = "true" ] && ! mountpoint -q "$STORAGE
 fi
 mkdir -p "$BACKUP_DIR"
 
+# Serialize bot-scheduled and manual backups at the filesystem boundary.
+if ! command -v flock >/dev/null 2>&1; then
+  echo "!! flock is required for safe backups (install util-linux)." >&2
+  exit 1
+fi
+exec 9>"$BACKUP_DIR/.backup.lock"
+if ! flock -n 9; then
+  echo "==> Another backup is already running; skipping."
+  exit 0
+fi
+
 rcon() {
   command -v mcrcon >/dev/null 2>&1 && [ -n "${RCON_PASSWORD:-}" ] || return 1
   mcrcon -H "$RCON_HOST" -P "$RCON_PORT" -p "$RCON_PASSWORD" "$@" >/dev/null 2>&1
