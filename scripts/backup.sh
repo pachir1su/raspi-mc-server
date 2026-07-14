@@ -42,6 +42,8 @@ if rcon "list"; then RUNNING=1; fi
 if [ "$RUNNING" -eq 1 ]; then
   echo "==> Server up: flushing world before backup..."
   rcon "say §7Backing up the world..." || true
+  # Always restore auto-save if any later backup step exits unexpectedly.
+  trap 'rcon "save-on" || true' EXIT
   rcon "save-off" || true
   rcon "save-all flush" || true
   sleep 3
