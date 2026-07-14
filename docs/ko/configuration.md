@@ -4,6 +4,23 @@
 기본값이 들어간 `server/server.properties.template`을 제공합니다. 아래는 가장
 중요한 항목들이며, 템플릿 주석에 각 항목 설명이 있습니다.
 
+## `.env` 셸 문법
+
+운영 스크립트는 저장소의 `.env`를 Bash 문법으로 불러옵니다. 공백이나 `;` 같은
+셸 특수문자가 들어간 값은 반드시 큰따옴표로 감싸세요:
+
+```dotenv
+MC_PUBLIC_VERSION="Paper Java 1.21.x"
+MC_PUBLIC_RULES="Respect builds and items; ask the operator when something breaks."
+```
+
+Git에 추적되는 `.env`에는 플레이스홀더만 두세요. 실제 비밀값은 Pi의 운영용
+복사본에만 입력하고, 서비스를 재시작하기 전에 문법을 확인하세요:
+
+```bash
+bash -c 'set -euo pipefail; set -a; . ./.env; set +a'
+```
+
 ## 접근 제어
 
 | 키 | 기본값 | 이유 |
