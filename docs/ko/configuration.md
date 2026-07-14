@@ -43,14 +43,14 @@ broadcast-rcon-to-ops=false
 ## 난이도 & 게임플레이
 
 `gamemode`, `difficulty`, `pvp`, `hardcore`, `allow-nether`는 합리적인 서바이벌
-기본값입니다. 취향대로 바꾸고, 적용하려면 서버를 재시작하세요(또는 봇의 `/restart`).
+기본값입니다. 취향대로 바꾸고, 적용하려면 서버를 재시작하세요(또는 봇의 `/재시작`).
 
 ## 변경 적용
 
 대부분의 `server.properties` 변경은 재시작이 필요합니다:
 
 ```bash
-sudo systemctl restart minecraft.service   # 또는 디스코드 봇 /restart
+sudo systemctl restart minecraft.service   # 또는 디스코드 봇 /재시작
 ```
 
 ## Paper 전용 튜닝

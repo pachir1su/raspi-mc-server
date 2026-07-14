@@ -82,6 +82,11 @@ All general management commands remain **admin-only** (checked against
 `ADMIN_USER_IDS`). Reopen the stored language/server menu with
 `.venv/bin/python -m bot.main --setup`.
 
+The first-run language controls bot responses and status text. Discord slash
+command names follow each user's **Discord client language**: Korean clients
+receive Korean names such as `/연동 요청` and `/구조 스폰`, while English
+clients retain the canonical names below.
+
 | Command | What it does |
 |---|---|
 | `/status` | Is the server up? Who's online (via RCON `list`). |
@@ -113,6 +118,7 @@ All general management commands remain **admin-only** (checked against
 | `/place add/list/show/delete` | Shared coordinate book with durable photos and optional external map links. |
 | `/diary add/recent/show` | Bounded shared server journal with optional photos. |
 | `/server-score` | On-demand 0–100 score from Paper and Pi health metrics. |
+| `/update check/upload/status` | Inspect Releases, install a ZIP matching the official asset SHA-256, and read rollback status (admin). |
 | `/logs` | Open bot and Minecraft log controls. |
 
 `/start`, `/stop`, `/restart`, `/backup create`, restore, and activation show the loading animation while
@@ -172,8 +178,10 @@ the microSD.
   local RCON only.
 - Keep `ADMIN_USER_IDS` tight. Anyone in that list can cheat and stop the
   server.
-- The systemd unit uses a **narrow sudoers rule** (see `deploy/`) so the bot
-  can control only the minecraft service, not run arbitrary root commands.
+- The systemd units use a **narrow sudoers rule** (see `deploy/`) so the bot
+  can control only the named Minecraft service and queue the root-owned
+  updater service, not run arbitrary root commands. Updates require a second
+  admin button confirmation.
 - Keep RCON on localhost; the bot connects to `127.0.0.1`.
 
 ## How the loading animation works

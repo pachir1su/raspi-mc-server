@@ -1,0 +1,20 @@
+# Root-owned one-shot application updater. setup_raspberrypi.sh renders paths
+# and installs the executable separately under /usr/local/lib.
+[Unit]
+Description=Verified updater for raspi-mc-server
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/mnt/minecraft
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /usr/local/lib/raspi-mc-server/apply_update.py --repo-dir @REPO_DIR@ --state-dir @STATE_DIR@ --storage-root @STORAGE_ROOT@
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@REPO_DIR@ @STATE_DIR@ @STORAGE_ROOT@
+
+[Install]
+WantedBy=multi-user.target

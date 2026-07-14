@@ -126,6 +126,14 @@ emergency snapshot, but same-disk backups do not protect against HDD failure.
 
 ## Safe update procedure
 
+Normally run `/update check`, press **Install update**, and inspect `/update
+status` after the bot restarts. `/update upload` accepts an official deployment
+ZIP already on your device; source-code ZIPs have no manifest and are rejected.
+Paper keeps running, while `.env` and operational data remain untouched.
+
+Use the manual procedure only for the first updater installation or when the
+bot is unavailable.
+
 ```bash
 cd ~/raspi-mc-server
 git status --short
@@ -134,12 +142,14 @@ git switch main
 git pull --ff-only
 .venv/bin/pip install -r requirements.txt
 sudo ./deploy/setup_raspberrypi.sh
-sudo systemctl restart minecraft.service mc-discord-bot.service
+sudo systemctl restart mc-discord-bot.service
 ./scripts/health_check.sh
 ```
 
 Back up unexpected local changes instead of overwriting them. After updating,
-exercise `/panel`, `/metrics`, `/logs`, and one manual backup.
+exercise `/panel`, `/metrics`, and `/logs`. Application updates do not modify
+the world, so they avoid a routine world backup that would add HDD I/O and TPS
+pressure.
 
 ## Keep these off-device
 

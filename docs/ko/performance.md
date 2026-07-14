@@ -38,7 +38,7 @@ Paper는 `config/paper-world-defaults.yml`에 조절 항목을 노출합니다. 
 
 ## 모니터링
 
-Discord `/metrics` 또는 `/panel`의 **성능** 버튼은 Paper TPS, Pi CPU 온도,
+Discord `/성능지표` 또는 `/관리패널`의 **성능** 버튼은 Paper TPS, Pi CPU 온도,
 1/5/15분 load average, 메모리, HDD, 업타임, 현재·과거 저전압/스로틀링 비트를
 한 화면에 표시합니다.
 

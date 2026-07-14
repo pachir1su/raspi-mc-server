@@ -90,6 +90,7 @@ sudo systemctl enable minecraft.service mc-discord-bot.service
 | 주제 | 한국어 | English |
 |---|---|---|
 | 무화면 SD카드 → 서버 가동 | [헤드리스 전체 설치](docs/ko/headless-setup.md) | [headless setup](docs/en/headless-setup.md) |
+| HDD 규격·케이스·전원 | [HDD 하드웨어](docs/ko/hdd-hardware.md) | [HDD hardware](docs/en/hdd-hardware.md) |
 | 설치 & 첫 실행 | [설치](docs/ko/setup.md) | [setup](docs/en/setup.md) |
 | 서버 설정 | [설정](docs/ko/configuration.md) | [configuration](docs/en/configuration.md) |
 | 치트와 관리자 | [치트와 관리자](docs/ko/cheats-and-ops.md) | [cheats-and-ops](docs/en/cheats-and-ops.md) |

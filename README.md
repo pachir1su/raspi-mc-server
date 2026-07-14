@@ -92,6 +92,7 @@ Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
 | Topic | English | 한국어 |
 |---|---|---|
 | Headless SD card → running server | [headless setup](docs/en/headless-setup.md) | [무화면 전체 설치](docs/ko/headless-setup.md) |
+| HDD form factor, enclosure & power | [HDD hardware](docs/en/hdd-hardware.md) | [HDD 하드웨어](docs/ko/hdd-hardware.md) |
 | Setup & first run | [setup](docs/en/setup.md) | [설치](docs/ko/setup.md) |
 | Server configuration | [configuration](docs/en/configuration.md) | [설정](docs/ko/configuration.md) |
 | Cheats & operators | [cheats-and-ops](docs/en/cheats-and-ops.md) | [치트와 관리자](docs/ko/cheats-and-ops.md) |

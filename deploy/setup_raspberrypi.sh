@@ -21,7 +21,7 @@ sudo apt-get install -y \
   openjdk-21-jre-headless \
   python3 python3-venv python3-pip \
   mcrcon \
-  curl tar
+  curl tar zip
 
 # --- Python venv for the bot --------------------------------------------
 if [ ! -d "$REPO_DIR/.venv" ]; then
@@ -56,12 +56,20 @@ if [ ! -f "${MC_SERVER_DIR:-/mnt/minecraft/live}/paper.jar" ]; then
   "$REPO_DIR/scripts/install_server.sh"
 fi
 
-# --- sudoers: let the bot control ONLY the minecraft service -------------
+# Resolve updater paths once; relative state paths are anchored to the repo.
+STORAGE_ROOT="${MC_STORAGE_ROOT:-/mnt/minecraft}"
+STATE_DIR="${MC_STATE_DIR:-data}"
+if [[ "$STATE_DIR" != /* ]]; then
+  STATE_DIR="$REPO_DIR/$STATE_DIR"
+fi
+
+# --- sudoers: let the bot control only named Minecraft/updater services ---
 SUDOERS="/etc/sudoers.d/raspi-mc-server"
 echo "==> Installing narrow sudoers rule at $SUDOERS"
 sudo tee "$SUDOERS" >/dev/null <<EOF
 # Allow $SERVICE_USER to manage only the minecraft service without a password.
 $SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl start minecraft.service, /bin/systemctl stop minecraft.service, /bin/systemctl restart minecraft.service, /bin/systemctl is-active minecraft.service
+$SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl start --no-block raspi-mc-updater.service, /bin/systemctl is-active raspi-mc-updater.service
 EOF
 sudo chmod 440 "$SUDOERS"
 
@@ -74,6 +82,17 @@ sed -e "s|^User=.*|User=$SERVICE_USER|" \
 sed -e "s|^User=.*|User=$SERVICE_USER|" \
     -e "s|/home/pi/raspi-mc-server|$REPO_DIR|g" \
     "$REPO_DIR/deploy/mc-discord-bot.service" | sudo tee /etc/systemd/system/mc-discord-bot.service >/dev/null
+
+# Install the privileged helper root-owned so the bot cannot rewrite it.
+sudo install -d -m 755 /usr/local/lib/raspi-mc-server
+sudo install -o root -g root -m 755 \
+  "$REPO_DIR/deploy/apply_update.py" \
+  /usr/local/lib/raspi-mc-server/apply_update.py
+sed -e "s|@REPO_DIR@|$REPO_DIR|g" \
+    -e "s|@STATE_DIR@|$STATE_DIR|g" \
+    -e "s|@STORAGE_ROOT@|$STORAGE_ROOT|g" \
+    "$REPO_DIR/deploy/raspi-mc-updater.service" | \
+    sudo tee /etc/systemd/system/raspi-mc-updater.service >/dev/null
 sudo systemctl daemon-reload
 
 cat <<EOF
