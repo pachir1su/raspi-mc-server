@@ -17,7 +17,7 @@ From Discord, `/logs` attaches the bot's current log file.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Unsupported class file major version` / Java errors | Wrong Java | Install JDK 21: `sudo apt install openjdk-21-jre-headless` |
+| `Unsupported class file major version` / Java errors | Wrong Java | Rerun `./deploy/setup_raspberrypi.sh` to install and verify Amazon Corretto Java 25 |
 | `Failed to bind to port` | Port 25565 in use | Another server running? `sudo ss -tlnp | grep 25565` |
 | Exits immediately, EULA message | EULA not accepted | Confirm `/mnt/minecraft/live/eula.txt` contains `eula=true` (install script does this) |
 | `Could not find a Paper build` | Bad `MC_VERSION` | Use a valid version, e.g. `MC_VERSION=1.21.4` |
