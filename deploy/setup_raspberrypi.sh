@@ -21,7 +21,7 @@ sudo apt-get install -y \
   openjdk-21-jre-headless \
   python3 python3-venv python3-pip \
   mcrcon \
-  curl tar zip
+  curl jq tar zip
 
 # --- Python venv for the bot --------------------------------------------
 if [ ! -d "$REPO_DIR/.venv" ]; then
