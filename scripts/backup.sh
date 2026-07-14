@@ -11,7 +11,8 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-[ -f "$REPO_DIR/.env" ] && set -a && . "$REPO_DIR/.env" && set +a
+. "$REPO_DIR/scripts/lib.sh"
+load_env_file "$REPO_DIR/.env"
 
 STORAGE_ROOT="${MC_STORAGE_ROOT:-/mnt/minecraft}"
 SERVER_DIR="${MC_SERVER_DIR:-$STORAGE_ROOT/live}"

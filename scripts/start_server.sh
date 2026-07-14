@@ -12,7 +12,8 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Load .env if present (for MC_SERVER_DIR / MC_MEMORY).
-[ -f "$REPO_DIR/.env" ] && set -a && . "$REPO_DIR/.env" && set +a
+. "$REPO_DIR/scripts/lib.sh"
+load_env_file "$REPO_DIR/.env"
 
 SERVER_DIR="${MC_SERVER_DIR:-$REPO_DIR/server}"
 MEMORY="${MC_MEMORY:-2600M}"
