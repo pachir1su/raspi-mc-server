@@ -45,7 +45,9 @@ For a Raspberry Pi with no display or keyboard, use the complete
 Windows with Raspberry Pi Imager and includes SSH, HDD safety, first launch,
 router ports, friend admission, reboot testing, and recovery.
 
-On a 64-bit Raspberry Pi OS, from the Pi:
+The setup script automatically installs Amazon Corretto Java 25 when needed.
+
+On Raspberry Pi OS Lite (64-bit, Debian 13 Trixie), from the Pi:
 
 ```bash
 git clone https://github.com/pachir1su/raspi-mc-server.git
@@ -56,7 +58,7 @@ lsblk -f
 sudo mkfs.ext4 /dev/sda1
 sudo ./scripts/setup_hdd.sh /dev/sda1
 
-# 2. Provision everything (Java, PaperMC, Python venv, systemd, sudoers)
+# 2. Provision everything (automatically installs Amazon Corretto Java 25)
 ./deploy/setup_raspberrypi.sh
 
 # 3. Set your secrets
@@ -129,7 +131,7 @@ raspi-mc-server/
 
 ## Requirements
 
-- Raspberry Pi 4B (4GB) with **64-bit** Raspberry Pi OS (Bookworm recommended).
+- Raspberry Pi 4B (4GB) with **Raspberry Pi OS Lite (64-bit, Debian 13 Trixie)**.
 - A 32GB microSD plus a 500GB USB 3.0 HDD for PaperMC, worlds, and backups.
 - A Discord application/bot token (for the bot) — see
   [docs/en/discord-bot.md](docs/en/discord-bot.md).

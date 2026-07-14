@@ -43,7 +43,9 @@
 먼저 보세요. Windows Raspberry Pi Imager, SSH, HDD 안전 확인, 최초 실행, 공유기 포트,
 친구 승인, 재부팅 시험, 복구까지 순서대로 설명합니다.
 
-64비트 라즈베리파이 OS에서, 파이에 접속해:
+설정 스크립트는 필요할 때 Amazon Corretto Java 25를 자동으로 설치합니다.
+
+Raspberry Pi OS Lite(64-bit, Debian 13 Trixie)에서 파이에 접속해:
 
 ```bash
 git clone https://github.com/pachir1su/raspi-mc-server.git
@@ -54,7 +56,7 @@ lsblk -f
 sudo mkfs.ext4 /dev/sda1
 sudo ./scripts/setup_hdd.sh /dev/sda1
 
-# 2. 전부 프로비저닝(자바, PaperMC, 파이썬 venv, systemd, sudoers)
+# 2. 전부 프로비저닝(Amazon Corretto Java 25 자동 설치 포함)
 ./deploy/setup_raspberrypi.sh
 
 # 3. 비밀값 설정
@@ -127,7 +129,7 @@ raspi-mc-server/
 
 ## 준비물
 
-- **64비트** 라즈베리파이 OS(Bookworm 권장)를 올린 라즈베리파이 4B(4GB).
+- **Raspberry Pi OS Lite(64-bit, Debian 13 Trixie)**를 올린 라즈베리파이 4B(4GB).
 - 32GB microSD와 PaperMC·월드·백업용 500GB USB 3.0 HDD.
 - 디스코드 애플리케이션/봇 토큰(봇용) — [docs/ko/discord-bot.md](docs/ko/discord-bot.md) 참고.
 

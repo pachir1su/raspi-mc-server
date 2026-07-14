@@ -11,7 +11,7 @@ PaperMC server with the Discord admin bot.
 
 ## 0. Prerequisites
 
-- Raspberry Pi 4B (4GB), **64-bit Raspberry Pi OS** (Bookworm recommended).
+- Raspberry Pi 4B (4GB), **Raspberry Pi OS Lite (64-bit, Debian 13 Trixie)**.
 - A 32GB microSD and 500GB external HDD. The OS and bot remain on microSD;
   PaperMC, live worlds, backups, and uploaded maps live on the HDD.
 - Network: the Pi on your LAN, and (for friends outside your LAN) either port

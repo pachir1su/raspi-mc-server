@@ -11,7 +11,7 @@
 
 ## 0. 준비물
 
-- 라즈베리파이 4B(4GB), **64비트 라즈베리파이 OS**(Bookworm 권장).
+- 라즈베리파이 4B(4GB), **Raspberry Pi OS Lite(64-bit, Debian 13 Trixie)**.
 - 32GB microSD와 500GB 외장 HDD. 이 구성에서는 OS·봇은 microSD, PaperMC·월드·
   백업·업로드 맵은 HDD에 둡니다.
 - 네트워크: 파이는 LAN에 연결. LAN 밖 친구가 들어오려면 포트포워딩이나 터널이

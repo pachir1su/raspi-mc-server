@@ -36,7 +36,7 @@ storage is the safer unattended setup.
 2. Disconnect the HDD from the PC and insert **only the microSD**.
 3. Select:
    - Device: `Raspberry Pi 4`
-   - OS: `Raspberry Pi OS (other)` → `Raspberry Pi OS Lite (64-bit)`
+   - OS: `Raspberry Pi OS (other)` → `Raspberry Pi OS Lite (64-bit, Debian 13 Trixie)`
    - Storage: the prepared microSD
 4. Open **OS customisation**.
 
@@ -542,7 +542,7 @@ world backups and secrets on a PC or separate storage too.
 
 ## 17. Completion checklist
 
-- [ ] Imager configured Raspberry Pi OS Lite 64-bit, user, Wi-Fi, and SSH
+- [ ] Imager configured Raspberry Pi OS Lite (64-bit, Debian 13 Trixie), user, Wi-Fi, and SSH
 - [ ] `ssh mcadmin@mc-pi.local` works
 - [ ] SSH still works after OS update and reboot
 - [ ] HDD was identified by size, MODEL, and SERIAL and prepared as ext4
