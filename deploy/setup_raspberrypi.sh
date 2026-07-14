@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# setup_raspberrypi.sh — one-shot provisioning for a fresh 64-bit Raspberry Pi OS.
+# setup_raspberrypi.sh — 새 64비트 Raspberry Pi OS를 한 번에 구성합니다.
 #
-# Installs system packages, the Minecraft server, the Python venv for the
-# Discord bot, the systemd units, and a narrow sudoers rule so the bot can
-# start/stop ONLY the minecraft service (no broad root access).
+# 시스템 패키지, Minecraft 서버, Discord 봇용 Python 가상 환경, systemd 유닛과
+# 봇이 Minecraft 서비스만 시작·중지할 수 있는 제한된 sudoers 규칙을 설치합니다.
 #
-# Run from the repo root on the Pi:
+# Pi의 저장소 루트에서 실행합니다.
 #   ./deploy/setup_raspberrypi.sh
 set -euo pipefail
 
@@ -14,16 +13,68 @@ SERVICE_USER="${SERVICE_USER:-$(id -un)}"
 
 echo "==> Provisioning raspi-mc-server for user '$SERVICE_USER'"
 
-# --- System packages -----------------------------------------------------
+# java -version 출력에서 주 버전을 추출합니다.
+java_major_version() {
+  local versionLine rawVersion
+  command -v java >/dev/null 2>&1 || return 1
+  versionLine="$(java -version 2>&1 | head -n1)"
+  rawVersion="$(sed -n 's/.*version "\([0-9][0-9.]*\)".*/\1/p' <<<"$versionLine")"
+  [ -n "$rawVersion" ] || return 1
+  if [[ "$rawVersion" == 1.* ]]; then
+    cut -d. -f2 <<<"$rawVersion"
+  else
+    cut -d. -f1 <<<"$rawVersion"
+  fi
+}
+
+# Corretto 공개키와 apt 저장소를 재실행에 안전하게 등록합니다.
+register_corretto_repository() {
+  local keyringTemp
+  keyringTemp="$(mktemp)"
+  if ! wget -qO- https://apt.corretto.aws/corretto.key | gpg --dearmor >"$keyringTemp"; then
+    rm -f -- "$keyringTemp"
+    echo "!! Amazon Corretto 공개키를 가져오지 못했습니다." >&2
+    return 1
+  fi
+  sudo install -m 0644 "$keyringTemp" /usr/share/keyrings/corretto-keyring.gpg
+  rm -f -- "$keyringTemp"
+  printf '%s\n' \
+    'deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main' | \
+    sudo tee /etc/apt/sources.list.d/corretto.list >/dev/null
+}
+
+# --- 시스템 패키지 -------------------------------------------------------
 echo "==> Installing system packages..."
 sudo apt-get update
 sudo apt-get install -y \
-  openjdk-21-jre-headless \
   python3 python3-venv python3-pip \
   mcrcon \
+  ca-certificates apt-transport-https gnupg wget \
   curl jq tar zip
 
-# --- Python venv for the bot --------------------------------------------
+# Java 25 이상이 없을 때만 Amazon Corretto 25를 설치합니다.
+JAVA_MAJOR="$(java_major_version 2>/dev/null || true)"
+if [[ "$JAVA_MAJOR" =~ ^[0-9]+$ ]] && [ "$JAVA_MAJOR" -ge 25 ]; then
+  echo "==> Java $JAVA_MAJOR already satisfies the Java 25 requirement."
+else
+  echo "==> Installing Amazon Corretto 25..."
+  register_corretto_repository
+  sudo apt-get update
+  sudo apt-get install -y \
+    java-25-amazon-corretto-jdk \
+    libxi6 libxtst6 libxrender1
+fi
+
+# 설치 또는 기존 Java가 실제로 요구 버전을 충족하는지 확인합니다.
+JAVA_MAJOR="$(java_major_version 2>/dev/null || true)"
+if ! [[ "$JAVA_MAJOR" =~ ^[0-9]+$ ]] || [ "$JAVA_MAJOR" -lt 25 ]; then
+  echo "!! Java 25 이상을 사용할 수 없습니다. Corretto 설치 상태와 기본 java 대상을 확인하세요." >&2
+  echo "   확인 명령: java -version" >&2
+  exit 1
+fi
+echo "==> Java verified: $(java -version 2>&1 | head -n1)"
+
+# --- 봇용 Python 가상 환경 ----------------------------------------------
 if [ ! -d "$REPO_DIR/.venv" ]; then
   echo "==> Creating Python venv..."
   python3 -m venv "$REPO_DIR/.venv"
@@ -37,12 +88,12 @@ if [ ! -f "$REPO_DIR/.env" ]; then
   exit 1
 fi
 chmod 600 "$REPO_DIR/.env"
-# Load paths selected by the operator before checking the installation target.
+# 설치 대상을 검사하기 전에 운영자가 선택한 경로를 불러옵니다.
 set -a
 . "$REPO_DIR/.env"
 set +a
 
-# --- External HDD --------------------------------------------------------
+# --- 외장 HDD ------------------------------------------------------------
 if ! mountpoint -q /mnt/minecraft; then
   echo "!! /mnt/minecraft is not mounted. Prepare the HDD first:" >&2
   echo "     sudo mkfs.ext4 /dev/sdXN       # DESTRUCTIVE: choose the correct partition" >&2
@@ -50,32 +101,32 @@ if ! mountpoint -q /mnt/minecraft; then
   exit 1
 fi
 
-# --- Minecraft server ----------------------------------------------------
+# --- Minecraft 서버 ------------------------------------------------------
 if [ ! -f "${MC_SERVER_DIR:-/mnt/minecraft/live}/paper.jar" ]; then
   echo "==> Installing PaperMC on the HDD..."
   "$REPO_DIR/scripts/install_server.sh"
 fi
 
-# Resolve updater paths once; relative state paths are anchored to the repo.
+# 업데이터 경로를 한 번만 계산하고 상대 상태 경로는 저장소를 기준으로 고정합니다.
 STORAGE_ROOT="${MC_STORAGE_ROOT:-/mnt/minecraft}"
 STATE_DIR="${MC_STATE_DIR:-data}"
 if [[ "$STATE_DIR" != /* ]]; then
   STATE_DIR="$REPO_DIR/$STATE_DIR"
 fi
 
-# --- sudoers: let the bot control only named Minecraft/updater services ---
+# --- sudoers: 봇이 지정된 Minecraft/업데이터 서비스만 제어하게 합니다. ---
 SUDOERS="/etc/sudoers.d/raspi-mc-server"
 echo "==> Installing narrow sudoers rule at $SUDOERS"
 sudo tee "$SUDOERS" >/dev/null <<EOF
-# Allow $SERVICE_USER to manage only the minecraft service without a password.
+# $SERVICE_USER가 비밀번호 없이 지정된 서비스만 관리하도록 허용합니다.
 $SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl start minecraft.service, /bin/systemctl stop minecraft.service, /bin/systemctl restart minecraft.service, /bin/systemctl is-active minecraft.service
 $SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl start --no-block raspi-mc-updater.service, /bin/systemctl is-active raspi-mc-updater.service
 EOF
 sudo chmod 440 "$SUDOERS"
 
-# --- systemd units -------------------------------------------------------
+# --- systemd 유닛 --------------------------------------------------------
 echo "==> Installing systemd units..."
-# Render the repository path and service account instead of assuming /home/pi.
+# /home/pi를 가정하지 않고 실제 저장소 경로와 서비스 계정을 반영합니다.
 sed -e "s|^User=.*|User=$SERVICE_USER|" \
     -e "s|/home/pi/raspi-mc-server|$REPO_DIR|g" \
     "$REPO_DIR/deploy/minecraft.service" | sudo tee /etc/systemd/system/minecraft.service >/dev/null
@@ -83,7 +134,7 @@ sed -e "s|^User=.*|User=$SERVICE_USER|" \
     -e "s|/home/pi/raspi-mc-server|$REPO_DIR|g" \
     "$REPO_DIR/deploy/mc-discord-bot.service" | sudo tee /etc/systemd/system/mc-discord-bot.service >/dev/null
 
-# Install the privileged helper root-owned so the bot cannot rewrite it.
+# 봇이 수정하지 못하도록 권한 상승 도우미를 root 소유로 설치합니다.
 sudo install -d -m 755 /usr/local/lib/raspi-mc-server
 sudo install -o root -g root -m 755 \
   "$REPO_DIR/deploy/apply_update.py" \

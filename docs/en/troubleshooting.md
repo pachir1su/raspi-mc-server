@@ -17,7 +17,7 @@ From Discord, `/logs` attaches the bot's current log file.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Unsupported class file major version` / Java errors | Java is older than Paper requires | Install the version reported by the installer; Paper 26.1+ requires Java 25. See [setup](setup.md#java-25-for-paper-261). |
+| `Unsupported class file major version` / Java errors | Java is older than Paper requires | Rerun `./deploy/setup_raspberrypi.sh` to install and verify Amazon Corretto Java 25. Paper 26.1+ requires Java 25; see [setup](setup.md#java-25-for-paper-261). |
 | `Failed to bind to port` | Port 25565 in use | Another server running? `sudo ss -tlnp | grep 25565` |
 | Exits immediately, EULA message | EULA not accepted | Confirm `/mnt/minecraft/live/eula.txt` contains `eula=true` (install script does this) |
 | `Could not find a STABLE Paper build` | Bad `MC_VERSION`, or that version has only experimental builds | Use a version with a STABLE build, e.g. `MC_VERSION=26.1.2`, or leave `MC_VERSION` unset. |

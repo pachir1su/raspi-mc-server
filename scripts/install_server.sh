@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# install_server.sh — install a PaperMC server on a Raspberry Pi 4B (64-bit).
+# install_server.sh — Raspberry Pi 4B(64비트)에 PaperMC 서버를 설치합니다.
 #
-# What it does:
-#   1. Resolves the newest STABLE PaperMC release through Fill v3.
-#   2. Checks the selected release's minimum Java version.
-#   3. Downloads and verifies the selected PaperMC server jar.
-#   4. Seeds server.properties from the template and accepts the EULA.
-#   5. Leaves ops/whitelist for you to fill in (owner-only cheats).
+# 수행 작업:
+#   1. Fill v3에서 최신 STABLE PaperMC 릴리스를 선택합니다.
+#   2. 선택한 릴리스의 최소 Java 버전을 확인합니다.
+#   3. PaperMC 서버 jar를 다운로드하고 검증합니다.
+#   4. server.properties를 템플릿에서 만들고 EULA에 동의합니다.
+#   5. 소유자 전용 치트를 위해 ops/whitelist 설정은 운영자에게 맡깁니다.
 #
-# Re-runnable: it will re-download the jar and refresh only missing config.
+# 재실행하면 jar를 다시 내려받되 없는 설정 파일만 생성합니다.
 #
-# Usage:
-#   ./scripts/install_server.sh                         # newest STABLE version
-#   MC_VERSION=26.1.2 ./scripts/install_server.sh       # selected STABLE version
+# 사용법:
+#   ./scripts/install_server.sh                         # 최신 STABLE 버전
+#   MC_VERSION=26.1.2 ./scripts/install_server.sh       # 지정한 STABLE 버전
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# Load the HDD-backed server directory selected during setup.
+# HDD 기반 서버 경로 설정을 불러옵니다.
 . "$REPO_DIR/scripts/lib.sh"
 load_env_file "$REPO_DIR/.env"
 SERVER_DIR="${MC_SERVER_DIR:-$REPO_DIR/server}"
@@ -25,7 +25,7 @@ API="https://fill.papermc.io/v3/projects/paper"
 USER_AGENT="raspi-mc-server/installer (github.com/pachir1su/raspi-mc-server)"
 TEMP_JAR=""
 
-# Keep the previous paper.jar unless a verified replacement is ready.
+# 검증된 교체 파일이 준비되지 않으면 기존 paper.jar를 보존합니다.
 cleanup_temp_jar() {
   if [ -n "$TEMP_JAR" ] && [ -f "$TEMP_JAR" ]; then
     rm -f -- "$TEMP_JAR"
@@ -33,12 +33,12 @@ cleanup_temp_jar() {
 }
 trap cleanup_temp_jar EXIT
 
-# Fetch one Fill API resource with the required project identification.
+# 프로젝트 식별 헤더를 포함해 Fill API 리소스 하나를 가져옵니다.
 api_get() {
   curl -fsSL -H "User-Agent: $USER_AGENT" "$1"
 }
 
-# Return the newest STABLE build object for one Minecraft version.
+# Minecraft 버전 하나에서 가장 최신 STABLE 빌드 객체를 반환합니다.
 stable_build_for_version() {
   local version="$1" buildsJson stableBuild
   buildsJson="$(api_get "$API/versions/$version/builds")" || return 1
@@ -50,7 +50,7 @@ stable_build_for_version() {
   printf '%s\n' "$stableBuild"
 }
 
-# Extract a modern Java major version from `java -version` output.
+# java -version 출력에서 주 버전을 추출합니다.
 java_major_version() {
   local versionLine rawVersion
   versionLine="$(java -version 2>&1 | head -n1)"
@@ -62,14 +62,6 @@ java_major_version() {
   fi
 }
 
-# Point operators to Paper's supported Java installation path.
-print_java_install_help() {
-  local requiredJava="$1"
-  echo "   Paper Java guide: https://docs.papermc.io/misc/java-install/" >&2
-  echo "   After adding its Corretto apt repository, install with:" >&2
-  echo "   sudo apt-get install -y java-$requiredJava-amazon-corretto-jdk libxi6 libxtst6 libxrender1" >&2
-}
-
 if ! command -v jq >/dev/null 2>&1; then
   echo "!! jq is required to read the Paper Fill API." >&2
   echo "   Install it with: sudo apt install jq" >&2
@@ -79,7 +71,7 @@ fi
 echo "==> raspi-mc-server installer"
 echo "    server dir : $SERVER_DIR"
 
-# --- 1. Paper version and STABLE build ----------------------------------
+# --- Paper 버전과 STABLE 빌드 -------------------------------------------
 BUILD_JSON=""
 if [ -n "$MC_VERSION" ]; then
   echo "==> Resolving the newest STABLE Paper build for $MC_VERSION..."
@@ -119,7 +111,7 @@ fi
 echo "    mc version : $MC_VERSION"
 echo "    Paper build: $BUILD_ID (STABLE)"
 
-# --- 2. Java requirement ------------------------------------------------
+# --- Java 요구 버전 ------------------------------------------------------
 REQUIRED_JAVA=""
 if VERSION_JSON="$(api_get "$API/versions/$MC_VERSION" 2>/dev/null)" &&
    REQUIRED_JAVA="$(jq -er '.version.java.version.minimum' <<<"$VERSION_JSON" 2>/dev/null)"; then
@@ -130,14 +122,12 @@ else
 fi
 
 if ! command -v java >/dev/null 2>&1; then
-  if [ -n "$REQUIRED_JAVA" ] && [ "$REQUIRED_JAVA" -gt 21 ]; then
-    echo "!! Paper $MC_VERSION requires Java $REQUIRED_JAVA, but Java is not installed." >&2
-    print_java_install_help "$REQUIRED_JAVA"
-    exit 1
+  echo "!! Java가 설치되어 있지 않습니다." >&2
+  if [ -n "$REQUIRED_JAVA" ]; then
+    echo "   Paper $MC_VERSION의 최소 요구 버전은 Java $REQUIRED_JAVA입니다." >&2
   fi
-  echo "==> Installing OpenJDK 21 (headless)..."
-  sudo apt-get update
-  sudo apt-get install -y openjdk-21-jre-headless
+  echo "   저장소 루트에서 ./deploy/setup_raspberrypi.sh를 다시 실행해 Corretto 25를 설치하세요." >&2
+  exit 1
 fi
 
 CURRENT_JAVA="$(java_major_version)"
@@ -148,11 +138,12 @@ fi
 echo "==> Java present: $(java -version 2>&1 | head -n1)"
 if [ -n "$REQUIRED_JAVA" ] && [ "$CURRENT_JAVA" -lt "$REQUIRED_JAVA" ]; then
   echo "!! Paper $MC_VERSION requires Java $REQUIRED_JAVA; Java $CURRENT_JAVA is active." >&2
-  print_java_install_help "$REQUIRED_JAVA"
+  echo "   저장소 루트에서 ./deploy/setup_raspberrypi.sh를 다시 실행해 Corretto 25를 설치하세요." >&2
+  echo "   Java 25보다 높은 버전이 필요하면 요구 버전에 맞는 JDK를 직접 설치하세요." >&2
   exit 1
 fi
 
-# --- 3. Verified PaperMC jar --------------------------------------------
+# --- 검증된 PaperMC jar --------------------------------------------------
 mkdir -p "$SERVER_DIR"
 TEMP_JAR="$(mktemp "$SERVER_DIR/.paper.jar.XXXXXX")"
 echo "==> Downloading $DOWNLOAD_NAME ..."
@@ -171,14 +162,14 @@ mv -f -- "$TEMP_JAR" "$SERVER_DIR/paper.jar"
 TEMP_JAR=""
 echo "    verified SHA-256 and saved to $SERVER_DIR/paper.jar"
 
-# --- 4. Config seeding ---------------------------------------------------
+# --- 설정 파일 생성 ------------------------------------------------------
 if [ ! -f "$SERVER_DIR/server.properties" ]; then
   cp "$REPO_DIR/server/server.properties.template" "$SERVER_DIR/server.properties"
   echo "==> Seeded server.properties from template."
   echo "    !! Edit rcon.password in $SERVER_DIR/server.properties before starting."
 fi
 
-# EULA — running the server implies you accept Mojang's EULA.
+# 서버 실행은 Mojang EULA 동의를 전제로 합니다.
 echo "eula=true" > "$SERVER_DIR/eula.txt"
 
 echo

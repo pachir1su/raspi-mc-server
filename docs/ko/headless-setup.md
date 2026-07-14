@@ -33,7 +33,7 @@ Paper 월드·백업·업로드 사진은 HDD의 `/mnt/minecraft`에 두고, Ras
 2. **HDD는 PC에서 분리하고 microSD만** 카드 리더에 꽂습니다.
 3. Imager에서 다음을 선택합니다.
    - 장치: `Raspberry Pi 4`
-   - 운영체제: `Raspberry Pi OS (other)` → `Raspberry Pi OS Lite (64-bit)`
+   - 운영체제: `Raspberry Pi OS (other)` → `Raspberry Pi OS Lite (64-bit, Debian 13 Trixie)`
    - 저장소: 준비한 microSD
 4. **OS 사용자 지정**을 엽니다.
 
@@ -536,7 +536,7 @@ vcgencmd measure_temp
 
 ## 17. 최종 완료 체크리스트
 
-- [ ] Imager에서 Raspberry Pi OS Lite 64-bit, 사용자, Wi-Fi, SSH를 설정함
+- [ ] Imager에서 Raspberry Pi OS Lite(64-bit, Debian 13 Trixie), 사용자, Wi-Fi, SSH를 설정함
 - [ ] `ssh mcadmin@mc-pi.local` 접속 성공
 - [ ] OS 업데이트와 재부팅 후 다시 SSH 접속 성공
 - [ ] HDD 장치를 크기·MODEL·SERIAL로 확인하고 ext4로 준비함
