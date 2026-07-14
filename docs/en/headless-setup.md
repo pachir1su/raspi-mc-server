@@ -248,9 +248,10 @@ cd ~/raspi-mc-server
 ./deploy/setup_raspberrypi.sh
 ```
 
-The script installs Java 21, the Python environment, Paper, systemd units, and a
-narrow sudoers rule limited to the Minecraft service. It is designed to be
-re-runnable.
+The script installs the base Java 21 package, the Python environment, Paper,
+systemd units, and a narrow sudoers rule limited to the Minecraft service.
+Current Paper 26.1 requires Java 25; install it first as described in
+[Setup](setup.md#java-25-for-paper-261). The script is designed to be re-runnable.
 
 ## 9. Configure RCON and Discord secrets
 
@@ -296,7 +297,7 @@ MC_SERVER_DIR=/mnt/minecraft/live
 MC_REQUIRE_STORAGE_MOUNT=true
 MC_STATE_DIR=/mnt/minecraft/bot-state
 MC_PUBLIC_ADDRESS=<public address or IP given to friends>
-MC_PUBLIC_VERSION="Paper Java 1.21.x + Bedrock"
+MC_PUBLIC_VERSION="Paper Java 26.1.x + Bedrock"
 MC_PUBLIC_RULES="Respect builds and items; tell the operator when something breaks."
 ```
 

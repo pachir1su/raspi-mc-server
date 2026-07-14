@@ -17,10 +17,11 @@ From Discord, `/logs` attaches the bot's current log file.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `Unsupported class file major version` / Java errors | Wrong Java | Install JDK 21: `sudo apt install openjdk-21-jre-headless` |
+| `Unsupported class file major version` / Java errors | Java is older than Paper requires | Install the version reported by the installer; Paper 26.1+ requires Java 25. See [setup](setup.md#java-25-for-paper-261). |
 | `Failed to bind to port` | Port 25565 in use | Another server running? `sudo ss -tlnp | grep 25565` |
 | Exits immediately, EULA message | EULA not accepted | Confirm `/mnt/minecraft/live/eula.txt` contains `eula=true` (install script does this) |
-| `Could not find a Paper build` | Bad `MC_VERSION` | Use a valid version, e.g. `MC_VERSION=1.21.4` |
+| `Could not find a STABLE Paper build` | Bad `MC_VERSION`, or that version has only experimental builds | Use a version with a STABLE build, e.g. `MC_VERSION=26.1.2`, or leave `MC_VERSION` unset. |
+| Installer v0.1.8 or earlier cannot download Paper | The retired `api.papermc.io/v2` endpoint is no longer supported | Update this repository and use the Fill v3 installer. |
 | Out of memory / killed | Heap too big for 4GB | Lower `MC_MEMORY` (e.g. `2600M`) in `.env` |
 
 ## Players can't connect
