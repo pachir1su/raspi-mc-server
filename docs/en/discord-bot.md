@@ -50,8 +50,8 @@ MC_SPAWN_Y=80
 MC_SPAWN_Z=0.5
 MC_MAP_URL_TEMPLATE=https://map.example.com/?world={dimension}&x={x}&y={y}&z={z}
 MC_PUBLIC_ADDRESS=play.example.com
-MC_PUBLIC_VERSION=Paper Java 1.21.x
-MC_PUBLIC_RULES=Respect builds and items; tell the operator when something breaks.
+MC_PUBLIC_VERSION="Paper Java 26.1.x"
+MC_PUBLIC_RULES="Respect builds and items; tell the operator when something breaks."
 STATUS_CHANNEL_ID=123456789012345678
 ALERT_TPS_THRESHOLD=18.0
 ALERT_MEMORY_PERCENT=85

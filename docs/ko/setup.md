@@ -26,6 +26,31 @@
 sudo apt update && sudo apt full-upgrade -y && sudo reboot
 ```
 
+마인크래프트 버전 이름은 2026년부터 **연도.드롭.패치** 방식으로 바뀌었습니다.
+예를 들어 `26.1.2`는 2026년 첫 번째 드롭의 두 번째 패치이며, `1.22` 같은 버전을
+찾지 않아도 됩니다. `MC_VERSION`을 비워 두면 설치 스크립트가 **STABLE** 빌드가
+있는 가장 최신 Paper 버전을 고르고 experimental 전용 릴리스는 건너뜁니다.
+
+### Paper 26.1용 Java 25
+
+Paper 26.1+는 Java 25가 필요합니다. Raspberry Pi OS 기본 저장소에 없을 수 있으므로
+프로비저닝 전에 Paper가 권장하는 Amazon Corretto 빌드를 설치하세요. 다음 명령은
+Paper의 Debian/Ubuntu Java 설치 안내를 따릅니다:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates apt-transport-https gnupg wget
+wget -O - https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
+sudo apt-get update
+sudo apt-get install -y java-25-amazon-corretto-jdk libxi6 libxtst6 libxrender1
+java -version
+```
+
+`java -version`에 Java 25와 `64-Bit`가 표시되는지 확인하세요. 이후 Paper 버전이 더
+높은 Java를 요구하면 `install_server.sh`가 표시한 버전 이상을 설치합니다. 자세한
+내용은 [Paper Java 설치 문서](https://docs.papermc.io/misc/java-install/)를 참고하세요.
+
 ## 1. 클론 및 HDD 준비
 
 ```bash
@@ -53,12 +78,14 @@ findmnt /mnt/minecraft
 ./deploy/setup_raspberrypi.sh
 ```
 
-`setup_raspberrypi.sh`는 Java 21 설치, PaperMC 다운로드, 봇용 파이썬 venv 생성,
-systemd 유닛 설치, 그리고 봇이 **마인크래프트 서비스만** 시작/정지할 수 있도록
-**좁은 sudoers 규칙**을 추가합니다(전체 root 권한이 아닙니다).
+`setup_raspberrypi.sh`는 이전 Paper용 기본 Java 21 패키지 설치, PaperMC 다운로드,
+봇용 파이썬 venv 생성, systemd 유닛 설치, 그리고 봇이 **마인크래프트 서비스만**
+시작/정지할 수 있도록 **좁은 sudoers 규칙**을 추가합니다(전체 root 권한이
+아닙니다). 현재 Paper 26.1은 위에서 설치한 Java 25를 사용합니다.
 
 > 봇/systemd 없이 서버만 설치하려면
-> `MC_VERSION=1.21.4 ./scripts/install_server.sh` 를 실행하세요.
+> 최신 STABLE 버전은 `./scripts/install_server.sh`, 버전을 지정하려면
+> `MC_VERSION=26.1.2 ./scripts/install_server.sh`를 실행하세요.
 
 ## 3. 비밀값 설정
 
