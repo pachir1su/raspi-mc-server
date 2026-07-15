@@ -27,6 +27,21 @@ class PanelUxTests(unittest.TestCase):
         ):
             self.assertNotIn(removedName, source + friendCog)
 
+    def testAdminDashboardUsesPlainActionLabels(self):
+        """The busiest panel names outcomes instead of implementation concepts."""
+        source = (ROOT / "bot" / "control_panel.py").read_text(encoding="utf-8")
+
+        for label in (
+            "접속자 관리",
+            "서버 제어",
+            "성능 상세",
+            "렉 원인",
+            "긴급 복구",
+            "친구 계정",
+            "관리 도움말",
+        ):
+            self.assertIn(f'label="{label}"', source)
+
 
 if __name__ == "__main__":
     unittest.main()
