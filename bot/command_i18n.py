@@ -11,6 +11,10 @@ from discord import app_commands
 
 # Command and option names must stay short and unique within their parent.
 KOREAN_NAMES = {
+    "server": "서버",
+    "admin": "관리자",
+    "my-tools": "내도구",
+    "place-photo": "좌표사진",
     "portal": "접속안내",
     "online": "접속자",
     "status": "상태",
@@ -92,6 +96,14 @@ KOREAN_NAMES = {
 
 # Descriptions are keyed by their canonical English text from decorators.
 KOREAN_DESCRIPTIONS = {
+    "Open the friend-safe button server panel.": "친구용 버튼 서버 패널을 엽니다.",
+    "Open the private button-first administrator panel.": "관리자 전용 버튼 패널을 엽니다.",
+    "Open button controls for your linked player.": "연동된 내 플레이어의 버튼 도구를 엽니다.",
+    "Upload files that Discord buttons cannot attach.": "버튼으로 첨부할 수 없는 파일을 업로드합니다.",
+    "Upload a Java world ZIP archive.": "Java 월드 ZIP 파일을 업로드합니다.",
+    "Upload a trusted application Release ZIP.": "신뢰하는 애플리케이션 Release ZIP을 업로드합니다.",
+    "Attach a photo to an existing coordinate.": "기존 좌표에 사진을 첨부합니다.",
+    "Write a diary entry with a photo attachment.": "사진을 첨부한 서버 일지를 작성합니다.",
     "Show friend-safe server access info and live status.": "친구용 서버 접속 정보와 현재 상태를 표시합니다.",
     "Show who is online without exposing admin controls.": "관리 기능을 노출하지 않고 접속자를 표시합니다.",
     "Show whether the server is up and who is online.": "서버 실행 상태와 접속자를 표시합니다.",
