@@ -3,7 +3,7 @@
 import tempfile
 import unittest
 
-from bot.app_settings import AppSettingsStore, ensureFirstRunSetup
+from bot.app_settings import EX_CONFIG, AppSettingsStore, ensureFirstRunSetup
 
 
 class AppSettingsTests(unittest.TestCase):
@@ -49,7 +49,8 @@ class AppSettingsTests(unittest.TestCase):
             with self.assertRaises(SystemExit) as context:
                 ensureFirstRunSetup(stateDir, interactive=False)
 
-        self.assertIn("First setup is required", str(context.exception))
+        # 재시작을 멈추도록 EX_CONFIG(78)로 종료해야 합니다(이슈 C).
+        self.assertEqual(EX_CONFIG, context.exception.code)
 
 
 if __name__ == "__main__":

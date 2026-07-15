@@ -2,9 +2,14 @@
 
 import json
 import os
+import sys
 import tempfile
 from dataclasses import asdict, dataclass
 from typing import Callable
+
+# First-setup 미완료처럼 재시작해도 안 풀리는 설정 오류의 종료 코드(이슈 C).
+# systemd 유닛의 RestartPreventExitStatus=78과 짝을 이뤄 crash loop를 막습니다.
+EX_CONFIG = getattr(os, "EX_CONFIG", 78)
 
 
 @dataclass(frozen=True)
@@ -148,10 +153,14 @@ def ensureFirstRunSetup(
     if store.exists() and not force:
         return store.load()
     if not interactive:
-        raise SystemExit(
+        # 비대화형(systemd)에서 설정이 없으면 재시작해도 소용없으므로 EX_CONFIG로
+        # 종료해 systemd가 재시작을 포기하게 합니다(이슈 C). 저널에는 한 번만 남습니다.
+        print(
             "First setup is required. Run `.venv/bin/python -m bot.main` "
-            "once in a terminal, then start the service again."
+            "once in a terminal, then start the service again.",
+            file=sys.stderr,
         )
+        raise SystemExit(EX_CONFIG)
     settings = runFirstSetupMenu(inputFn=inputFn, outputFn=outputFn)
     store.save(settings)
     return settings

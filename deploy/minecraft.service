@@ -1,13 +1,15 @@
 # systemd unit for the PaperMC server.
 #
-# Install:
-#   sudo cp deploy/minecraft.service /etc/systemd/system/
+# 이 파일은 템플릿입니다. deploy/setup_raspberrypi.sh가 @USER@/@REPO_DIR@를
+# 실제 값으로 치환해 /etc/systemd/system/에 설치합니다. 수동으로 설치할 때는
+# 아래 자리표시자를 직접 바꾼 뒤 복사하세요(docs/*/setup.md 참고):
+#   sudo sed -e "s|@USER@|$(id -un)|g" -e "s|@REPO_DIR@|$PWD|g" \
+#     deploy/minecraft.service | sudo tee /etc/systemd/system/minecraft.service
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now minecraft.service
 #
-# Adjust User= and paths to match your Pi. A graceful stop is sent via
-# RCON-free systemd TERM; PaperMC handles SIGTERM by saving and shutting
-# down cleanly.
+# A graceful stop is sent via systemd TERM; PaperMC handles SIGTERM by saving
+# and shutting down cleanly.
 [Unit]
 Description=PaperMC Minecraft server (raspi-mc-server)
 After=network-online.target
@@ -16,10 +18,10 @@ RequiresMountsFor=/mnt/minecraft
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/raspi-mc-server
-EnvironmentFile=/home/pi/raspi-mc-server/.env
-ExecStart=/home/pi/raspi-mc-server/scripts/start_server.sh
+User=@USER@
+WorkingDirectory=@REPO_DIR@
+EnvironmentFile=@REPO_DIR@/.env
+ExecStart=@REPO_DIR@/scripts/start_server.sh
 # Give the JVM time to save chunks on shutdown before systemd gives up.
 TimeoutStopSec=90
 Restart=on-failure
