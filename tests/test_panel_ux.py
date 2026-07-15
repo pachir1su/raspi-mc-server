@@ -42,6 +42,14 @@ class PanelUxTests(unittest.TestCase):
         ):
             self.assertIn(f'label="{label}"', source)
 
+    def testAdminHelpExplainsAccountsAndUploads(self):
+        """Private help covers the two workflows that otherwise require discovery."""
+        source = (ROOT / "bot" / "cogs" / "admin.py").read_text(encoding="utf-8")
+
+        self.assertIn("관리자 전용 도움말", source)
+        self.assertIn("한 Discord 사용자에게 여러 계정", source)
+        self.assertIn("/업로드", source)
+
 
 if __name__ == "__main__":
     unittest.main()
