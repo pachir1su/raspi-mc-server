@@ -180,6 +180,11 @@ def _main(argv=None) -> int:
     """
     import sys
 
+    from dotenv import load_dotenv
+
+    # Match bot.main: operators can run the CLI from the repository root
+    # without exporting or retyping the secret RCON environment variables.
+    load_dotenv()
     args = sys.argv[1:] if argv is None else argv
     if not args:
         print('usage: python -m bot.rcon "<command>"', file=sys.stderr)
