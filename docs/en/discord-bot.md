@@ -87,8 +87,8 @@ names below.
 | Command | What it does |
 |---|---|
 | `/server` | Friend-safe access information, online players, and refresh buttons. |
-| `/admin` | Private owner dashboard for service, players, backups, worlds, updates, logs, storage, performance, incidents, account links, and advanced tools. |
-| `/my-tools` | Private self-service panel for linking, rescue, location, score, coordinates, and diary. |
+| `/admin` | Private owner dashboard for service, players, backups, worlds, updates, logs, storage, performance, incidents, direct multi-account assignment, admin-only help, and advanced tools. |
+| `/my-tools` | Private self-service panel for selecting an assigned account, rescue, location, score, coordinates, and diary. |
 | `/upload world/update/place-photo/diary` | Attachment-only flows that Discord buttons cannot provide. World/update remain admin-only; friend media still checks link ownership. |
 
 Destructive backup/world/service actions require a second confirmation button.
