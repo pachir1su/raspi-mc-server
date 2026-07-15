@@ -45,7 +45,7 @@ class AdminDashboardView(OwnerView):
         embed = await self.controller.panelOverviewEmbed()
         await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="플레이어", emoji="👥", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(label="접속자 관리", emoji="👥", style=discord.ButtonStyle.primary, row=0)
     async def players(self, interaction: discord.Interaction, button: discord.ui.Button):
         players = await self.controller.panelOnlinePlayers()
         if not players:
@@ -69,7 +69,7 @@ class AdminDashboardView(OwnerView):
         embed = await self.controller.panelHealthEmbed()
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @discord.ui.button(label="성능", emoji="📊", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="성능 상세", emoji="📊", style=discord.ButtonStyle.secondary, row=0)
     async def performance(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True, thinking=True)
         embed = await self.controller.panelMetricsEmbed()
@@ -114,7 +114,7 @@ class AdminDashboardView(OwnerView):
         embed = await self.controller.panelStorageEmbed()
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @discord.ui.button(label="튜닝 리포트", emoji="🧰", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="렉 원인", emoji="🧰", style=discord.ButtonStyle.secondary, row=2)
     async def tuning(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True, thinking=True)
         warnings, embed = await self.controller._collectPerformanceWarnings()
@@ -122,7 +122,7 @@ class AdminDashboardView(OwnerView):
             embed.add_field(name="Warnings", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @discord.ui.button(label="사고 대응", emoji="🚑", style=discord.ButtonStyle.danger, row=2)
+    @discord.ui.button(label="긴급 복구", emoji="🚑", style=discord.ButtonStyle.danger, row=2)
     async def incident(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             "자주 쓰는 사고 대응 작업입니다. 서버 상태를 바꿀 수 있습니다.",
@@ -130,7 +130,7 @@ class AdminDashboardView(OwnerView):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="연동 관리", emoji="🔗", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="친구 계정", emoji="👤", style=discord.ButtonStyle.secondary, row=2)
     async def links(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.controller.panelOpenLinkAdmin(interaction)
 
@@ -140,6 +140,12 @@ class AdminDashboardView(OwnerView):
             "텍스트가 꼭 필요한 공지·RCON·허용목록과 감사 기록입니다.",
             view=AdvancedPanelView(self.controller, self.ownerId),
             ephemeral=True,
+        )
+
+    @discord.ui.button(label="관리 도움말", emoji="❓", style=discord.ButtonStyle.primary, row=2)
+    async def help(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            embed=self.controller.panelHelpEmbed(), ephemeral=True
         )
 
 
