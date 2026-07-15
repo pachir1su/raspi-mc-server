@@ -20,6 +20,7 @@ from bot import userTag
 from bot.app_settings import ensureFirstRunSetup
 from bot.crossplay import CrossplayManager
 from bot.command_i18n import CommandTranslator
+from bot.command_surface import pruneCommandTree
 
 _log = log.get("main")
 cfg = None
@@ -37,6 +38,9 @@ class McBot(commands.Bot):
         await self.tree.set_translator(CommandTranslator())
         await self.load_extension("bot.cogs.admin")
         await self.load_extension("bot.cogs.friend")
+        # Keep legacy callbacks available to panels but publish only four roots.
+        removedNames = pruneCommandTree(self.tree)
+        _log.info("hid legacy slash-command roots: %s", ", ".join(removedNames))
         if cfg.guild_ids:
             # 여러 길드에 즉시 등록합니다(이슈 G, #18).
             for guildId in cfg.guild_ids:
