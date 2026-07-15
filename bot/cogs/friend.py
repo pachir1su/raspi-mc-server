@@ -14,6 +14,7 @@ from bot.app_settings import AppSettingsStore
 from bot.config import cfg
 from bot.diary import DiaryEntry, DiaryStore
 from bot.health_score import HealthInputs, calculateHealthScore
+from bot.friend_panel import MyToolsView
 from bot.performance_report import parseTps
 from bot.places import (
     MAX_IMAGE_BYTES,
@@ -71,6 +72,34 @@ class Friend(commands.Cog):
         self.diaryStore = DiaryStore(cfg.state_dir)
         self.imageStore = ImageStore(cfg.state_dir)
 
+    @app_commands.command(
+        name="my-tools", description="Open button controls for your linked player."
+    )
+    async def myTools(self, interaction: discord.Interaction) -> None:
+        """Open the text-light self-service panel for the invoking user."""
+        link = await asyncio.to_thread(self.linkStore.get, interaction.user.id)
+        if link:
+            state = "승인됨" if link.approved else "승인 대기"
+            description = (
+                f"**연동:** `{link.minecraftName}` ({link.edition}) · {state}\n"
+                "아래 버튼으로 내 캐릭터와 서버 기록을 관리하세요."
+            )
+        else:
+            description = (
+                "연결된 Minecraft 계정이 없습니다. "
+                "**연동 요청** 버튼으로 시작하세요."
+            )
+        embed = discord.Embed(
+            title="🧰 내 Minecraft 도구",
+            description=description,
+            color=BRAND_BLUE,
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            view=MyToolsView(self, interaction.user.id),
+            ephemeral=True,
+        )
+
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Allow the friend surface only when its owner-controlled switch is enabled."""
         if cfg.public_commands_enabled or _isAdmin(interaction):
@@ -101,9 +130,12 @@ class Friend(commands.Cog):
             message = (
                 "⏳ 관리자의 연동 승인을 기다리는 중입니다."
                 if link
-                else "❌ 먼저 `/link request <마크닉>`으로 연동을 요청하세요."
+                else "❌ 먼저 `/내도구`의 **연동 요청** 버튼을 사용하세요."
             )
-            await interaction.response.send_message(message, ephemeral=True)
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
         return None
 
     async def _requireFriendAccess(self, interaction: discord.Interaction) -> bool:
@@ -583,6 +615,266 @@ class Friend(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
         except (OSError, RuntimeError, ValueError) as error:
             await interaction.followup.send(f"❌ 건강 점수 계산 실패: {error}", ephemeral=True)
+
+    # --- button-panel adapters ---------------------------------------
+    async def panelRequestLink(
+        self, interaction: discord.Interaction, minecraftName: str, edition: str
+    ) -> None:
+        """Create a link request from the edition buttons and short modal."""
+        try:
+            if edition == "bedrock" and self.appSettings.serverMode != "java_bedrock":
+                raise ValueError("현재 서버는 Java 전용으로 설정되어 있습니다.")
+            link = await asyncio.to_thread(
+                self.linkStore.request,
+                interaction.user.id,
+                minecraftName,
+                edition,
+            )
+            await interaction.response.send_message(
+                f"✅ `{link.minecraftName}` ({link.edition}) 연동을 요청했습니다. "
+                "관리자 승인을 기다려 주세요.",
+                ephemeral=True,
+            )
+        except (ValueError, OSError, RuntimeError) as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+
+    async def panelLinkStatus(self, interaction: discord.Interaction) -> None:
+        """Show the current user's link without requiring command arguments."""
+        link = await asyncio.to_thread(self.linkStore.get, interaction.user.id)
+        if not link:
+            await interaction.response.send_message("연동 요청이 없습니다.", ephemeral=True)
+            return
+        state = "승인됨" if link.approved else "승인 대기"
+        await interaction.response.send_message(
+            f"**마크닉:** `{link.minecraftName}`\n"
+            f"**에디션:** `{link.edition}`\n**상태:** {state}",
+            ephemeral=True,
+        )
+
+    async def panelApproveLink(
+        self, interaction: discord.Interaction, userId: int
+    ) -> None:
+        """Approve a selected link while preserving whitelist validation."""
+        if not await self._requireAdmin(interaction):
+            return
+        try:
+            pending = await asyncio.to_thread(self.linkStore.get, userId)
+            if not pending:
+                raise KeyError("해당 사용자의 연동 요청이 없습니다.")
+            if (
+                pending.edition == "bedrock"
+                and self.appSettings.serverMode != "java_bedrock"
+            ):
+                raise ValueError("Java + Bedrock 모드를 먼저 활성화하세요.")
+            whitelistOutput = await _rcon(buildWhitelistCommand(pending))
+            loweredOutput = whitelistOutput.casefold()
+            if "unknown command" in loweredOutput or "unknown or incomplete" in loweredOutput:
+                raise RuntimeError("Minecraft가 접속 허용 명령을 거부했습니다.")
+            link = await asyncio.to_thread(
+                self.linkStore.approve, userId, interaction.user.id
+            )
+            await interaction.response.send_message(
+                f"✅ <@{userId}> ↔ `{link.minecraftName}` ({link.edition}) 연동을 "
+                f"승인했습니다.\n`{whitelistOutput.strip() or 'done'}`",
+                ephemeral=True,
+            )
+        except (KeyError, ValueError, OSError, RuntimeError, RconError) as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+
+    async def panelRevokeLink(
+        self, interaction: discord.Interaction, userId: int
+    ) -> None:
+        """Revoke the selected stored link without asking for a typed user ID."""
+        if not await self._requireAdmin(interaction):
+            return
+        removed = await asyncio.to_thread(self.linkStore.remove, userId)
+        message = "✅ 연동을 해제했습니다." if removed else "해제할 연동이 없습니다."
+        await interaction.response.send_message(message, ephemeral=True)
+
+    async def panelRescueSpawn(self, interaction: discord.Interaction) -> None:
+        """Reuse the bounded self-rescue command from a button callback."""
+        await type(self).rescueSpawn.callback(self, interaction)
+
+    async def panelWhereAmI(self, interaction: discord.Interaction) -> None:
+        """Reuse the linked-player location lookup from a button callback."""
+        await type(self).rescueWhereAmI.callback(self, interaction)
+
+    async def panelServerScore(self, interaction: discord.Interaction) -> None:
+        """Reuse the on-demand health calculation from a button callback."""
+        await type(self).serverScore.callback(self, interaction)
+
+    async def panelPlaces(self) -> list[Place]:
+        """Return coordinate choices for the panel dropdown."""
+        return await asyncio.to_thread(self.placeStore.list)
+
+    async def panelShowPlace(
+        self, interaction: discord.Interaction, name: str
+    ) -> None:
+        """Open a selected coordinate card."""
+        place = await asyncio.to_thread(self.placeStore.get, name)
+        if not place:
+            await interaction.response.send_message("좌표를 찾지 못했습니다.", ephemeral=True)
+            return
+        await self._sendPlace(interaction, place)
+
+    async def panelDeletePlace(
+        self, interaction: discord.Interaction, name: str
+    ) -> None:
+        """Delete a selected coordinate while preserving its ownership rule."""
+        try:
+            place = await asyncio.to_thread(self.placeStore.get, name)
+            if not place:
+                await interaction.response.send_message("좌표를 찾지 못했습니다.", ephemeral=True)
+                return
+            if not _isAdmin(interaction) and place.createdBy != interaction.user.id:
+                await interaction.response.send_message(
+                    "⛔ 등록자 또는 관리자만 삭제할 수 있습니다.", ephemeral=True
+                )
+                return
+            deleted = await asyncio.to_thread(self.placeStore.delete, name)
+            await asyncio.to_thread(
+                self.imageStore.remove, deleted.imagePath if deleted else None
+            )
+            await interaction.response.send_message("✅ 좌표를 삭제했습니다.", ephemeral=True)
+        except (ValueError, OSError, RuntimeError) as error:
+            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+
+    async def panelSaveCurrentPlace(
+        self, interaction: discord.Interaction, name: str, description: str
+    ) -> None:
+        """Read the linked player's current position and store it under a short name."""
+        link = await self._approvedLink(interaction)
+        if not link:
+            return
+        try:
+            playerName = serverPlayerName(
+                link, self.appSettings.bedrockUsernamePrefix
+            )
+            positionOutput, dimensionOutput = await asyncio.gather(
+                _rcon(f"data get entity {playerName} Pos"),
+                _rcon(f"data get entity {playerName} Dimension"),
+            )
+            dimension, x, y, z = parsePosition(positionOutput, dimensionOutput)
+            place, previous = await asyncio.to_thread(
+                self.placeStore.save,
+                name,
+                dimension,
+                round(x),
+                round(y),
+                round(z),
+                description,
+                None,
+                interaction.user.id,
+            )
+            if previous and previous.imagePath:
+                await asyncio.to_thread(self.imageStore.remove, previous.imagePath)
+            await asyncio.to_thread(
+                self.diaryStore.record,
+                "place",
+                f"Saved {place.name} at {place.dimension} {place.x} {place.y} {place.z}.",
+                interaction.user.id,
+            )
+            await self._sendPlace(interaction, place)
+        except (ValueError, OSError, RuntimeError, RconError) as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    async def panelDiaryEntries(self) -> list[DiaryEntry]:
+        """Return recent diary entries for the panel dropdown."""
+        return await asyncio.to_thread(self.diaryStore.recent, 25)
+
+    async def panelShowDiary(
+        self, interaction: discord.Interaction, entryId: str
+    ) -> None:
+        """Open one selected diary entry."""
+        entry = await asyncio.to_thread(self.diaryStore.get, entryId)
+        if not entry:
+            await interaction.response.send_message("일지를 찾지 못했습니다.", ephemeral=True)
+            return
+        await self._sendDiaryEntry(interaction, entry)
+
+    async def panelAddDiary(
+        self, interaction: discord.Interaction, message: str
+    ) -> None:
+        """Record a text-only diary entry submitted through a modal."""
+        if not await self._requireFriendAccess(interaction):
+            return
+        try:
+            entry = await asyncio.to_thread(
+                self.diaryStore.record,
+                "note",
+                message,
+                interaction.user.id,
+            )
+            await self._sendDiaryEntry(interaction, entry)
+        except (ValueError, OSError, RuntimeError) as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    async def panelUploadPlacePhoto(
+        self,
+        interaction: discord.Interaction,
+        name: str,
+        attachment: discord.Attachment,
+    ) -> None:
+        """Replace the photo of a selected coordinate via the upload-only command."""
+        if not await self._requireFriendAccess(interaction):
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        imagePath = None
+        stored = False
+        try:
+            place = await asyncio.to_thread(self.placeStore.get, name)
+            if not place:
+                raise ValueError("좌표를 찾지 못했습니다.")
+            if not _isAdmin(interaction) and place.createdBy != interaction.user.id:
+                raise ValueError("등록자 또는 관리자만 사진을 바꿀 수 있습니다.")
+            imagePath = await self._saveAttachment(attachment)
+            updated, previous = await asyncio.to_thread(
+                self.placeStore.save,
+                place.name,
+                place.dimension,
+                place.x,
+                place.y,
+                place.z,
+                place.description,
+                imagePath,
+                place.createdBy,
+            )
+            stored = True
+            if previous and previous.imagePath != imagePath:
+                await asyncio.to_thread(self.imageStore.remove, previous.imagePath)
+            await self._sendPlace(interaction, updated)
+        except (ValueError, OSError, RuntimeError, discord.HTTPException) as error:
+            if not stored:
+                await asyncio.to_thread(self.imageStore.remove, imagePath)
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    async def panelUploadDiaryPhoto(
+        self,
+        interaction: discord.Interaction,
+        message: str,
+        attachment: discord.Attachment,
+    ) -> None:
+        """Create a photo diary entry through the attachment-only command group."""
+        if not await self._requireFriendAccess(interaction):
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        imagePath = None
+        stored = False
+        try:
+            imagePath = await self._saveAttachment(attachment)
+            entry = await asyncio.to_thread(
+                self.diaryStore.record,
+                "note",
+                message,
+                interaction.user.id,
+                imagePath,
+            )
+            stored = True
+            await self._sendDiaryEntry(interaction, entry)
+        except (ValueError, OSError, RuntimeError, discord.HTTPException) as error:
+            if not stored:
+                await asyncio.to_thread(self.imageStore.remove, imagePath)
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

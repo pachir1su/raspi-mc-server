@@ -6,14 +6,19 @@
 """
 
 import asyncio
+import os
 import struct
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import patch
 
 from bot.rcon import (
     Rcon,
     RconAuthError,
     RconConnectionError,
     RconTimeout,
+    _main,
 )
 
 TYPE_AUTH = 3
@@ -92,6 +97,35 @@ class RconClientTests(unittest.IsolatedAsyncioTestCase):
                 out = await client.command("list")
             self.assertIn("players online", out)
 
+
+class RconCliTests(unittest.IsolatedAsyncioTestCase):
+    def testCliLoadsDotenvBeforeReadingPassword(self):
+        class FakeRcon:
+            def __init__(self, host, port, password):
+                self.password = password
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return None
+
+            async def command(self, command):
+                return f"{self.password}:{command}"
+
+        def loadEnvironment():
+            os.environ["RCON_PASSWORD"] = "from-dotenv"
+
+        with patch.dict(os.environ, {}, clear=True), patch(
+            "dotenv.load_dotenv", side_effect=loadEnvironment
+        ) as loadDotenv, patch("bot.rcon.Rcon", FakeRcon), redirect_stdout(
+            StringIO()
+        ) as output:
+            self.assertEqual(0, _main(["list"]))
+
+        loadDotenv.assert_called_once_with()
+        self.assertEqual("from-dotenv:list", output.getvalue().strip())
+
     async def testWrongPasswordRaisesAuthError(self):
         async with FakeRconServer("badpass") as server:
             with self.assertRaises(RconAuthError):
@@ -105,10 +139,11 @@ class RconClientTests(unittest.IsolatedAsyncioTestCase):
                     pass
 
     async def testClosedPortRaisesConnectionError(self):
-        # 아무도 듣고 있지 않은 포트 → 연결 자체가 실패해야 합니다.
-        with self.assertRaises(RconConnectionError):
-            async with Rcon("127.0.0.1", 1, "secret", timeout=1):
-                pass
+        # OS별 예약 포트 동작에 의존하지 않고 연결 거부를 직접 재현합니다.
+        with patch("bot.rcon.asyncio.open_connection", side_effect=OSError("refused")):
+            with self.assertRaises(RconConnectionError):
+                async with Rcon("127.0.0.1", 25575, "secret", timeout=1):
+                    pass
 
     async def testLongHexPasswordAuthenticates(self):
         # 64자 hex 비밀번호도 정상 처리되는지 확인(실배포 재현 케이스).

@@ -18,7 +18,7 @@ Your friends play normal survival with no command access. You keep full control.
 
 ## How to op yourself (and only yourself)
 
-From the server console or the Discord `/mc` command:
+From the server console or Discord `/admin` → **Advanced tools** → **Advanced RCON**:
 
 ```
 op YourMinecraftName
@@ -38,8 +38,8 @@ deop SomeoneElse
 The **console, RCON, the Discord bot, and SSH sessions** all execute commands
 at **op level 4** regardless of the ops list. That's why:
 
-- The Discord `/mc <command>` runs any command (it goes through RCON).
-- `mcrcon` from SSH runs any command.
+- Discord **Advanced RCON** runs any command through RCON.
+- `.venv/bin/python -m bot.rcon` from SSH runs any command using `.env`.
 
 Because those channels are gated to **you** (admin allowlist / SSH access /
 being at the console), they are effectively *your* private cheat console — even
@@ -57,7 +57,7 @@ though in-game you could also just be op.
 As an op you can `/gamemode creative` yourself any time — that's the intended
 "owner cheat". Your friends (non-ops) cannot, which is the whole point.
 
-## Common owner cheat commands (via console / `/mc`)
+## Common owner cheat commands (via console / Advanced RCON)
 
 ```
 gamemode creative YourName

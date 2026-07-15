@@ -338,7 +338,7 @@ cd ~/raspi-mc-server
 set -a
 . ./.env
 set +a
-mcrcon -H 127.0.0.1 -P 25575 -p "$RCON_PASSWORD" "op Owner_Java_Name"
+.venv/bin/python -m bot.rcon "op Owner_Java_Name"
 ```
 
 Prefer a Java account for owner administration. Friends join through Discord
@@ -409,21 +409,12 @@ Test from mobile data or another network, not from the same Wi-Fi.
 
 Friends install no Geyser, Floodgate, mod, or separate launcher.
 
-In Discord, the friend runs:
-
-```text
-/link request minecraft_name:<exact name or Xbox gamertag> edition:<Java or Bedrock>
-```
-
-The owner runs:
-
-```text
-/link list
-/link approve user:<friend Discord account>
-```
+In Discord, the friend opens `/my-tools`, presses **Request link**, selects the
+edition, and enters the exact name or Xbox gamertag. The owner opens `/admin` →
+**Account links**, selects the request, and presses **Approve**.
 
 Approval also adds the correct Java/Floodgate whitelist entry. Approved friends
-can use `/rescue spawn` and `/rescue whereami` only for their linked account.
+can use **Rescue to spawn** and **My location** in `/my-tools` only for their linked account.
 
 Floodgate documents that `fwhitelist` can resolve a gamertag only after that Xbox
 account has joined some Geyser server before. If approval fails for a completely
@@ -432,7 +423,7 @@ new account, follow the first-Bedrock-login recovery in
 
 ## 14. Daily headless operation
 
-Normally use Discord `/panel`. If the bot is unavailable, connect from Windows:
+Normally use Discord `/admin`. If the bot is unavailable, connect from Windows:
 
 ```powershell
 ssh mcadmin@mc-pi.local
@@ -466,19 +457,19 @@ Install this feature once with the manual procedure below and rerun
 provisioning. For later versions, publishing a GitHub Release automatically
 attaches `raspi-mc-server-vX.Y.Z.zip` plus its SHA-256 file.
 
-Run `/update check` and press **Install update**. The Pi downloads the official
+Open `/admin` → **Updates** and press **Check new version**, then **Install update**. The Pi downloads the official
 Release asset directly and verifies its manifest and every file's SHA-256. Only
 the Discord bot restarts; Paper and the world keep running.
 
-If the Release ZIP is already on your PC, `/update upload file:<ZIP>` is the
+If the Release ZIP is already on your PC, `/upload update file:<ZIP>` is the
 recovery path. Use the deployment ZIP attached by the workflow, not GitHub's
 automatic `Source code (zip)` or a repacked archive; those lack the verification
-manifest. Use `/update check` when Discord's attachment limit is too small.
+manifest. Use **Check new version** when Discord's attachment limit is too small.
 
 The updater preserves `.env`, `/mnt/minecraft/live`, bot state (links, places,
 journal), photos, and logs. It prepares a new Python environment first and
 rolls code and dependencies back if the bot fails its startup check. Inspect
-the result after restart with `/update status`.
+the result after restart with **Recent result** in the Updates panel.
 
 ### First installation or bot unavailable
 

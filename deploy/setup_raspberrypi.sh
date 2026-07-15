@@ -129,7 +129,9 @@ sudo chmod 440 "$SUDOERS"
 echo "==> Installing systemd units..."
 # 유닛 템플릿의 @USER@/@REPO_DIR@ 자리표시자를 실제 값으로 치환해 설치합니다(이슈 F).
 install_unit() {
-  sed -e "s|@USER@|$SERVICE_USER|g" -e "s|@REPO_DIR@|$REPO_DIR|g" "$1" | \
+  sed -e "s|@USER@|$SERVICE_USER|g" \
+    -e "s|@REPO_DIR@|$REPO_DIR|g" \
+    -e "s|@STATE_DIR@|$STATE_DIR|g" "$1" | \
     sudo tee "$2" >/dev/null
 }
 install_unit "$REPO_DIR/deploy/minecraft.service" /etc/systemd/system/minecraft.service
@@ -149,8 +151,9 @@ sudo systemctl daemon-reload
 
 # 봇 상태 디렉터리(data/)를 서비스 계정 소유로 보정합니다. root로 도는 업데이터가
 # 먼저 만들어 소유권이 어긋난 경우 봇 first-setup의 PermissionError를 막습니다(이슈 E).
-mkdir -p "$STATE_DIR"
+mkdir -p "$STATE_DIR" "$REPO_DIR/bot/logs"
 sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$STATE_DIR"
+sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$REPO_DIR/bot/logs"
 
 cat <<EOF
 

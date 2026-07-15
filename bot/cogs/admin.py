@@ -32,6 +32,7 @@ from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
 from bot.player_info import parseOnlinePlayers, summarizeInventory, validatePlayerName
 from bot.performance_report import parseTps, shouldAlert
+from bot.public_panel import PublicServerView
 from bot.rcon import (
     Rcon,
     RconAuthError,
@@ -56,7 +57,7 @@ from bot.update_ui import UpdateConfirmView
 from bot.world_storage import StorageError, WorldStorage
 
 _log = log.get("cog.admin")
-PUBLIC_COMMANDS = {"portal", "online"}
+PUBLIC_COMMANDS = {"server", "portal", "online"}
 
 # 접속자가 0명이면 자동 백업 주기를 이 배수만큼 늘려 부하를 줄입니다(이슈 I, #16).
 IDLE_INTERVAL_MULTIPLIER = 4
@@ -123,6 +124,10 @@ def _startUpdater() -> tuple[bool, str]:
 
 
 class Admin(commands.Cog):
+    uploadGroup = app_commands.Group(
+        name="upload", description="Upload files that Discord buttons cannot attach."
+    )
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.settingsStore = SettingsStore(cfg.state_dir)
@@ -133,6 +138,71 @@ class Admin(commands.Cog):
         self.updateStore = UpdateStore(cfg.state_dir, cfg.storage_root)
         self.operationLock = asyncio.Lock()
         self.lastAlertAt: dict[str, datetime] = {}
+
+    @app_commands.command(
+        name="server", description="Open the friend-safe button server panel."
+    )
+    async def serverPanel(self, interaction: discord.Interaction) -> None:
+        """Open the read-only public panel without command arguments."""
+        await interaction.response.send_message(
+            embed=await self.publicServerEmbed(),
+            view=PublicServerView(self, interaction.user.id),
+            ephemeral=True,
+        )
+
+    @app_commands.command(
+        name="admin", description="Open the private button-first administrator panel."
+    )
+    async def adminPanel(self, interaction: discord.Interaction) -> None:
+        """Open the single owner-only entry point for routine operations."""
+        await interaction.response.send_message(
+            embed=await self.panelOverviewEmbed(),
+            view=AdminDashboardView(self, interaction.user.id),
+            ephemeral=True,
+        )
+
+    @uploadGroup.command(name="world", description="Upload a Java world ZIP archive.")
+    async def uploadWorld(
+        self, interaction: discord.Interaction, file: discord.Attachment
+    ) -> None:
+        """Derive the map name from the file so uploading requires no typing."""
+        name = Path(file.filename).stem[:60]
+        await type(self).worldUpload.callback(self, interaction, name, file)
+
+    @uploadGroup.command(
+        name="update", description="Upload a trusted application Release ZIP."
+    )
+    async def uploadUpdate(
+        self, interaction: discord.Interaction, file: discord.Attachment
+    ) -> None:
+        """Forward a selected ZIP into the existing verified update flow."""
+        await type(self).updateUpload.callback(self, interaction, file)
+
+    @uploadGroup.command(
+        name="place-photo", description="Attach a photo to an existing coordinate."
+    )
+    async def uploadPlacePhoto(
+        self, interaction: discord.Interaction, name: str, file: discord.Attachment
+    ) -> None:
+        """Keep optional coordinate photos while the normal place flow stays button-only."""
+        friend = self.bot.get_cog("Friend")
+        if friend is None:
+            await interaction.response.send_message("친구 도구가 준비되지 않았습니다.", ephemeral=True)
+            return
+        await friend.panelUploadPlacePhoto(interaction, name, file)
+
+    @uploadGroup.command(
+        name="diary", description="Write a diary entry with a photo attachment."
+    )
+    async def uploadDiaryPhoto(
+        self, interaction: discord.Interaction, message: str, file: discord.Attachment
+    ) -> None:
+        """Preserve the attachment path for the inherently text-based diary feature."""
+        friend = self.bot.get_cog("Friend")
+        if friend is None:
+            await interaction.response.send_message("친구 도구가 준비되지 않았습니다.", ephemeral=True)
+            return
+        await friend.panelUploadDiaryPhoto(interaction, message, file)
 
     async def cog_load(self):
         """Start the persistent in-bot scheduler after the cog is ready."""
@@ -150,7 +220,15 @@ class Admin(commands.Cog):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         commandName = interaction.command.name if interaction.command else ""
+        qualifiedName = (
+            interaction.command.qualified_name if interaction.command else ""
+        )
         if commandName in PUBLIC_COMMANDS and cfg.public_commands_enabled:
+            return True
+        if (
+            qualifiedName in {"upload place-photo", "upload diary"}
+            and cfg.public_commands_enabled
+        ):
             return True
         if _is_admin(interaction):
             return True
@@ -1113,6 +1191,127 @@ class Admin(commands.Cog):
             )
             return
         await self._incidentCommand(interaction, "kill @e[type=item]", "incident_kill_items")
+
+    async def publicServerEmbed(self) -> discord.Embed:
+        """Build the friend-safe server card shared by `/서버` panel refreshes."""
+        players = []
+        statusText = t("portal_offline")
+        try:
+            statusText = await _rcon("list")
+            players = parseOnlinePlayers(statusText)
+        except RconError:
+            pass
+        online = statusText != t("portal_offline")
+        embed = discord.Embed(
+            title=t("portal_title"),
+            description=t("portal_description"),
+            color=OK_GREEN if online else WARN_YELLOW,
+        )
+        embed.add_field(
+            name="상태", value="🟢 온라인" if online else "🔴 오프라인", inline=True
+        )
+        embed.add_field(
+            name=t("portal_online"),
+            value=", ".join(players) if players else t("online_none"),
+            inline=True,
+        )
+        embed.add_field(
+            name=t("portal_address"),
+            value=cfg.public_address or t("portal_address_missing"),
+            inline=False,
+        )
+        embed.add_field(name=t("portal_version"), value=cfg.public_version, inline=True)
+        if cfg.public_rules:
+            embed.add_field(name=t("portal_rules"), value=cfg.public_rules, inline=False)
+        return embed
+
+    async def panelLegacyCommand(
+        self, commandName: str, interaction: discord.Interaction, *args
+    ) -> None:
+        """Invoke a preserved command callback from a button without duplicating logic."""
+        command = getattr(type(self), commandName, None)
+        callback = getattr(command, "callback", None)
+        if callback is None:
+            raise RuntimeError(f"panel action is unavailable: {commandName}")
+        await callback(self, interaction, *args)
+
+    async def panelBackups(self):
+        """Return newest backup metadata for the panel dropdown."""
+        try:
+            return await asyncio.to_thread(self.storage.listBackups)
+        except StorageError:
+            return []
+
+    async def panelWorlds(self):
+        """Return imported world metadata for the panel dropdown."""
+        try:
+            return await asyncio.to_thread(self.storage.listWorlds)
+        except StorageError:
+            return []
+
+    async def panelBackupEmbed(self) -> discord.Embed:
+        """Summarize the persistent backup policy and most recent archive."""
+        settings = await asyncio.to_thread(self.settingsStore.load)
+        backups = await self.panelBackups()
+        latest = backups[0].modifiedAt.strftime("%Y-%m-%d %H:%M UTC") if backups else "없음"
+        embed = discord.Embed(title="💾 월드 백업", color=BRAND_BLUE)
+        embed.description = (
+            f"**자동 백업:** {'켜짐' if settings.enabled else '꺼짐'}\n"
+            f"**주기:** {settings.intervalMinutes}분\n"
+            f"**최근 백업:** {latest}\n"
+            f"**보관:** {settings.retentionHours}시간 + 일일 {settings.dailyRetentionDays}일"
+        )
+        return embed
+
+    async def panelBackupSettings(self):
+        """Return the current backup settings for stateful button labels."""
+        return await asyncio.to_thread(self.settingsStore.load)
+
+    async def panelUpdateBackupSetting(self, fieldName: str, value: int):
+        """Persist one allowlisted backup setting selected from a dropdown."""
+        allowed = {
+            "intervalMinutes",
+            "retentionHours",
+            "dailyRetentionDays",
+            "maxUsagePercent",
+            "minFreeGb",
+        }
+        if fieldName not in allowed:
+            raise ValueError("unsupported backup setting")
+        settings = await asyncio.to_thread(self.settingsStore.load)
+        updated = replace(settings, **{fieldName: value})
+        await asyncio.to_thread(self.settingsStore.save, updated)
+        return updated
+
+    async def panelTextAction(
+        self, interaction: discord.Interaction, action: str, value: str
+    ) -> None:
+        """Route the few unavoidable text modals through existing audited actions."""
+        mapping = {
+            "say": "say",
+            "mc": "mc",
+            "wl_add": "wl_add",
+            "wl_remove": "wl_remove",
+        }
+        commandName = mapping.get(action)
+        if commandName is None:
+            raise ValueError("unsupported text action")
+        await self.panelLegacyCommand(commandName, interaction, value)
+
+    async def panelOpenLinkAdmin(self, interaction: discord.Interaction) -> None:
+        """Open pending/approved link management as a dropdown panel."""
+        friend = self.bot.get_cog("Friend")
+        if friend is None:
+            await interaction.response.send_message("친구 도구가 준비되지 않았습니다.", ephemeral=True)
+            return
+        from bot.friend_panel import LinkAdminView
+
+        links = await asyncio.to_thread(friend.linkStore.list)
+        await interaction.response.send_message(
+            "연동 요청을 선택한 뒤 승인하거나 해제하세요.",
+            view=LinkAdminView(friend, interaction.user.id, links),
+            ephemeral=True,
+        )
 
     async def panelOnlinePlayers(self) -> list[str]:
         """Return validated live player names from Paper's list command."""

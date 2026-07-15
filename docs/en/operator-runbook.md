@@ -1,7 +1,7 @@
 # Server owner operations runbook
 
 Use this checklist for the Raspberry Pi 4B + 32GB microSD + 500GB USB HDD
-deployment. Prefer Discord `/panel`; use SSH when Discord or the bot is down.
+deployment. Prefer Discord `/admin`; use SSH when Discord or the bot is down.
 
 For initial imaging, Wi-Fi/SSH setup, and finding the Pi without a display, see
 [headless-setup.md](headless-setup.md).
@@ -20,7 +20,7 @@ DHCP reservation for the Pi so port forwarding and emergency SSH do not move.
 
 ## Daily check
 
-Open `/panel` and verify server status, HDD free space, backup freshness, and the
+Open `/admin` and verify server status, HDD free space, backup freshness, and the
 **Performance** card for TPS, CPU temperature, memory, and power flags.
 
 | Metric | Healthy | Investigate |
@@ -40,7 +40,7 @@ cd ~/raspi-mc-server
 
 ## Start, stop, and restart
 
-- Normal path: `/panel` → **Server controls**.
+- Normal path: `/admin` → **Server controls**.
 - Stop and restart require a second confirmation click.
 - If Discord is unavailable:
 
@@ -70,13 +70,13 @@ disconnecting the HDD.
 
 ## Player support
 
-Use `/players` to select a connected player and inspect inventory,
+Use `/admin` → **Players** to select a connected player and inspect inventory,
 position/dimension, health/food/XP, or effects. Inspection is read-only. RCON
 cannot inspect an offline player's live entity data.
 
 ## Log triage order
 
-1. `/logs` → **Minecraft errors**.
+1. `/admin` → **Logs** → **Minecraft errors**.
 2. Use **Bot errors** for failed Discord commands.
 3. Open the full preview for context.
 4. Download the original when needed.
@@ -90,8 +90,8 @@ tail -n 200 /mnt/minecraft/live/logs/latest.log
 
 ## When the HDD disappears
 
-Symptoms include `/storage` failure, systemd start failure, or a mount error in
-`/health`.
+Symptoms include a **Storage** failure, systemd start failure, or a mount error in
+`/admin` → **Health**.
 
 ```bash
 lsblk -f
@@ -107,7 +107,7 @@ the empty mount directory on microSD.
 
 ## Undervoltage or throttling
 
-Inspect `/metrics` or run:
+Inspect `/admin` → **Performance** or run:
 
 ```bash
 vcgencmd get_throttled
@@ -120,14 +120,14 @@ vcgencmd measure_temp
 
 ## Backup and restore
 
-Before restore, run `/backup verify`, copy an important archive off the HDD,
-notify connected players, then run `/backup restore`. Restore makes another
+Before restore, open `/admin` → **Backups**, select and **Verify** the archive,
+copy it off the HDD, notify players, then press **Restore** and confirm. Restore makes another
 emergency snapshot, but same-disk backups do not protect against HDD failure.
 
 ## Safe update procedure
 
-Normally run `/update check`, press **Install update**, and inspect `/update
-status` after the bot restarts. `/update upload` accepts an official deployment
+Normally open `/admin` → **Updates**, press **Check new version**, and inspect
+**Recent result** after restart. `/upload update` accepts an official deployment
 ZIP already on your device; source-code ZIPs have no manifest and are rejected.
 Paper keeps running, while `.env` and operational data remain untouched.
 
@@ -147,7 +147,7 @@ sudo systemctl restart mc-discord-bot.service
 ```
 
 Back up unexpected local changes instead of overwriting them. After updating,
-exercise `/panel`, `/metrics`, and `/logs`. Application updates do not modify
+exercise `/admin` overview, **Performance**, and **Logs**. Application updates do not modify
 the world, so they avoid a routine world backup that would add HDD I/O and TPS
 pressure.
 

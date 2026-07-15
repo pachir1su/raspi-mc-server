@@ -1,8 +1,9 @@
 # systemd unit for the Discord admin bot.
 #
-# 이 파일은 템플릿입니다. deploy/setup_raspberrypi.sh가 @USER@/@REPO_DIR@를
+# 이 파일은 템플릿입니다. deploy/setup_raspberrypi.sh가 @USER@/@REPO_DIR@/@STATE_DIR@를
 # 실제 값으로 치환해 설치합니다. 수동 설치 시 자리표시자를 직접 바꾸세요:
 #   sudo sed -e "s|@USER@|$(id -un)|g" -e "s|@REPO_DIR@|$PWD|g" \
+#     -e "s|@STATE_DIR@|$PWD/data|g" \
 #     deploy/mc-discord-bot.service | \
 #     sudo tee /etc/systemd/system/mc-discord-bot.service
 #   sudo systemctl daemon-reload
@@ -37,8 +38,8 @@ RestartPreventExitStatus=78
 # 그 대신 아래 하드닝으로 보안 수준을 보상합니다.
 ProtectSystem=strict
 ProtectHome=read-only
-# 봇이 실제로 써야 하는 경로만 다시 쓰기 허용합니다(data/, bot/logs/, HDD).
-ReadWritePaths=@REPO_DIR@ /mnt/minecraft
+# 봇이 실제로 써야 하는 경로만 다시 쓰기 허용합니다(state, logs, HDD).
+ReadWritePaths=@STATE_DIR@ @REPO_DIR@/bot/logs /mnt/minecraft
 PrivateTmp=true
 ProtectControlGroups=true
 ProtectKernelTunables=true

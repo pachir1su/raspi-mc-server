@@ -61,7 +61,7 @@ Keep `rcon.port` bound to localhost (the default host the bot uses is
 ## Difficulty & gameplay
 
 `gamemode`, `difficulty`, `pvp`, `hardcore`, `allow-nether` are set to sensible
-survival defaults. Change them to taste; restart the server (or use `/restart`)
+survival defaults. Change them to taste; restart the server (or use `/admin` → **Server controls**)
 to apply.
 
 ## Applying changes
@@ -69,7 +69,7 @@ to apply.
 Most `server.properties` changes require a restart:
 
 ```bash
-sudo systemctl restart minecraft.service   # or /restart from the Discord bot
+sudo systemctl restart minecraft.service   # or /admin -> Server controls
 ```
 
 ## Paper-specific tuning

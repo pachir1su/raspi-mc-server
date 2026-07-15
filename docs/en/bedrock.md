@@ -58,8 +58,9 @@ custom-server UI is restricted and is not part of this one-tap support target.
 
 ## Discord link and admission
 
-The friend runs `/link request`, enters the exact Java name or Xbox gamertag,
-and selects the edition. The owner runs `/link approve`. Approval also runs the
+The friend opens `/my-tools`, presses **Request link**, selects the edition, and
+enters the exact Java name or Xbox gamertag. The owner opens `/admin` →
+**Account links** and presses **Approve**. Approval also runs the
 correct Paper/Floodgate whitelist command, so no second whitelist step is
 needed. Floodgate names use a `.` prefix internally to avoid colliding with a
 Java account of the same name; the friend still types the ordinary gamertag.

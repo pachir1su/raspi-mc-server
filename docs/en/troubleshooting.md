@@ -11,7 +11,7 @@ sudo journalctl -u mc-discord-bot.service -n 100 --no-pager  # bot
 tail -n 100 /mnt/minecraft/live/logs/latest.log              # Minecraft's own log
 ```
 
-From Discord, `/logs` attaches the bot's current log file.
+From Discord, `/admin` → **Logs** previews or attaches the current log file.
 
 ## Server won't start
 
@@ -26,7 +26,7 @@ From Discord, `/logs` attaches the bot's current log file.
 
 ## Players can't connect
 
-1. **Discord link approved?** The owner runs `/link list`, then `/link approve`.
+1. **Discord link approved?** The owner opens `/admin` → **Account links**, selects the request, and presses **Approve**.
 2. **Correct endpoint?** Java uses `25565/TCP`; iPhone, Android, and Minecraft
    for Windows use Geyser on `19132/UDP`.
 3. **Correct version/account?** Java must match the Paper-supported protocol;
@@ -45,8 +45,8 @@ From Discord, `/logs` attaches the bot's current log file.
 | Commands don't appear | Global sync delay | Set `DISCORD_GUILD_ID` for instant guild sync |
 | `Missing required config` at start | `.env` incomplete | Set `DISCORD_TOKEN`, `RCON_PASSWORD`, `ADMIN_USER_IDS` |
 | `⛔ not authorised` | Your ID not in allowlist | Add your Discord user ID to `ADMIN_USER_IDS` |
-| `/mc` returns RCON error | RCON off/mismatch | `enable-rcon=true`; `RCON_PASSWORD` must match `server.properties` |
-| `/start` etc. fail | sudoers rule missing | Re-run `deploy/setup_raspberrypi.sh` |
+| **Advanced RCON** returns an RCON error | RCON off/mismatch | `enable-rcon=true`; `RCON_PASSWORD` must match `server.properties` |
+| Server-control buttons fail | sudoers rule missing | Re-run `deploy/setup_raspberrypi.sh` |
 | Bot crash-loops with `The "no new privileges" flag is set` | Old unit had `NoNewPrivileges=true`, which blocks `sudo` (setuid) | Reinstall `deploy/mc-discord-bot.service` (it no longer sets `NoNewPrivileges`; hardening is preserved with `ProtectSystem`/`ProtectHome`/`ReadWritePaths`). See [discord-bot.md](discord-bot.md#security-hardening-and-sudo). |
 | Bot restarts every 10s right after install | First setup not completed | Run `.venv/bin/python -m bot.main` once in a terminal. The service now exits `EX_CONFIG` (78) and `RestartPreventExitStatus=78` stops the loop. |
 | `raspi-mc-updater.service` shows `failed` at boot | No pending update request | Expected before this fix; update the repo so the updater treats "no request" as success (exit 0). |
@@ -107,7 +107,7 @@ vanishes. Work around it:
 - **Move the SSD to a USB 2.0 port.** It is slower but the controller stays up;
   this alone fixes most cases.
 - **Add a powered USB hub.** The adapter may be browning out the 5V rail;
-  undervoltage also shows in `/metrics` throttle flags.
+  undervoltage also shows in `/admin` → **Performance** throttle flags.
 - **Apply a usb-storage quirk** to disable UAS for the bridge. Find the
   `idVendor:idProduct` with `lsusb`, then add to `/boot/firmware/cmdline.txt`
   (one line): `usb-storage.quirks=VVVV:PPPP:u` and reboot. This forces the slower
@@ -123,7 +123,7 @@ move the world to USB 3.0 HDD/SSD storage, ensure the Pi isn't thermally throttl
 
 - Confirm the HDD is mounted with `findmnt /mnt/minecraft` before deleting
   anything.
-- Shorten retention with `/backup configure`, prune old backups, remove
+- Shorten retention with `/admin` → **Backups** → **Policy settings**, press **Prune**, remove
   unneeded restore archives, or move backups off-device.
 - Inspect `/mnt/minecraft/live/logs/` and bot logs; use the configured retention
   rather than blindly deleting active files.

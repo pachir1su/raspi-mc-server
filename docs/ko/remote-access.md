@@ -6,14 +6,14 @@
 
 ## 1. SSH + RCON (기본)
 
-가장 단순한 원격 콘솔: 파이에 SSH로 들어가 `mcrcon` 사용.
+가장 단순한 원격 콘솔: 파이에 SSH로 들어가 내장 Python RCON 클라이언트 사용.
 
 ```bash
 ssh pi@파이-LAN-IP
 cd raspi-mc-server
-# .env 에 RCON_* 가 있음; source 하거나 플래그로 직접 전달
-mcrcon -H 127.0.0.1 -P 25575 -p "$RCON_PASSWORD" "list"
-mcrcon -H 127.0.0.1 -P 25575 -p "$RCON_PASSWORD" "gamemode creative 내닉네임"
+# 클라이언트가 .env의 RCON_HOST/RCON_PORT/RCON_PASSWORD를 읽음
+.venv/bin/python -m bot.rcon "list"
+.venv/bin/python -m bot.rcon "gamemode creative 내닉네임"
 ```
 
 RCON은 op 레벨 4로 실행되므로 완전한 관리/치트 콘솔입니다. RCON은 localhost에

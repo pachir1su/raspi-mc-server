@@ -50,7 +50,9 @@ def _matchParentOwner(path: Path) -> None:
     """
     try:
         parentStat = path.parent.stat()
-        os.chown(path, parentStat.st_uid, parentStat.st_gid)
+        chown = getattr(os, "chown", None)
+        if chown is not None:
+            chown(path, parentStat.st_uid, parentStat.st_gid)
     except OSError:
         # 권한이 없거나(비-root 실행) 지원되지 않으면 조용히 건너뜁니다.
         pass
@@ -305,7 +307,9 @@ def applyUpdate(args: argparse.Namespace) -> None:
     try:
         repoStat = repoDir.stat()
         stateDir.mkdir(parents=True, exist_ok=True)
-        os.chown(stateDir, repoStat.st_uid, repoStat.st_gid)
+        chown = getattr(os, "chown", None)
+        if chown is not None:
+            chown(stateDir, repoStat.st_uid, repoStat.st_gid)
     except OSError:
         pass
     startedAt = datetime.now(timezone.utc).isoformat()

@@ -38,7 +38,7 @@ Apply changes and restart. Change one thing at a time and watch TPS.
 
 ## Monitoring
 
-Discord `/metrics` or the dashboard **Performance** button combines Paper TPS,
+Discord `/admin` → **Performance** combines Paper TPS,
 Pi CPU temperature, 1/5/15-minute load averages, memory, HDD, uptime, and current
 or historical undervoltage/throttle flags.
 
