@@ -25,34 +25,22 @@ backup, and `save-on`.
 - Keep every backup for the newest 48 hours.
 - Then keep the newest backup per day for 30 days.
 - Stop at 80% HDD usage or below 30 GB free.
-- `/backup configure` persists to `data/backup-settings.json`.
+- Changes from `/admin` → **Backups** → **Policy settings** persist to `data/backup-settings.json`.
 - The shortest permitted interval is 10 minutes.
 
-Inspect and change the policy from Discord:
-The settings view also shows the next due time based on the newest backup.
-
-```text
-/backup settings
-/backup configure interval_minutes:30 retention_hours:48 daily_retention_days:30
-/backup configure max_usage_percent:80 min_free_gb:30
-/backup enabled enabled:false
-```
+Open `/admin` → **Backups**. The card shows the current policy; **Automatic
+backup** toggles it, and **Policy settings** provides preselected dropdowns for
+interval, retention, maximum usage, and minimum free space.
 
 ## Backup and restore commands
 
-```text
-/backup create
-/backup list
-/backup download name:<filename>
-/backup verify name:<filename>
-/backup prune
-/backup restore name:<filename> confirm:RESTORE
-/backup delete name:<filename> confirm:DELETE
-```
+Open `/admin` → **Backups**, choose an archive from the dropdown, then use
+**Back up now**, **Verify**, **Download**, **Prune**, **Restore**, or **Delete**.
+Restore and delete require a second confirmation button rather than typed words.
 
-Every backup has a SHA-256 sidecar. `/backup verify` checks the digest, archive
+Every backup has a SHA-256 sidecar. **Verify** checks the digest, archive
 structure, and `world/level.dat`. Restore requires that verification to pass;
-corrupt backups and archives without a checksum are blocked. `/backup prune`
+corrupt backups and archives without a checksum are blocked. **Prune**
 applies the saved retention policy immediately.
 
 A restore first creates an emergency snapshot, only replaces the world after
@@ -62,20 +50,16 @@ be downloaded from `/mnt/minecraft/backups` over SSH/SFTP.
 
 ## Map uploads and switching
 
-```text
-/world upload name:<stored-name> file:<zip/tar.gz/tgz>
-/world list
-/world activate name:<stored-name> confirm:ACTIVATE
-/world download name:<stored-name>
-/world delete name:<stored-name> confirm:DELETE
-```
+Upload with `/upload world file:<zip>`; the filename becomes the stored name.
+Then open `/admin` → **Worlds**, select it, and use **Activate**, **Download**, or
+**Delete**. Activation and deletion require a second confirmation button.
 
 An upload must contain exactly one Java Edition world with `level.dat`. The bot
 rejects traversal paths, links, device files, archives expanding beyond 100 GiB,
 and excessive file counts. Activating a map also snapshots the live world first.
 
-Backup and map name fields autocomplete actual HDD entries. `/health` checks
-RCON, HDD capacity, backup freshness, and scheduler state. `/audit` displays
+Backup and map dropdowns list actual HDD entries. `/admin` → **Health** checks
+RCON, HDD capacity, backup freshness, and scheduler state. **Advanced tools** → **Audit log** displays
 privileged creation, deletion, restore, activation, and settings changes stored
 in `data/audit.jsonl`.
 
