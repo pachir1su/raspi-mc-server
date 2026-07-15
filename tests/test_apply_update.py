@@ -14,6 +14,7 @@ import argparse
 from deploy.apply_update import (
     ApplyError,
     _loadAndValidateArchive,
+    _matchParentOwner,
     _officialDigest,
     applyUpdate,
 )
@@ -87,6 +88,13 @@ class ApplyUpdateTests(unittest.TestCase):
         ):
             with self.assertRaises(ApplyError):
                 _officialDigest("v2.0.0")
+
+    def testOwnerCorrectionIsPortableWhenChownIsUnavailable(self):
+        with tempfile.TemporaryDirectory() as temporaryDir:
+            path = Path(temporaryDir) / "status.json"
+            path.write_text("{}", encoding="utf-8")
+            with patch("deploy.apply_update.os.chown", None, create=True):
+                _matchParentOwner(path)
 
 
 class UpdateRequestHandlingTests(unittest.TestCase):
