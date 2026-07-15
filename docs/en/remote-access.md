@@ -6,14 +6,14 @@ options below (or port forwarding).
 
 ## 1. SSH + RCON (baseline)
 
-The simplest remote console: SSH into the Pi, then use `mcrcon`.
+The simplest remote console: SSH into the Pi, then use the bundled Python RCON client.
 
 ```bash
 ssh pi@your-pi-lan-ip
 cd raspi-mc-server
-# .env holds RCON_* ; source it or pass flags directly
-mcrcon -H 127.0.0.1 -P 25575 -p "$RCON_PASSWORD" "list"
-mcrcon -H 127.0.0.1 -P 25575 -p "$RCON_PASSWORD" "gamemode creative YourName"
+# The client loads RCON_HOST/RCON_PORT/RCON_PASSWORD from .env.
+.venv/bin/python -m bot.rcon "list"
+.venv/bin/python -m bot.rcon "gamemode creative YourName"
 ```
 
 RCON runs at op level 4, so this is a full admin/cheat console. Keep RCON bound
