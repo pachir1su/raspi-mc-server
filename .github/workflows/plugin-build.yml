@@ -1,0 +1,38 @@
+name: Build DeathBox plugin
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "plugin/deathbox/**"
+      - ".github/workflows/plugin-build.yml"
+  pull_request:
+    paths:
+      - "plugin/deathbox/**"
+      - ".github/workflows/plugin-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Compile and package the plugin
+        working-directory: plugin/deathbox
+        run: mvn -B -ntp package
+
+      - name: Upload the built jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeathBox-jar
+          path: plugin/deathbox/target/DeathBox-*.jar
+          if-no-files-found: error

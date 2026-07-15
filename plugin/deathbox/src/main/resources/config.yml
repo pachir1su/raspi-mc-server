@@ -1,0 +1,30 @@
+# DeathBox configuration.
+# These settings belong to this Paper plugin only — not to the Discord bot's
+# .env and not to server.properties.
+
+# Master switch. When false the plugin loads but does nothing on death.
+enabled: true
+
+# Container used for the box. A double chest gives the full 54 slots needed to
+# hold a completely full inventory (36 + armor + offhand). "chest" and "barrel"
+# hold 27 slots and are only safe for small inventories.
+#   double-chest | chest | barrel
+container: double-chest
+
+# How far (in blocks) to search around the death location for a safe spot.
+# Kept small on purpose: the search is bounded and never scans a whole chunk.
+search-radius: 4
+
+# Boxes older than this many hours are removed on the hourly sweep.
+# 0 means boxes never expire.
+expire-hours: 0
+
+# When true, players holding the deathbox.friend permission may open other
+# players' boxes. When false, only the owner and operators can.
+friends-can-open: false
+
+# When true and no safe block can be found (void, lava, full area, world
+# border), the items are kept in a plugin-owned virtual box and the player is
+# told to ask an admin to recover them. When false, the items are dropped
+# normally as a last resort.
+fallback-virtual-box: true

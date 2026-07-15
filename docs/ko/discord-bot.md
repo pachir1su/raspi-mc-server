@@ -137,6 +137,11 @@ sudo journalctl -u mc-discord-bot.service -f
 - Discord 서버의 실제 파일 한도 안에서 원본 첨부
 - 너무 큰 파일은 SSH/SFTP 경로 안내
 
+봇 로그의 모든 줄에는 시각(`YYYY-MM-DD HH:MM:SS`)이 찍히며, 현재 파일이
+`LOG_MAX_BYTES`(기본 5MiB, `0`이면 비활성화)를 넘거나 로컬 날짜가 바뀌면 새
+`bot_<시각>.log` 파일로 넘어갑니다. `LOG_RETENTION_DAYS`(기본 14)는 시작 시 오래된
+파일을 정리합니다.
+
 관리 작업 감사 로그는 5MiB에서 한 번 회전해 microSD에서 무한히 커지지 않습니다.
 
 ## 보안 메모

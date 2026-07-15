@@ -98,7 +98,7 @@ sudo systemctl enable minecraft.service mc-discord-bot.service
 | 치트와 관리자 | [치트와 관리자](docs/ko/cheats-and-ops.md) | [cheats-and-ops](docs/en/cheats-and-ops.md) |
 | 디스코드 봇 | [디스코드 봇](docs/ko/discord-bot.md) | [discord-bot](docs/en/discord-bot.md) |
 | 친구 연동·구조·일지 | [친구 도구](docs/ko/friend-tools.md) | [friend-tools](docs/en/friend-tools.md) |
-| Death Box 플러그인 설계 | [Death Box 설계](docs/ko/death-box-design.md) | [death-box-design](docs/en/death-box-design.md) |
+| Death Box 플러그인 | [Death Box 설계](docs/ko/death-box-design.md) | [death-box-design](docs/en/death-box-design.md) |
 | 원격 접속(RCON / Cloudflare) | [원격 접속](docs/ko/remote-access.md) | [remote-access](docs/en/remote-access.md) |
 | 백업 | [백업](docs/ko/backup.md) | [backup](docs/en/backup.md) |
 | 성능 튜닝 | [성능 튜닝](docs/ko/performance.md) | [performance](docs/en/performance.md) |
@@ -120,6 +120,7 @@ raspi-mc-server/
 ├── scripts/       # 설치 / 시작 / 정지 / 백업 / 복원
 ├── deploy/        # systemd 유닛 + 파이 원샷 프로비저닝
 ├── bot/           # 디스코드 관리 봇 (Python, discord.py)
+├── plugin/        # Paper 플러그인 (DeathBox — 사망 시 보호 상자)
 ├── docs/          # 영어·한국어 문서, 에이전트 프롬프트
 ├── .env           # 추적되는 예시값; Pi에서 실제 값으로 교체
 └── README.md / README.ko.md

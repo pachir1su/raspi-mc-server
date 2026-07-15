@@ -141,6 +141,11 @@ bounded tail of the bot log or Paper `latest.log` and supports:
 - original attachments within the guild's actual Discord limit
 - an SSH/SFTP hint when a file is too large
 
+Every bot log line is timestamped (`YYYY-MM-DD HH:MM:SS`), and the bot rolls to a
+fresh `bot_<timestamp>.log` file whenever the current one passes `LOG_MAX_BYTES`
+(default 5 MiB, `0` disables) or the local date changes. `LOG_RETENTION_DAYS`
+(default 14) prunes older files on startup.
+
 The privileged audit JSONL rotates once at 5 MiB instead of growing forever on
 the microSD.
 
