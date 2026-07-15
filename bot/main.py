@@ -20,11 +20,25 @@ from bot import userTag
 from bot.app_settings import ensureFirstRunSetup
 from bot.crossplay import CrossplayManager
 from bot.command_i18n import CommandTranslator
-from bot.command_surface import pruneCommandTree
 
 _log = log.get("main")
 cfg = None
 t = None
+
+
+async def syncCommandTree(tree, guildIds: list[int]) -> None:
+    """Publish four commands and remove stale globals in guild-only mode."""
+    if guildIds:
+        for guildId in guildIds:
+            guild = discord.Object(id=guildId)
+            tree.copy_global_to(guild=guild)
+            await tree.sync(guild=guild)
+        # Guild-only mode must also delete global commands from older
+        # deployments, otherwise Discord shows both sets in one server.
+        tree.clear_commands(guild=None)
+        await tree.sync()
+        return
+    await tree.sync()
 
 
 class McBot(commands.Bot):
@@ -38,18 +52,10 @@ class McBot(commands.Bot):
         await self.tree.set_translator(CommandTranslator())
         await self.load_extension("bot.cogs.admin")
         await self.load_extension("bot.cogs.friend")
-        # Keep legacy callbacks available to panels but publish only four roots.
-        removedNames = pruneCommandTree(self.tree)
-        _log.info("hid legacy slash-command roots: %s", ", ".join(removedNames))
+        await syncCommandTree(self.tree, cfg.guild_ids)
         if cfg.guild_ids:
-            # 여러 길드에 즉시 등록합니다(이슈 G, #18).
-            for guildId in cfg.guild_ids:
-                guild = discord.Object(id=guildId)
-                self.tree.copy_global_to(guild=guild)
-                await self.tree.sync(guild=guild)
             _log.info("synced commands to guilds %s", cfg.guild_ids)
         else:
-            await self.tree.sync()
             _log.info("synced commands globally")
 
     async def on_ready(self):
