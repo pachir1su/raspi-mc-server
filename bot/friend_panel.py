@@ -361,8 +361,9 @@ class ManagedProfileSelect(discord.ui.Select):
                     else "이전 승인 대기 기록 · 삭제 후 다시 등록"
                 ),
                 emoji="☕" if link.edition == "java" else "📱",
+                default=index == 0,
             )
-            for link in links[:25]
+            for index, link in enumerate(links[:25])
         ]
         super().__init__(
             placeholder="등록된 Minecraft 계정 선택",
