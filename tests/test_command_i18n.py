@@ -7,10 +7,10 @@ from bot.command_i18n import KOREAN_DESCRIPTIONS, KOREAN_NAMES
 
 class CommandI18nTests(unittest.TestCase):
     def testCoreFriendCommandsHaveKoreanNames(self):
-        self.assertEqual("연동", KOREAN_NAMES["link"])
-        self.assertEqual("요청", KOREAN_NAMES["request"])
-        self.assertEqual("구조", KOREAN_NAMES["rescue"])
-        self.assertEqual("내위치", KOREAN_NAMES["whereami"])
+        self.assertEqual("서버", KOREAN_NAMES["server"])
+        self.assertEqual("관리자", KOREAN_NAMES["admin"])
+        self.assertEqual("내도구", KOREAN_NAMES["my-tools"])
+        self.assertEqual("업로드", KOREAN_NAMES["upload"])
 
     def testLocalizedNamesFitDiscordLimit(self):
         for localizedName in KOREAN_NAMES.values():
