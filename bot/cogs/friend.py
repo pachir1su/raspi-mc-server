@@ -15,6 +15,7 @@ from bot.config import cfg
 from bot.diary import DiaryEntry, DiaryStore
 from bot.health_score import HealthInputs, calculateHealthScore
 from bot.friend_panel import MyToolsView
+from bot.internal_actions import InternalActionGroup, internalAction
 from bot.performance_report import parseTps
 from bot.places import (
     MAX_IMAGE_BYTES,
@@ -50,18 +51,10 @@ async def _rcon(command: str) -> str:
 class Friend(commands.Cog):
     """Account linking and bounded self-service tools for trusted friends."""
 
-    linkGroup = app_commands.Group(
-        name="link", description="Link Discord to one Minecraft account."
-    )
-    rescueGroup = app_commands.Group(
-        name="rescue", description="Self-service help for your linked player."
-    )
-    placeGroup = app_commands.Group(
-        name="place", description="Shared coordinate book with photos and map links."
-    )
-    diaryGroup = app_commands.Group(
-        name="diary", description="Shared server-life journal."
-    )
+    linkGroup = InternalActionGroup()
+    rescueGroup = InternalActionGroup()
+    placeGroup = InternalActionGroup()
+    diaryGroup = InternalActionGroup()
 
     def __init__(self, bot: commands.Bot):
         # Keep every friend-facing store outside the large admin cog.
@@ -544,7 +537,7 @@ class Friend(commands.Cog):
         await self._sendDiaryEntry(interaction, entry)
 
     # --- on-demand score ----------------------------------------------
-    @app_commands.command(
+    @internalAction(
         name="server-score", description="Calculate an on-demand 0-100 server health score."
     )
     async def serverScore(self, interaction: discord.Interaction) -> None:
@@ -693,15 +686,15 @@ class Friend(commands.Cog):
 
     async def panelRescueSpawn(self, interaction: discord.Interaction) -> None:
         """Reuse the bounded self-rescue command from a button callback."""
-        await type(self).rescueSpawn.callback(self, interaction)
+        await self.rescueSpawn(interaction)
 
     async def panelWhereAmI(self, interaction: discord.Interaction) -> None:
         """Reuse the linked-player location lookup from a button callback."""
-        await type(self).rescueWhereAmI.callback(self, interaction)
+        await self.rescueWhereAmI(interaction)
 
     async def panelServerScore(self, interaction: discord.Interaction) -> None:
         """Reuse the on-demand health calculation from a button callback."""
-        await type(self).serverScore.callback(self, interaction)
+        await self.serverScore(interaction)
 
     async def panelPlaces(self) -> list[Place]:
         """Return coordinate choices for the panel dropdown."""

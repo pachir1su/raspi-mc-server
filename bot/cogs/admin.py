@@ -26,6 +26,7 @@ from bot import BRAND_BLUE, OK_GREEN, WARN_YELLOW, ERR_RED, userTag
 from bot.audit import AuditLog
 from bot.config import cfg
 from bot.i18n import t
+from bot.internal_actions import InternalActionGroup, internalAction
 from bot.backup_settings import SettingsStore
 from bot.control_panel import AdminDashboardView, LogPanelView, PlayerPanelView
 from bot.log_viewer import discordPreview, filterImportant, readTail
@@ -167,7 +168,7 @@ class Admin(commands.Cog):
     ) -> None:
         """Derive the map name from the file so uploading requires no typing."""
         name = Path(file.filename).stem[:60]
-        await type(self).worldUpload.callback(self, interaction, name, file)
+        await self.worldUpload(interaction, name, file)
 
     @uploadGroup.command(
         name="update", description="Upload a trusted application Release ZIP."
@@ -176,7 +177,7 @@ class Admin(commands.Cog):
         self, interaction: discord.Interaction, file: discord.Attachment
     ) -> None:
         """Forward a selected ZIP into the existing verified update flow."""
-        await type(self).updateUpload.callback(self, interaction, file)
+        await self.updateUpload(interaction, file)
 
     @uploadGroup.command(
         name="place-photo", description="Attach a photo to an existing coordinate."
@@ -390,7 +391,7 @@ class Admin(commands.Cog):
         return warnings, embed
 
     # --- player-facing portal ------------------------------------------
-    @app_commands.command(name="portal", description="Show friend-safe server access info and live status.")
+    @internalAction(name="portal", description="Show friend-safe server access info and live status.")
     async def portal(self, interaction: discord.Interaction):
         players = []
         statusText = t("portal_offline")
@@ -425,7 +426,7 @@ class Admin(commands.Cog):
         embed.set_footer(text=statusText[:200])
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="online", description="Show who is online without exposing admin controls.")
+    @internalAction(name="online", description="Show who is online without exposing admin controls.")
     async def online(self, interaction: discord.Interaction):
         try:
             players = parseOnlinePlayers(await _rcon("list"))
@@ -440,7 +441,7 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
     # --- read-only ------------------------------------------------------
-    @app_commands.command(description="Show whether the server is up and who is online.")
+    @internalAction(description="Show whether the server is up and who is online.")
     async def status(self, interaction: discord.Interaction):
         try:
             out = await _rcon("list")
@@ -476,7 +477,7 @@ class Admin(commands.Cog):
         _log.info("status by %s", userTag(interaction.user))
 
     # --- broadcast / commands ------------------------------------------
-    @app_commands.command(description="Broadcast a message to everyone in-game.")
+    @internalAction(description="Broadcast a message to everyone in-game.")
     @app_commands.describe(message="Text to say in chat")
     async def say(self, interaction: discord.Interaction, message: str):
         try:
@@ -488,7 +489,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "server.say", "failed", str(e))
             await interaction.response.send_message(f"❌ {e}", ephemeral=True)
 
-    @app_commands.command(name="mc", description="Run ANY server command via RCON (owner cheat channel).")
+    @internalAction(name="mc", description="Run ANY server command via RCON (owner cheat channel).")
     @app_commands.describe(command="e.g. gamemode creative YourName, time set day, give ...")
     async def mc(self, interaction: discord.Interaction, command: str):
         # This is the "only I can cheat" channel: it runs at op level 4.
@@ -509,7 +510,7 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"❌ {e}", ephemeral=True)
 
     # --- whitelist ------------------------------------------------------
-    whitelist = app_commands.Group(name="whitelist", description="Manage the whitelist.")
+    whitelist = InternalActionGroup()
 
     @whitelist.command(name="add", description="Whitelist a player by name.")
     async def wl_add(self, interaction: discord.Interaction, name: str):
@@ -530,11 +531,11 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"❌ {e}", ephemeral=True)
 
     # --- lifecycle (systemd) -------------------------------------------
-    @app_commands.command(description="Start the Minecraft service.")
+    @internalAction(description="Start the Minecraft service.")
     async def start(self, interaction: discord.Interaction):
         await self._lifecycle(interaction, "start", "Starting the server")
 
-    @app_commands.command(description="Stop the Minecraft service (saves first).")
+    @internalAction(description="Stop the Minecraft service (saves first).")
     async def stop(self, interaction: discord.Interaction):
         # Best-effort graceful save before systemd stops the JVM.
         try:
@@ -543,7 +544,7 @@ class Admin(commands.Cog):
             pass
         await self._lifecycle(interaction, "stop", "Stopping the server")
 
-    @app_commands.command(description="Restart the Minecraft service.")
+    @internalAction(description="Restart the Minecraft service.")
     async def restart(self, interaction: discord.Interaction):
         await self._lifecycle(interaction, "restart", "Restarting the server")
 
@@ -566,7 +567,7 @@ class Admin(commands.Cog):
         )
 
     # --- HDD backups ----------------------------------------------------
-    backupGroup = app_commands.Group(name="backup", description="Manage HDD world backups.")
+    backupGroup = InternalActionGroup()
 
     async def _safeBackup(self, label: str):
         """Flush Paper through RCON, archive the worlds, and always resume saving."""
@@ -821,7 +822,7 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
     # --- uploaded maps --------------------------------------------------
-    worldGroup = app_commands.Group(name="world", description="Upload and activate HDD maps.")
+    worldGroup = InternalActionGroup()
 
     @worldGroup.command(name="upload", description="Upload and validate a Java map archive.")
     async def worldUpload(self, interaction: discord.Interaction, name: str, file: discord.Attachment):
@@ -909,7 +910,7 @@ class Admin(commands.Cog):
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
-    @app_commands.command(name="storage", description="Show HDD mount and free-space status.")
+    @internalAction(name="storage", description="Show HDD mount and free-space status.")
     async def storageStatus(self, interaction: discord.Interaction):
         try:
             total, used, free = self.storage.storageUsage()
@@ -922,7 +923,7 @@ class Admin(commands.Cog):
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
-    @app_commands.command(name="health", description="Check RCON, HDD, scheduler, and backup freshness.")
+    @internalAction(name="health", description="Check RCON, HDD, scheduler, and backup freshness.")
     async def health(self, interaction: discord.Interaction):
         results = []
         try:
@@ -953,7 +954,7 @@ class Admin(commands.Cog):
             results.append(f"❌ Storage/scheduler: {error}")
         await interaction.response.send_message("\n".join(results), ephemeral=True)
 
-    @app_commands.command(name="audit", description="Show recent privileged-operation audit records.")
+    @internalAction(name="audit", description="Show recent privileged-operation audit records.")
     async def audit(self, interaction: discord.Interaction, limit: app_commands.Range[int, 1, 20] = 10):
         records = await asyncio.to_thread(self.auditLog.recent, limit)
         lines = [
@@ -967,7 +968,7 @@ class Admin(commands.Cog):
         )
 
     # --- button-first control panel ------------------------------------
-    @app_commands.command(name="panel", description="Open the button-first Minecraft admin dashboard.")
+    @internalAction(name="panel", description="Open the button-first Minecraft admin dashboard.")
     async def panel(self, interaction: discord.Interaction):
         """Open routine administration without requiring command arguments."""
         embed = await self.panelOverviewEmbed()
@@ -977,7 +978,7 @@ class Admin(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(name="players", description="Select an online player and inspect their state.")
+    @internalAction(name="players", description="Select an online player and inspect their state.")
     async def players(self, interaction: discord.Interaction):
         """Open the live player dropdown directly as a keyboard-friendly shortcut."""
         players = await self.panelOnlinePlayers()
@@ -990,13 +991,13 @@ class Admin(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(name="metrics", description="Show Raspberry Pi resources and Paper TPS.")
+    @internalAction(name="metrics", description="Show Raspberry Pi resources and Paper TPS.")
     async def metrics(self, interaction: discord.Interaction):
         """Keyboard shortcut for the same performance card used by the dashboard."""
         await interaction.response.defer(ephemeral=True, thinking=True)
         await interaction.followup.send(embed=await self.panelMetricsEmbed(), ephemeral=True)
 
-    @app_commands.command(name="tuning-report", description="Explain current performance risks and tuning advice.")
+    @internalAction(name="tuning-report", description="Explain current performance risks and tuning advice.")
     async def tuningReport(self, interaction: discord.Interaction):
         """Turn raw metrics into actionable Pi-friendly tuning advice."""
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -1009,9 +1010,7 @@ class Admin(commands.Cog):
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
     # --- application updates -------------------------------------------
-    updateGroup = app_commands.Group(
-        name="update", description="Manage safe Raspberry Pi application updates."
-    )
+    updateGroup = InternalActionGroup()
 
     @updateGroup.command(
         name="check",
@@ -1139,9 +1138,7 @@ class Admin(commands.Cog):
             except discord.HTTPException:
                 _log.exception("could not report updater start failure")
 
-    incidentGroup = app_commands.Group(
-        name="incident", description="One-click emergency helpers for common accidents."
-    )
+    incidentGroup = InternalActionGroup()
 
     async def _incidentCommand(
         self, interaction: discord.Interaction, command: str, successKey: str
@@ -1229,11 +1226,10 @@ class Admin(commands.Cog):
         self, commandName: str, interaction: discord.Interaction, *args
     ) -> None:
         """Invoke a preserved command callback from a button without duplicating logic."""
-        command = getattr(type(self), commandName, None)
-        callback = getattr(command, "callback", None)
-        if callback is None:
+        callback = getattr(self, commandName, None)
+        if callback is None or not callable(callback):
             raise RuntimeError(f"panel action is unavailable: {commandName}")
-        await callback(self, interaction, *args)
+        await callback(interaction, *args)
 
     async def panelBackups(self):
         """Return newest backup metadata for the panel dropdown."""
@@ -1708,7 +1704,7 @@ class Admin(commands.Cog):
             value /= 1024
 
     # --- logs -----------------------------------------------------------
-    @app_commands.command(description="Open button controls for bot and Minecraft logs.")
+    @internalAction(description="Open button controls for bot and Minecraft logs.")
     async def logs(self, interaction: discord.Interaction):
         await interaction.response.send_message(
             "확인할 로그를 선택하세요.",
