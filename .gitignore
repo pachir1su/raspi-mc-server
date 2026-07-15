@@ -32,6 +32,9 @@ __pycache__/
 .venv/
 venv/
 
+# Paper plugin build output (Maven)
+plugin/**/target/
+
 # OS / editor
 .DS_Store
 *.swp
