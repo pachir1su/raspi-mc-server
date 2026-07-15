@@ -168,3 +168,41 @@ class Rcon:
         resp_id, ptype = struct.unpack("<ii", data[:8])
         self._last_body = data[8:-2].decode("utf-8", errors="replace")  # strip two nulls
         return resp_id, ptype, self._last_body
+
+
+def _main(argv=None) -> int:
+    """Tiny CLI so operators can run one RCON command without the mcrcon binary.
+
+    mcrcon는 Debian 저장소에 없어 설치가 번거로우므로(이슈 J), 내장 클라이언트를
+    재사용합니다. RCON_HOST/RCON_PORT/RCON_PASSWORD는 .env(또는 환경)에서 읽습니다.
+
+        .venv/bin/python -m bot.rcon "op YourName"
+    """
+    import sys
+
+    args = sys.argv[1:] if argv is None else argv
+    if not args:
+        print('usage: python -m bot.rcon "<command>"', file=sys.stderr)
+        return 2
+    password = os.getenv("RCON_PASSWORD", "")
+    if not password:
+        print("RCON_PASSWORD is not set", file=sys.stderr)
+        return 2
+    host = os.getenv("RCON_HOST", "127.0.0.1")
+    port = int(os.getenv("RCON_PORT", "25575"))
+    command = " ".join(args)
+
+    async def run() -> str:
+        async with Rcon(host, port, password) as client:
+            return await client.command(command)
+
+    try:
+        print(asyncio.run(run()))
+        return 0
+    except RconError as error:
+        print(f"RCON error: {error}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())
