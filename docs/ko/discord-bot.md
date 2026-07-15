@@ -177,6 +177,32 @@ sudo journalctl -u mc-discord-bot.service -f
   못 하게 합니다. 업데이트는 항상 관리자 버튼 재확인을 요구합니다.
 - RCON은 localhost에 두세요; 봇은 `127.0.0.1`로 접속합니다.
 
+## 보안 하드닝과 sudo
+
+봇은 `sudo systemctl`로 마인크래프트 서비스를 재시작합니다(crossplay 설정과
+시작/정지/재시작 제어). `sudo`는 커널의 setuid를 쓰는데 **`NoNewPrivileges=true`가
+이를 차단**합니다 — 예전 유닛이 이 플래그를 켜 두어 모든 `sudo` 호출이
+`The "no new privileges" flag is set` 오류로 실패하고 봇이 재시작 루프에 빠졌습니다.
+
+권한 상승을 좁게 유지하면서 하드닝을 보존하도록 수정했습니다:
+
+- `mc-discord-bot.service`에는 `NoNewPrivileges`를 **두지 않습니다**(`sudo`가 필요).
+- 권한 상승은 **좁은 sudoers 규칙**(`/etc/sudoers.d/raspi-mc-server`)으로 한정됩니다:
+  봇은 지정된 마인크래프트 서비스의 시작/정지/재시작·상태 조회와 업데이터 큐잉만
+  가능하며 그 외에는 아무것도 못 합니다.
+- 대신 샌드박싱으로 보상합니다: `ProtectSystem=strict`, `ProtectHome=read-only`(리포와
+  `/mnt/minecraft`만 `ReadWritePaths=`로 허용), `PrivateTmp=true`,
+  `ProtectControlGroups=true`, `ProtectKernelTunables=true`.
+
+트레이드오프: `NoNewPrivileges`를 빼면 유닛 안에서 setuid가 다시 가능해지지만,
+sudoers 화이트리스트 덕분에 봇이 상승 권한으로 실행할 수 있는 것은 두 고정 서비스에
+대한 `systemctl`뿐입니다. 마인크래프트·업데이터 유닛은 `sudo`를 쓰지 않으므로
+`NoNewPrivileges=true`를 그대로 둡니다.
+
+설정이 끝나지 않았다면(`data/app-settings.json` 없음) 봇은 `EX_CONFIG`(78)로 종료하고
+유닛의 `RestartPreventExitStatus=78`이 systemd 재시작 루프를 멈춥니다 — 터미널에서
+`.venv/bin/python -m bot.main`을 한 번 실행해 설정을 마치세요.
+
 ## 로딩 애니메이션 원리
 
 디스코드는 명령이 `defer`하면 자체 "생각 중…" 문구를 강제하며 교체할 수 없습니다.

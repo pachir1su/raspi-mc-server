@@ -131,10 +131,18 @@ raspi-mc-server/
 
 ## Requirements
 
-- Raspberry Pi 4B (4GB) with **Raspberry Pi OS Lite (64-bit, Debian 13 Trixie)**.
+- Raspberry Pi 4B (4GB) with **Raspberry Pi OS Lite (64-bit)**. Bookworm
+  (Legacy) is the tested baseline; on Trixie the `cloud-init` first boot may
+  ignore Raspberry Pi Imager settings (SSH/user) — see
+  [troubleshooting](docs/en/troubleshooting.md#trixie-imager-settings-ssh-user-are-not-applied).
 - A 32GB microSD plus a 500GB USB 3.0 HDD for PaperMC, worlds, and backups.
+  Some USB 3.0↔SATA adapters crash the Pi 4B xHCI controller under load; see
+  the [troubleshooting notes](docs/en/troubleshooting.md#pi-4b-usb-30--sata-ssd-adapter-xhci-controller-dies).
 - A Discord application/bot token (for the bot) — see
   [docs/en/discord-bot.md](docs/en/discord-bot.md).
+- **Note:** `mcrcon` is **not** in the Debian repositories, so the setup script
+  does not install it. Run one-off RCON commands with the built-in client:
+  `.venv/bin/python -m bot.rcon "list"`.
 
 ## License
 

@@ -47,6 +47,10 @@ From Discord, `/logs` attaches the bot's current log file.
 | `⛔ not authorised` | Your ID not in allowlist | Add your Discord user ID to `ADMIN_USER_IDS` |
 | `/mc` returns RCON error | RCON off/mismatch | `enable-rcon=true`; `RCON_PASSWORD` must match `server.properties` |
 | `/start` etc. fail | sudoers rule missing | Re-run `deploy/setup_raspberrypi.sh` |
+| Bot crash-loops with `The "no new privileges" flag is set` | Old unit had `NoNewPrivileges=true`, which blocks `sudo` (setuid) | Reinstall `deploy/mc-discord-bot.service` (it no longer sets `NoNewPrivileges`; hardening is preserved with `ProtectSystem`/`ProtectHome`/`ReadWritePaths`). See [discord-bot.md](discord-bot.md#security-hardening-and-sudo). |
+| Bot restarts every 10s right after install | First setup not completed | Run `.venv/bin/python -m bot.main` once in a terminal. The service now exits `EX_CONFIG` (78) and `RestartPreventExitStatus=78` stops the loop. |
+| `raspi-mc-updater.service` shows `failed` at boot | No pending update request | Expected before this fix; update the repo so the updater treats "no request" as success (exit 0). |
+| First setup fails with `PermissionError` writing `data/` | The root updater created `data/` first | Fixed: the updater now `chown`s `data/` to the service user; `setup_raspberrypi.sh` also runs `chown -R`. Manually: `sudo chown -R <user>:<user> data/`. |
 
 ## RCON connection refused
 
@@ -54,6 +58,60 @@ From Discord, `/logs` attaches the bot's current log file.
 - `rcon.password` (server) == `RCON_PASSWORD` (.env).
 - `RCON_HOST=127.0.0.1`, `RCON_PORT` matches `rcon.port` (25575).
 - The server is fully started (RCON opens after `Done`).
+
+The bot now distinguishes RCON failures instead of always reporting "offline":
+
+- **🔴 Server offline** — the TCP connection was refused (server stopped/starting).
+- **🟠 RCON authentication failed** — the port answered but the password is wrong;
+  make `RCON_PASSWORD` (.env) match `rcon.password` (server.properties).
+- **🟠 Slow response** — the connection opened but the server did not reply within
+  the timeout (`RCON_TIMEOUT`, default 10s); usually mid-startup or overloaded.
+
+Root causes are logged under the `mc.rcon` logger. You can test RCON without the
+external `mcrcon` binary (which is not in the Debian repositories):
+
+```bash
+.venv/bin/python -m bot.rcon "list"
+```
+
+## Raspberry Pi OS / hardware gotchas
+
+### Trixie: Imager settings (SSH, user) are not applied
+
+On the newest Raspberry Pi OS (Trixie), the `cloud-init`-based first boot can
+ignore the customisation you set in Raspberry Pi Imager (enable SSH, username,
+Wi-Fi), leaving you locked out of a headless Pi.
+
+- **Recommended:** flash **Raspberry Pi OS Bookworm (Legacy, 64-bit)** for this
+  project. It is the tested baseline and applies Imager settings reliably.
+- **If you must stay on Trixie:** after flashing, mount the boot partition and
+  fix cloud-init by hand:
+  - Ensure `ssh` (or `ssh.txt`) exists in the boot partition to force SSH on.
+  - Edit `user-data` on the boot partition (cloud-init) to set the user,
+    `ssh_pwauth`, and `chpasswd`, then reboot. Confirm with
+    `sudo cloud-init status --long` on the device once you have console access.
+
+### Pi 4B USB 3.0 + SATA SSD adapter: xHCI controller dies
+
+Some USB 3.0 ↔ SATA adapters (notably certain JMicron/ASMedia bridges) crash the
+Pi 4B's xHCI USB controller under load. Symptoms in `dmesg`/journal:
+
+```
+xhci_hcd ... WARNING: Host System Error
+xhci_hcd ... HC died; cleaning up
+```
+
+The drive disappears and the world storage on `/mnt/minecraft` goes read-only or
+vanishes. Work around it:
+
+- **Move the SSD to a USB 2.0 port.** It is slower but the controller stays up;
+  this alone fixes most cases.
+- **Add a powered USB hub.** The adapter may be browning out the 5V rail;
+  undervoltage also shows in `/metrics` throttle flags.
+- **Apply a usb-storage quirk** to disable UAS for the bridge. Find the
+  `idVendor:idProduct` with `lsusb`, then add to `/boot/firmware/cmdline.txt`
+  (one line): `usb-storage.quirks=VVVV:PPPP:u` and reboot. This forces the slower
+  but far more stable BOT transport.
 
 ## Lag / low TPS
 

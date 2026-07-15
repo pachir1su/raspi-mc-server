@@ -129,9 +129,16 @@ raspi-mc-server/
 
 ## 준비물
 
-- **Raspberry Pi OS Lite(64-bit, Debian 13 Trixie)**를 올린 라즈베리파이 4B(4GB).
-- 32GB microSD와 PaperMC·월드·백업용 500GB USB 3.0 HDD.
+- **Raspberry Pi OS Lite(64-bit)**를 올린 라즈베리파이 4B(4GB). 테스트 기준은
+  Bookworm(Legacy)이며, Trixie에서는 `cloud-init` 첫 부팅이 Imager 설정(SSH·사용자)을
+  무시할 수 있습니다 —
+  [문제 해결](docs/ko/troubleshooting.md#trixie-imager-설정ssh사용자이-적용되지-않음) 참고.
+- 32GB microSD와 PaperMC·월드·백업용 500GB USB 3.0 HDD. 일부 USB 3.0↔SATA 어댑터는
+  부하 시 Pi 4B xHCI 컨트롤러를 죽입니다 —
+  [문제 해결 노트](docs/ko/troubleshooting.md#pi-4b-usb-30--sata-ssd-어댑터-xhci-컨트롤러-다운) 참고.
 - 디스코드 애플리케이션/봇 토큰(봇용) — [docs/ko/discord-bot.md](docs/ko/discord-bot.md) 참고.
+- **참고:** `mcrcon`은 데비안 저장소에 없어 설치 스크립트가 설치하지 않습니다. 일회성
+  RCON 명령은 내장 클라이언트로 실행하세요: `.venv/bin/python -m bot.rcon "list"`.
 
 ## 라이선스
 

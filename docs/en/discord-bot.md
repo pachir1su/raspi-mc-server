@@ -184,6 +184,35 @@ the microSD.
   admin button confirmation.
 - Keep RCON on localhost; the bot connects to `127.0.0.1`.
 
+## Security hardening and sudo
+
+The bot restarts the Minecraft service through `sudo systemctl` (for crossplay
+setup and the start/stop/restart controls). `sudo` relies on the kernel's
+setuid mechanism, which **`NoNewPrivileges=true` blocks** — an earlier unit set
+that flag, so every `sudo` call failed with `The "no new privileges" flag is
+set` and the bot fell into a restart loop.
+
+The fix keeps the elevation narrow while preserving hardening:
+
+- `NoNewPrivileges` is **not** set on `mc-discord-bot.service` (it must allow
+  `sudo`).
+- Privilege escalation stays confined by the **narrow sudoers rule**
+  (`/etc/sudoers.d/raspi-mc-server`): the bot may only start/stop/restart and
+  query the named Minecraft service and queue the updater — nothing else.
+- Compensating sandboxing is applied instead: `ProtectSystem=strict`,
+  `ProtectHome=read-only` with an explicit `ReadWritePaths=` for the repo and
+  `/mnt/minecraft`, `PrivateTmp=true`, `ProtectControlGroups=true`, and
+  `ProtectKernelTunables=true`.
+
+Trade-off: dropping `NoNewPrivileges` re-enables setuid within the unit, but the
+sudoers allowlist means the only program the bot can run with elevated rights is
+`systemctl` against two fixed services. The Minecraft and updater units still
+keep `NoNewPrivileges=true` because they never call `sudo`.
+
+If setup did not complete (no `data/app-settings.json`), the bot exits with
+`EX_CONFIG` (78) and the unit's `RestartPreventExitStatus=78` stops systemd from
+looping — run `.venv/bin/python -m bot.main` once in a terminal to finish setup.
+
 ## How the loading animation works
 
 Discord forces its own "thinking…" text when a command `defer`s, and you can't
