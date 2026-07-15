@@ -1,0 +1,28 @@
+name: DeathBox
+version: ${project.version}
+main: io.github.pachir1su.deathbox.DeathBoxPlugin
+api-version: '1.21'
+author: pachir1su
+description: On death, stores the player's dropped items in a protected, owner-only chest instead of leaving them to burn, explode, or despawn.
+website: https://github.com/pachir1su/raspi-mc-server
+
+commands:
+  deathbox:
+    description: Locate or manage your death boxes.
+    usage: |-
+      /deathbox locate            - show your newest box's coordinates
+      /deathbox list              - list your active boxes
+      /deathbox recover <id>      - (admin) recover a virtual fallback box
+      /deathbox purge <id> confirm- (admin) delete a box after confirmation
+    aliases: [dbox, dbx]
+
+permissions:
+  deathbox.use:
+    description: Use /deathbox locate and list, and open your own boxes.
+    default: true
+  deathbox.friend:
+    description: Open other players' death boxes when friends-can-open is enabled.
+    default: false
+  deathbox.admin:
+    description: Open any box, and recover or purge boxes.
+    default: op
