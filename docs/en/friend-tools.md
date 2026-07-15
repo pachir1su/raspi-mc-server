@@ -22,7 +22,7 @@ PUBLIC_COMMANDS_ENABLED=true
 # Put runtime JSON and uploaded photos on the mounted HDD.
 MC_STATE_DIR=/mnt/minecraft/bot-state
 
-# Fixed destination used by /rescue spawn. No default coordinates are used.
+# Fixed destination used by the /my-tools rescue button. No default coordinates are used.
 MC_SPAWN_DIMENSION=overworld
 MC_SPAWN_X=0.5
 MC_SPAWN_Y=80
@@ -39,7 +39,7 @@ To choose the spawn location:
 
 1. Join the server with the owner's Minecraft account.
 2. Stand on the exact safe block where rescued players should arrive.
-3. Press **F3** and note XYZ, or use the admin `/players` position view.
+3. Press **F3** and note XYZ, or use `/admin` → **Players** → **Position**.
 4. Put those values in `MC_SPAWN_X/Y/Z`. Adding `.5` to block-centre X/Z avoids
    spawning on an edge.
 5. Make sure the destination is lit, not obstructed, and inside the world border.
@@ -61,54 +61,37 @@ sudo journalctl -u mc-discord-bot.service -n 100 --no-pager
 
 ## 2. Link each friend
 
-The friend runs:
-
-```text
-/link request minecraft_name:<exact name> edition:<Java or Bedrock>
-```
-
-The owner reviews pending requests:
-
-```text
-/link list
-```
-
-The owner selects that Discord user and approves:
-
-```text
-/link approve user:<Discord member>
-```
-
-The friend verifies the result with `/link status`. Use `/link revoke` if the
+The friend runs `/my-tools`, presses **Request link**, chooses Java or Bedrock,
+and types only the exact Minecraft name in the modal. The owner runs `/admin`,
+opens **Account links**, selects the request, and presses **Approve**. The friend
+uses **Link status** in `/my-tools` to verify the result. The owner presses
+**Revoke** in the same account-link panel if the
 Discord account or Minecraft name changes. Java names follow the normal 1–16
 character format. Bedrock gamertags may also contain spaces. Unsafe command
 characters are rejected in both cases.
 
 Approval runs `whitelist add` for Java or Floodgate's `fwhitelist add` for
-Bedrock before recording approval. This is a server mutation, so `/link approve`
+Bedrock before recording approval. This is a server mutation, so approval
 remains behind `ADMIN_USER_IDS`. The friend needs no second admission step.
 
 ## 3. Rescue only the linked account
 
-- `/rescue spawn` teleports only the Minecraft name approved for the caller. The
+- **Rescue to spawn** in `/my-tools` teleports only the Minecraft name approved for the caller. The
   player must be online. The destination is the fixed `MC_SPAWN_*` configuration;
   the friend cannot enter a target, coordinates, or RCON command.
-- `/rescue whereami` reads only that linked online player's dimension and XYZ.
+- **My location** reads only that linked online player's dimension and XYZ.
 
 The account-link approval is the delegated authorization for this one fixed
-teleport. All general server mutation, raw `/mc`, lifecycle, backup, whitelist,
+teleport. All general server mutation, raw Advanced RCON, lifecycle, backup, whitelist,
 incident, and world-management commands remain behind `ADMIN_USER_IDS`.
 
 ## 4. Coordinate book and photos
 
-Approved friends and admins can use:
-
-```text
-/place add name:<name> dimension:<choice> x:<x> y:<y> z:<z> description:<optional> photo:<optional>
-/place list
-/place show name:<name>
-/place delete name:<name>
-```
+Approved friends and admins open **Coordinates** in `/my-tools`. Existing places
+are selected from a dropdown. **Save current position** reads the linked online
+player's XYZ automatically and asks only for a short name and optional note.
+View and delete are buttons. To attach or replace an image, use
+`/upload place-photo`; attachments are the one thing Discord buttons cannot send.
 
 Images must be PNG, JPEG, WebP, or GIF and no larger than 5 MiB. The bot downloads
 them once to `MC_STATE_DIR/friend-media`; it does not depend on expiring Discord
@@ -117,13 +100,9 @@ any place. The book is capped at 250 names to keep reads and Discord output smal
 
 ## 5. Server diary
 
-Approved friends and admins can use:
-
-```text
-/diary add message:<text> photo:<optional>
-/diary recent limit:<1-20>
-/diary show entry_id:<ID shown by recent>
-```
+Approved friends and admins open **Server diary** in `/my-tools`, select a recent
+entry from the dropdown, or press **New entry**. Free-form writing uses one modal
+because text is the feature. Use `/upload diary` only when adding a photo.
 
 Rescue and saved-place events are added automatically. The journal uses
 append-only JSONL for cheap writes and compacts to the newest 1,000 entries after
@@ -131,7 +110,7 @@ it grows past 2 MiB. Optional photos use the same 5 MiB local image policy.
 
 ## 6. On-demand server score
 
-`/server-score` samples Paper TPS, RCON reachability, CPU temperature, five-minute
+**Server score** in `/my-tools` samples Paper TPS, RCON reachability, CPU temperature, five-minute
 load, memory, HDD free space, and Raspberry Pi undervoltage/throttle flags. It
 returns 0–100, a grade, and every deduction. It runs only when requested: there
 is no new background loop, chunk scan, or extra server tick work.
@@ -155,7 +134,7 @@ your host-level HDD backup. They are ignored by Git.
 | Symptom | Check |
 |---|---|
 | Friend sees the feature-disabled message | Set `PUBLIC_COMMANDS_ENABLED=true`, then restart the bot. |
-| Link remains pending | Owner runs `/link list`, then `/link approve`. |
+| Link remains pending | Owner opens `/admin` → **Account links**, selects the request, then presses **Approve**. |
 | Rescue says spawn is not configured | Set all four `MC_SPAWN_DIMENSION/X/Y/Z` values and restart. |
 | Bedrock approval says the whitelist command is unknown | Re-run `python -m bot.main --setup`, select Java+Bedrock, and check both plugin configs were generated. |
 | Rescue or whereami cannot find the player | The exact linked Java/Floodgate account must currently be online. |
@@ -181,9 +160,9 @@ whitelist on
 whitelist reload
 ```
 
-Run these through local RCON or the admin-only `/mc`; never delegate them to the
+Run these through local RCON or `/admin` → **Advanced tools** → **Advanced RCON**; never delegate them to the
 friend. Re-enable the whitelist immediately even if another step fails, verify
-it with `whitelist list`, and then run `/link approve` again. Do not operate the
+it with `whitelist list`, and then press **Approve** again. Do not operate the
 server with the whitelist left off. See the official
 [Geyser whitelist FAQ](https://geysermc.org/wiki/geyser/faq/).
 
