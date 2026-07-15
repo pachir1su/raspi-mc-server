@@ -14,7 +14,7 @@ from bot.app_settings import AppSettingsStore
 from bot.config import cfg
 from bot.diary import DiaryEntry, DiaryStore
 from bot.health_score import HealthInputs, calculateHealthScore
-from bot.friend_panel import MyToolsView
+from bot.friend_panel import ManagedAccountView, MyToolsView
 from bot.internal_actions import InternalActionGroup, internalAction
 from bot.performance_report import parseTps
 from bot.places import (
@@ -28,6 +28,7 @@ from bot.player_links import (
     PlayerLink,
     PlayerLinkStore,
     buildWhitelistCommand,
+    buildWhitelistRemoveCommand,
     serverPlayerName,
 )
 from bot.rcon import Rcon, RconError
@@ -51,7 +52,6 @@ async def _rcon(command: str) -> str:
 class Friend(commands.Cog):
     """Account linking and bounded self-service tools for trusted friends."""
 
-    linkGroup = InternalActionGroup()
     rescueGroup = InternalActionGroup()
     placeGroup = InternalActionGroup()
     diaryGroup = InternalActionGroup()
@@ -66,21 +66,27 @@ class Friend(commands.Cog):
         self.imageStore = ImageStore(cfg.state_dir)
 
     @app_commands.command(
-        name="my-tools", description="Open button controls for your linked player."
+        name="my-tools", description="Choose one of your Minecraft accounts and use quick tools."
     )
     async def myTools(self, interaction: discord.Interaction) -> None:
         """Open the text-light self-service panel for the invoking user."""
-        link = await asyncio.to_thread(self.linkStore.get, interaction.user.id)
-        if link:
-            state = "승인됨" if link.approved else "승인 대기"
+        links = await asyncio.to_thread(
+            self.linkStore.listForUser, interaction.user.id
+        )
+        if links:
+            accountLines = [
+                f"• `{link.minecraftName}` — "
+                f"{'Java (PC)' if link.edition == 'java' else 'Bedrock (모바일/콘솔)'}"
+                for link in links
+            ]
             description = (
-                f"**연동:** `{link.minecraftName}` ({link.edition}) · {state}\n"
-                "아래 버튼으로 내 캐릭터와 서버 기록을 관리하세요."
+                "사용할 계정을 먼저 고른 뒤 아래 버튼을 누르세요.\n\n"
+                + "\n".join(accountLines)
             )
         else:
             description = (
-                "연결된 Minecraft 계정이 없습니다. "
-                "**연동 요청** 버튼으로 시작하세요."
+                "등록된 Minecraft 계정이 없습니다.\n"
+                "관리자에게 Java 또는 Bedrock 계정 등록을 요청하세요."
             )
         embed = discord.Embed(
             title="🧰 내 Minecraft 도구",
@@ -89,7 +95,7 @@ class Friend(commands.Cog):
         )
         await interaction.response.send_message(
             embed=embed,
-            view=MyToolsView(self, interaction.user.id),
+            view=MyToolsView(self, interaction.user.id, links),
             ephemeral=True,
         )
 
@@ -106,25 +112,29 @@ class Friend(commands.Cog):
         """Gate approval, revocation, and global deletion behind ADMIN_USER_IDS."""
         if _isAdmin(interaction):
             return True
-        await interaction.response.send_message(
-            "⛔ 관리자만 실행할 수 있습니다.", ephemeral=True
-        )
+        message = "⛔ 관리자만 실행할 수 있습니다."
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
         _log.warning("denied friend-admin command from %s", userTag(interaction.user))
         return False
 
     async def _approvedLink(
-        self, interaction: discord.Interaction, respond: bool = True
+        self,
+        interaction: discord.Interaction,
+        linkId: str | None = None,
+        respond: bool = True,
     ) -> PlayerLink | None:
-        """Resolve the approved Minecraft identity for this Discord user."""
-        link = await asyncio.to_thread(self.linkStore.get, interaction.user.id)
-        if link and link.approved:
+        """Resolve one approved profile owned by the invoking Discord user."""
+        if linkId:
+            link = await asyncio.to_thread(self.linkStore.getById, linkId)
+        else:
+            link = await asyncio.to_thread(self.linkStore.get, interaction.user.id)
+        if link and link.approved and link.discordUserId == interaction.user.id:
             return link
         if respond:
-            message = (
-                "⏳ 관리자의 연동 승인을 기다리는 중입니다."
-                if link
-                else "❌ 먼저 `/내도구`의 **연동 요청** 버튼을 사용하세요."
-            )
+            message = "❌ 등록된 계정을 찾지 못했습니다. 관리자에게 등록을 요청하세요."
             if interaction.response.is_done():
                 await interaction.followup.send(message, ephemeral=True)
             else:
@@ -208,7 +218,7 @@ class Friend(commands.Cog):
     ) -> None:
         """Send one journal entry with its durable local image if available."""
         embed = self._diaryEmbed(entry)
-        imagePath = self.imageStore.safePath(entry.imagePath)
+        imagePath = self.imageStore.safePath(place.imagePath)
         if imagePath and imagePath.is_file():
             file = discord.File(imagePath, filename=imagePath.name)
             embed.set_image(url=f"attachment://{imagePath.name}")
@@ -222,116 +232,12 @@ class Friend(commands.Cog):
         else:
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    # --- Discord ↔ Minecraft links ------------------------------------
-    @linkGroup.command(name="request", description="Request a link to your Minecraft name.")
-    @app_commands.describe(
-        minecraft_name="Your exact in-game name or Xbox gamertag",
-        edition="The Minecraft edition you use to join",
-    )
-    @app_commands.choices(
-        edition=[
-            app_commands.Choice(name="Java Edition (PC)", value="java"),
-            app_commands.Choice(name="Bedrock (mobile / Minecraft for Windows)", value="bedrock"),
-        ]
-    )
-    async def linkRequest(
-        self,
-        interaction: discord.Interaction,
-        minecraft_name: str,
-        edition: app_commands.Choice[str],
-    ) -> None:
-        try:
-            if edition.value == "bedrock" and self.appSettings.serverMode != "java_bedrock":
-                raise ValueError("This server is currently configured for Java only")
-            link = await asyncio.to_thread(
-                self.linkStore.request,
-                interaction.user.id,
-                minecraft_name,
-                edition.value,
-            )
-            await interaction.response.send_message(
-                f"✅ `{link.minecraftName}` ({link.edition}) 연동을 요청했습니다. "
-                "관리자 승인을 기다려 주세요.",
-                ephemeral=True,
-            )
-            _log.info("link requested by %s -> %s", userTag(interaction.user), link.minecraftName)
-        except (ValueError, OSError, RuntimeError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
-
-    @linkGroup.command(name="status", description="Show your current link status.")
-    async def linkStatus(self, interaction: discord.Interaction) -> None:
-        link = await asyncio.to_thread(self.linkStore.get, interaction.user.id)
-        if not link:
-            await interaction.response.send_message("연동 요청이 없습니다.", ephemeral=True)
-            return
-        state = "승인됨" if link.approved else "승인 대기"
-        await interaction.response.send_message(
-            f"**마크닉:** `{link.minecraftName}`\n"
-            f"**에디션:** `{link.edition}`\n**상태:** {state}",
-            ephemeral=True,
-        )
-
-    @linkGroup.command(name="approve", description="Approve one pending player link (admin).")
-    async def linkApprove(
-        self, interaction: discord.Interaction, user: discord.Member
-    ) -> None:
-        if not await self._requireAdmin(interaction):
-            return
-        try:
-            pending = await asyncio.to_thread(self.linkStore.get, user.id)
-            if not pending:
-                raise KeyError("No pending link request for that Discord user")
-            if pending.edition == "bedrock" and self.appSettings.serverMode != "java_bedrock":
-                raise ValueError("Enable Java + Bedrock mode before approving this link")
-            whitelistOutput = await _rcon(buildWhitelistCommand(pending))
-            loweredOutput = whitelistOutput.casefold()
-            if "unknown command" in loweredOutput or "unknown or incomplete" in loweredOutput:
-                raise RuntimeError(
-                    "Minecraft rejected the whitelist command; check the crossplay setup"
-                )
-            link = await asyncio.to_thread(
-                self.linkStore.approve, user.id, interaction.user.id
-            )
-            await interaction.response.send_message(
-                f"✅ {user.mention} ↔ `{link.minecraftName}` ({link.edition}) 연동을 "
-                f"승인하고 접속 허용 목록에 추가했습니다.\n`{whitelistOutput.strip() or 'done'}`",
-                ephemeral=True,
-            )
-            _log.info("link approved by %s for %s", userTag(interaction.user), user.id)
-        except (KeyError, ValueError, OSError, RuntimeError, RconError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
-
-    @linkGroup.command(name="revoke", description="Revoke a player link (admin).")
-    async def linkRevoke(
-        self, interaction: discord.Interaction, user: discord.Member
-    ) -> None:
-        if not await self._requireAdmin(interaction):
-            return
-        removed = await asyncio.to_thread(self.linkStore.remove, user.id)
-        message = "✅ 연동을 해제했습니다." if removed else "해제할 연동이 없습니다."
-        await interaction.response.send_message(message, ephemeral=True)
-        _log.info("link revoke by %s for %s -> %s", userTag(interaction.user), user.id, removed)
-
-    @linkGroup.command(name="list", description="List pending and approved links (admin).")
-    async def linkList(self, interaction: discord.Interaction) -> None:
-        if not await self._requireAdmin(interaction):
-            return
-        links = await asyncio.to_thread(self.linkStore.list)
-        lines = [
-            f"{'✅' if item.approved else '⏳'} <@{item.discordUserId}> ↔ "
-            f"`{item.minecraftName}` ({item.edition})"
-            for item in links[:40]
-        ]
-        if len(links) > 40:
-            lines.append(f"…외 {len(links) - 40}개")
-        await interaction.response.send_message(
-            "\n".join(lines) or "연동 요청이 없습니다.", ephemeral=True
-        )
-
     # --- linked-player rescue -----------------------------------------
     @rescueGroup.command(name="spawn", description="Teleport only your linked player to spawn.")
-    async def rescueSpawn(self, interaction: discord.Interaction) -> None:
-        link = await self._approvedLink(interaction)
+    async def rescueSpawn(
+        self, interaction: discord.Interaction, linkId: str | None = None
+    ) -> None:
+        link = await self._approvedLink(interaction, linkId)
         if not link:
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -356,8 +262,10 @@ class Friend(commands.Cog):
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
     @rescueGroup.command(name="whereami", description="Show your linked player's current location.")
-    async def rescueWhereAmI(self, interaction: discord.Interaction) -> None:
-        link = await self._approvedLink(interaction)
+    async def rescueWhereAmI(
+        self, interaction: discord.Interaction, linkId: str | None = None
+    ) -> None:
+        link = await self._approvedLink(interaction, linkId)
         if not link:
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -610,87 +518,138 @@ class Friend(commands.Cog):
             await interaction.followup.send(f"❌ 건강 점수 계산 실패: {error}", ephemeral=True)
 
     # --- button-panel adapters ---------------------------------------
-    async def panelRequestLink(
-        self, interaction: discord.Interaction, minecraftName: str, edition: str
-    ) -> None:
-        """Create a link request from the edition buttons and short modal."""
-        try:
-            if edition == "bedrock" and self.appSettings.serverMode != "java_bedrock":
-                raise ValueError("현재 서버는 Java 전용으로 설정되어 있습니다.")
-            link = await asyncio.to_thread(
-                self.linkStore.request,
-                interaction.user.id,
-                minecraftName,
-                edition,
-            )
+    async def panelLinkStatus(self, interaction: discord.Interaction) -> None:
+        """Show every approved profile assigned to the current Discord user."""
+        links = await asyncio.to_thread(
+            self.linkStore.listForUser, interaction.user.id
+        )
+        if not links:
             await interaction.response.send_message(
-                f"✅ `{link.minecraftName}` ({link.edition}) 연동을 요청했습니다. "
-                "관리자 승인을 기다려 주세요.",
+                "등록된 Minecraft 계정이 없습니다. 관리자에게 등록을 요청하세요.",
                 ephemeral=True,
             )
-        except (ValueError, OSError, RuntimeError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
-
-    async def panelLinkStatus(self, interaction: discord.Interaction) -> None:
-        """Show the current user's link without requiring command arguments."""
-        link = await asyncio.to_thread(self.linkStore.get, interaction.user.id)
-        if not link:
-            await interaction.response.send_message("연동 요청이 없습니다.", ephemeral=True)
             return
-        state = "승인됨" if link.approved else "승인 대기"
+        lines = [
+            f"• `{link.minecraftName}` — "
+            f"{'Java (PC)' if link.edition == 'java' else 'Bedrock (모바일/콘솔)'}"
+            for link in links
+        ]
         await interaction.response.send_message(
-            f"**마크닉:** `{link.minecraftName}`\n"
-            f"**에디션:** `{link.edition}`\n**상태:** {state}",
+            "**내 계정 목록**\n" + "\n".join(lines),
             ephemeral=True,
         )
 
-    async def panelApproveLink(
-        self, interaction: discord.Interaction, userId: int
+    async def panelLinksForUser(self, discordUserId: int) -> list[PlayerLink]:
+        """Return every profile so the private admin panel can manage it."""
+        return await asyncio.to_thread(
+            self.linkStore.listForUser, discordUserId, False
+        )
+
+    async def panelAddManagedLink(
+        self,
+        interaction: discord.Interaction,
+        discordUserId: int,
+        minecraftName: str,
+        edition: str,
     ) -> None:
-        """Approve a selected link while preserving whitelist validation."""
+        """Directly assign and whitelist one profile selected by an admin."""
         if not await self._requireAdmin(interaction):
             return
+        link = None
         try:
-            pending = await asyncio.to_thread(self.linkStore.get, userId)
-            if not pending:
-                raise KeyError("해당 사용자의 연동 요청이 없습니다.")
-            if (
-                pending.edition == "bedrock"
-                and self.appSettings.serverMode != "java_bedrock"
-            ):
-                raise ValueError("Java + Bedrock 모드를 먼저 활성화하세요.")
-            whitelistOutput = await _rcon(buildWhitelistCommand(pending))
+            if edition == "bedrock" and self.appSettings.serverMode != "java_bedrock":
+                raise ValueError(
+                    "현재 서버가 Java 전용입니다. 먼저 Java + Bedrock 모드를 켜세요."
+                )
+            link = await asyncio.to_thread(
+                self.linkStore.addManaged,
+                discordUserId,
+                minecraftName,
+                edition,
+                interaction.user.id,
+            )
+            whitelistOutput = await _rcon(buildWhitelistCommand(link))
             loweredOutput = whitelistOutput.casefold()
             if "unknown command" in loweredOutput or "unknown or incomplete" in loweredOutput:
-                raise RuntimeError("Minecraft가 접속 허용 명령을 거부했습니다.")
-            link = await asyncio.to_thread(
-                self.linkStore.approve, userId, interaction.user.id
+                raise RuntimeError(
+                    "Minecraft가 접속 허용 명령을 거부했습니다. 서버 설정을 확인하세요."
+                )
+            editionLabel = (
+                "Java (PC)" if link.edition == "java" else "Bedrock (모바일/콘솔)"
             )
-            await interaction.response.send_message(
-                f"✅ <@{userId}> ↔ `{link.minecraftName}` ({link.edition}) 연동을 "
-                f"승인했습니다.\n`{whitelistOutput.strip() or 'done'}`",
+            await interaction.followup.send(
+                f"✅ <@{discordUserId}>에게 **{editionLabel}** 계정 "
+                f"`{link.minecraftName}`을 등록했습니다.\n"
+                "같은 Discord 사용자에게 다른 계정도 계속 추가할 수 있습니다.",
+                view=ManagedAccountView(
+                    self,
+                    interaction.user.id,
+                    discordUserId,
+                    await self.panelLinksForUser(discordUserId),
+                ),
                 ephemeral=True,
             )
-        except (KeyError, ValueError, OSError, RuntimeError, RconError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            _log.info(
+                "managed link added by %s for %s -> %s",
+                userTag(interaction.user),
+                discordUserId,
+                link.minecraftName,
+            )
+        except (ValueError, OSError, RuntimeError, RconError) as error:
+            if link is not None:
+                await asyncio.to_thread(self.linkStore.removeLink, link.linkId)
+            await interaction.followup.send(f"❌ 계정 등록 실패: {error}", ephemeral=True)
 
-    async def panelRevokeLink(
-        self, interaction: discord.Interaction, userId: int
+    async def panelRemoveManagedLink(
+        self, interaction: discord.Interaction, linkId: str
     ) -> None:
-        """Revoke the selected stored link without asking for a typed user ID."""
+        """Remove only the selected profile and its matching whitelist entry."""
         if not await self._requireAdmin(interaction):
             return
-        removed = await asyncio.to_thread(self.linkStore.remove, userId)
-        message = "✅ 연동을 해제했습니다." if removed else "해제할 연동이 없습니다."
-        await interaction.response.send_message(message, ephemeral=True)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            link = await asyncio.to_thread(self.linkStore.getById, linkId)
+            if not link:
+                raise KeyError("선택한 계정이 이미 삭제되었거나 없습니다.")
+            whitelistOutput = await _rcon(buildWhitelistRemoveCommand(link))
+            loweredOutput = whitelistOutput.casefold()
+            if "unknown command" in loweredOutput or "unknown or incomplete" in loweredOutput:
+                raise RuntimeError(
+                    "Minecraft가 접속 허용 해제 명령을 거부했습니다. 서버 설정을 확인하세요."
+                )
+            removed = await asyncio.to_thread(self.linkStore.removeLink, linkId)
+            if not removed:
+                raise RuntimeError("계정 정보를 저장소에서 삭제하지 못했습니다.")
+            await interaction.followup.send(
+                f"✅ `{link.minecraftName}` 계정만 삭제했습니다. "
+                "같은 Discord 사용자의 다른 계정은 유지됩니다.",
+                view=ManagedAccountView(
+                    self,
+                    interaction.user.id,
+                    link.discordUserId,
+                    await self.panelLinksForUser(link.discordUserId),
+                ),
+                ephemeral=True,
+            )
+            _log.info(
+                "managed link removed by %s -> %s",
+                userTag(interaction.user),
+                link.minecraftName,
+            )
+        except (KeyError, ValueError, OSError, RuntimeError, RconError) as error:
+            await interaction.followup.send(f"❌ 계정 삭제 실패: {error}", ephemeral=True)
 
-    async def panelRescueSpawn(self, interaction: discord.Interaction) -> None:
+    async def panelRescueSpawn(
+        self, interaction: discord.Interaction, linkId: str
+    ) -> None:
         """Reuse the bounded self-rescue command from a button callback."""
-        await self.rescueSpawn(interaction)
+        await self.rescueSpawn(interaction, linkId)
 
-    async def panelWhereAmI(self, interaction: discord.Interaction) -> None:
+    async def panelWhereAmI(
+        self, interaction: discord.Interaction, linkId: str
+    ) -> None:
         """Reuse the linked-player location lookup from a button callback."""
-        await self.rescueWhereAmI(interaction)
+        await self.rescueWhereAmI(interaction, linkId)
 
     async def panelServerScore(self, interaction: discord.Interaction) -> None:
         """Reuse the on-demand health calculation from a button callback."""
@@ -733,10 +692,14 @@ class Friend(commands.Cog):
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
     async def panelSaveCurrentPlace(
-        self, interaction: discord.Interaction, name: str, description: str
+        self,
+        interaction: discord.Interaction,
+        linkId: str,
+        name: str,
+        description: str,
     ) -> None:
         """Read the linked player's current position and store it under a short name."""
-        link = await self._approvedLink(interaction)
+        link = await self._approvedLink(interaction, linkId)
         if not link:
             return
         try:
