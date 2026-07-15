@@ -132,7 +132,7 @@ sudo journalctl -u mc-discord-bot.service -f
 Once Paper reports `Done (…)!`, op **only yourself** with local RCON:
 
 ```bash
-mcrcon -H 127.0.0.1 -P 25575 -p '<your RCON password>' 'op YourMinecraftName'
+.venv/bin/python -m bot.rcon 'op YourMinecraftName'
 ```
 
 This is what makes you the only in-game cheater. See
@@ -140,10 +140,9 @@ This is what makes you the only in-game cheater. See
 
 ## 5. Let a friend request access
 
-```text
-Friend: /link request minecraft_name:<name> edition:<Java or Bedrock>
-Owner:  /link approve user:<Discord member>
-```
+The friend opens `/my-tools` → **Request link** and types only the Minecraft
+name. The owner opens `/admin` → **Account links**, selects the request, and
+presses **Approve**.
 
 Approval adds the account to the appropriate Java or Floodgate whitelist. The
 friend is not made op and can rescue only their own linked player.
