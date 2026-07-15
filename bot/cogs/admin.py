@@ -141,7 +141,7 @@ class Admin(commands.Cog):
         self.lastAlertAt: dict[str, datetime] = {}
 
     @app_commands.command(
-        name="server", description="Open the friend-safe button server panel."
+        name="server", description="Check server status and online players with buttons."
     )
     async def serverPanel(self, interaction: discord.Interaction) -> None:
         """Open the read-only public panel without command arguments."""
@@ -152,7 +152,7 @@ class Admin(commands.Cog):
         )
 
     @app_commands.command(
-        name="admin", description="Open the private button-first administrator panel."
+        name="admin", description="Manage the server, backups, worlds, and friend accounts."
     )
     async def adminPanel(self, interaction: discord.Interaction) -> None:
         """Open the single owner-only entry point for routine operations."""
@@ -162,7 +162,7 @@ class Admin(commands.Cog):
             ephemeral=True,
         )
 
-    @uploadGroup.command(name="world", description="Upload a Java world ZIP archive.")
+    @uploadGroup.command(name="world", description="Upload a Java world ZIP to use on this server.")
     async def uploadWorld(
         self, interaction: discord.Interaction, file: discord.Attachment
     ) -> None:
@@ -171,7 +171,7 @@ class Admin(commands.Cog):
         await self.worldUpload(interaction, name, file)
 
     @uploadGroup.command(
-        name="update", description="Upload a trusted application Release ZIP."
+        name="update", description="Upload a trusted bot program update ZIP."
     )
     async def uploadUpdate(
         self, interaction: discord.Interaction, file: discord.Attachment
@@ -180,7 +180,7 @@ class Admin(commands.Cog):
         await self.updateUpload(interaction, file)
 
     @uploadGroup.command(
-        name="place-photo", description="Attach a photo to an existing coordinate."
+        name="place-photo", description="Add a photo to a saved shared coordinate."
     )
     async def uploadPlacePhoto(
         self, interaction: discord.Interaction, name: str, file: discord.Attachment
@@ -193,7 +193,7 @@ class Admin(commands.Cog):
         await friend.panelUploadPlacePhoto(interaction, name, file)
 
     @uploadGroup.command(
-        name="diary", description="Write a diary entry with a photo attachment."
+        name="diary", description="Write a server diary entry and attach a photo."
     )
     async def uploadDiaryPhoto(
         self, interaction: discord.Interaction, message: str, file: discord.Attachment
@@ -1295,19 +1295,77 @@ class Admin(commands.Cog):
         await self.panelLegacyCommand(commandName, interaction, value)
 
     async def panelOpenLinkAdmin(self, interaction: discord.Interaction) -> None:
-        """Open pending/approved link management as a dropdown panel."""
+        """Open direct multi-profile account management for one Discord user."""
         friend = self.bot.get_cog("Friend")
         if friend is None:
             await interaction.response.send_message("친구 도구가 준비되지 않았습니다.", ephemeral=True)
             return
-        from bot.friend_panel import LinkAdminView
+        from bot.friend_panel import ManagedAccountView
 
-        links = await asyncio.to_thread(friend.linkStore.list)
         await interaction.response.send_message(
-            "연동 요청을 선택한 뒤 승인하거나 해제하세요.",
-            view=LinkAdminView(friend, interaction.user.id, links),
+            "**1. Discord 사용자 선택 → 2. Java/Bedrock 계정 추가**\n"
+            "연동 요청이나 승인은 없습니다. 한 사용자에게 계정을 여러 개 등록할 수 있습니다.",
+            view=ManagedAccountView(friend, interaction.user.id),
             ephemeral=True,
         )
+
+    @staticmethod
+    def panelHelpEmbed() -> discord.Embed:
+        """Explain administrator-only controls in plain Korean."""
+        embed = discord.Embed(
+            title="❓ 관리자 전용 도움말",
+            description=(
+                "이 도움말과 관리 버튼은 관리자에게만 보입니다. "
+                "평소에는 **상태 확인 → 필요한 버튼 한 번**이면 됩니다."
+            ),
+            color=BRAND_BLUE,
+        )
+        embed.add_field(
+            name="매일 쓰는 버튼",
+            value=(
+                "**접속자 관리**: 접속자 선택 후 상태 확인·이동·추방\n"
+                "**서버 제어**: 서버 시작·정지·재시작\n"
+                "**상태 진단 / 성능 상세**: 이상 원인과 라즈베리파이 상태 확인"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="데이터와 복구",
+            value=(
+                "**백업**: 즉시 백업, 자동 백업 주기·보관 설정, 복구\n"
+                "**월드**: 업로드한 월드 선택·적용\n"
+                "**업데이트**: 새 프로그램 확인·설치 결과 확인\n"
+                "**로그 / 저장공간**: 오류 기록과 HDD 여유 확인"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="친구 계정",
+            value=(
+                "Discord 사용자를 고른 뒤 **Java(PC)** 또는 "
+                "**Bedrock(모바일/콘솔)** 닉네임을 등록합니다.\n"
+                "한 Discord 사용자에게 여러 계정을 추가할 수 있고, "
+                "삭제할 때도 선택한 계정 하나만 삭제됩니다."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="파일 업로드가 필요할 때",
+            value=(
+                "Discord 명령 입력창에서 `/업로드`를 고른 뒤 "
+                "**월드 / 업데이트 / 좌표사진 / 일지** 중 목적을 선택하세요."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="주의가 필요한 버튼",
+            value=(
+                "**긴급 복구**는 긴급 작업, **고급 도구**는 공지·RCON·허용목록용입니다. "
+                "정지·재시작·삭제·복구 작업은 확인 화면을 읽고 실행하세요."
+            ),
+            inline=False,
+        )
+        return embed
 
     async def panelOnlinePlayers(self) -> list[str]:
         """Return validated live player names from Paper's list command."""
@@ -1342,7 +1400,10 @@ class Admin(commands.Cog):
         )
         embed = discord.Embed(
             title="🎛️ Minecraft 관리 패널",
-            description="아래 버튼으로 자주 쓰는 작업을 실행하세요.",
+            description=(
+                "서버 제어, 백업, 월드, 친구 계정을 버튼으로 관리합니다.\n"
+                "처음이면 **관리 도움말**부터 누르세요."
+            ),
             color=OK_GREEN if online else ERR_RED,
         )
         embed.add_field(name="서버", value="🟢 온라인" if online else "🔴 오프라인", inline=True)
