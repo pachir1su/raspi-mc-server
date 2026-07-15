@@ -58,6 +58,16 @@ class PanelUxTests(unittest.TestCase):
         self.assertIn("Bedrock (모바일/콘솔)", source)
         self.assertIn("사용할 Minecraft 계정 선택", source)
 
+    def testSetupDocsDoNotTeachTheRemovedRequestFlow(self):
+        """English and Korean setup guides match direct administrator assignment."""
+        english = (ROOT / "docs" / "en" / "setup.md").read_text(encoding="utf-8")
+        korean = (ROOT / "docs" / "ko" / "setup.md").read_text(encoding="utf-8")
+
+        self.assertNotIn("Request link", english)
+        self.assertNotIn("연동 요청", korean)
+        self.assertIn("Friend accounts", english)
+        self.assertIn("친구 계정", korean)
+
 
 if __name__ == "__main__":
     unittest.main()
