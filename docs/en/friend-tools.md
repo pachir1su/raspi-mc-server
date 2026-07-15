@@ -166,5 +166,6 @@ it with `whitelist list`, and then add the Bedrock profile again. Do not operate
 server with the whitelist left off. See the official
 [Geyser whitelist FAQ](https://geysermc.org/wiki/geyser/faq/).
 
-Death Box is deliberately separate. See [death-box-design.md](death-box-design.md)
-for the Paper plugin design and its test plan.
+Death Box is deliberately separate — it is a Paper plugin, not part of the bot.
+See [death-box-design.md](death-box-design.md) for how it works, how to build and
+install it, and its verification checklist.
