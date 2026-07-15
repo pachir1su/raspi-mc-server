@@ -9,7 +9,10 @@ import os
 
 from dotenv import load_dotenv
 
+from bot import log
 from bot.app_settings import AppSettingsStore
+
+_log = log.get("config")
 
 # Load .env from the repo root if present. On the Pi, systemd also injects
 # these via EnvironmentFile — load_dotenv won't clobber existing vars.
@@ -34,13 +37,32 @@ def _int_set(raw: str):
     return out
 
 
+def _guild_ids(raw: str):
+    """Parse comma-separated guild IDs into a list of ints (이슈 G, #18).
+
+    빈 값이면 전역 등록을 위해 빈 리스트를 반환합니다. 공백은 허용하고 빈 항목은
+    무시하며, 숫자가 아닌 값은 크래시 대신 경고 로그 후 건너뜁니다.
+    """
+    out = []
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if part.isdigit():
+            out.append(int(part))
+        else:
+            _log.warning("ignoring invalid DISCORD_GUILD_ID entry: %r", part)
+    return out
+
+
 class Config:
     # Runtime data path is needed before loading menu-managed settings.
     state_dir = os.getenv("MC_STATE_DIR", "data")
 
     # Discord
     token = os.getenv("DISCORD_TOKEN", "")
-    guild_id = os.getenv("DISCORD_GUILD_ID", "").strip() or None
+    # 쉼표로 여러 길드를 지정할 수 있습니다(친구 서버 + 개인 서버). 빈 값이면 전역.
+    guild_ids = _guild_ids(os.getenv("DISCORD_GUILD_ID", ""))
     admin_ids = _int_set(os.getenv("ADMIN_USER_IDS", ""))
     status_channel_id = os.getenv("STATUS_CHANNEL_ID", "").strip() or None
     language = _storedLanguage(state_dir)

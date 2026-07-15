@@ -9,7 +9,14 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
-from deploy.apply_update import ApplyError, _loadAndValidateArchive, _officialDigest
+import argparse
+
+from deploy.apply_update import (
+    ApplyError,
+    _loadAndValidateArchive,
+    _officialDigest,
+    applyUpdate,
+)
 
 
 class ApplyUpdateTests(unittest.TestCase):
@@ -80,6 +87,47 @@ class ApplyUpdateTests(unittest.TestCase):
         ):
             with self.assertRaises(ApplyError):
                 _officialDigest("v2.0.0")
+
+
+class UpdateRequestHandlingTests(unittest.TestCase):
+    """이슈 D: 요청 파일 없음 / 있음 / 손상된 JSON 처리."""
+
+    def _args(self, root: Path) -> argparse.Namespace:
+        stateDir = root / "data"
+        storageRoot = root / "storage"
+        stateDir.mkdir()
+        storageRoot.mkdir()
+        return argparse.Namespace(
+            repo_dir=root,
+            state_dir=stateDir,
+            storage_root=storageRoot,
+            bot_service="mc-discord-bot.service",
+        )
+
+    def testMissingRequestExitsCleanly(self):
+        with tempfile.TemporaryDirectory() as temporaryDir:
+            args = self._args(Path(temporaryDir))
+            # 요청 파일이 없으면 예외 없이 조용히 종료하고 상태 파일도 남기지 않습니다.
+            self.assertIsNone(applyUpdate(args))
+            self.assertFalse((args.state_dir / "update-status.json").exists())
+
+    def testCorruptRequestRaisesApplyError(self):
+        with tempfile.TemporaryDirectory() as temporaryDir:
+            args = self._args(Path(temporaryDir))
+            (args.state_dir / "update-request.json").write_text("{ not json", encoding="utf-8")
+            with self.assertRaises(ApplyError):
+                applyUpdate(args)
+
+    def testPresentRequestIsReadAndValidated(self):
+        with tempfile.TemporaryDirectory() as temporaryDir:
+            args = self._args(Path(temporaryDir))
+            # 태그가 잘못된 유효 요청 → 파일은 읽혔고 태그 검증에서 걸립니다.
+            (args.state_dir / "update-request.json").write_text(
+                json.dumps({"tag": "not-a-version", "source": "github"}), encoding="utf-8"
+            )
+            with self.assertRaises(ApplyError) as caught:
+                applyUpdate(args)
+            self.assertIn("tag", str(caught.exception))
 
 
 if __name__ == "__main__":

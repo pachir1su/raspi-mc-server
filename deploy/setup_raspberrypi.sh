@@ -46,9 +46,10 @@ register_corretto_repository() {
 # --- 시스템 패키지 -------------------------------------------------------
 echo "==> Installing system packages..."
 sudo apt-get update
+# 참고: mcrcon는 Debian(Bookworm) 저장소에 없어 apt로 설치할 수 없습니다(이슈 J).
+# RCON 한 줄 실행은 내장 클라이언트(.venv/bin/python -m bot.rcon "...")로 대체합니다.
 sudo apt-get install -y \
   python3 python3-venv python3-pip \
-  mcrcon \
   ca-certificates apt-transport-https gnupg wget \
   curl jq tar zip
 
@@ -126,13 +127,13 @@ sudo chmod 440 "$SUDOERS"
 
 # --- systemd 유닛 --------------------------------------------------------
 echo "==> Installing systemd units..."
-# /home/pi를 가정하지 않고 실제 저장소 경로와 서비스 계정을 반영합니다.
-sed -e "s|^User=.*|User=$SERVICE_USER|" \
-    -e "s|/home/pi/raspi-mc-server|$REPO_DIR|g" \
-    "$REPO_DIR/deploy/minecraft.service" | sudo tee /etc/systemd/system/minecraft.service >/dev/null
-sed -e "s|^User=.*|User=$SERVICE_USER|" \
-    -e "s|/home/pi/raspi-mc-server|$REPO_DIR|g" \
-    "$REPO_DIR/deploy/mc-discord-bot.service" | sudo tee /etc/systemd/system/mc-discord-bot.service >/dev/null
+# 유닛 템플릿의 @USER@/@REPO_DIR@ 자리표시자를 실제 값으로 치환해 설치합니다(이슈 F).
+install_unit() {
+  sed -e "s|@USER@|$SERVICE_USER|g" -e "s|@REPO_DIR@|$REPO_DIR|g" "$1" | \
+    sudo tee "$2" >/dev/null
+}
+install_unit "$REPO_DIR/deploy/minecraft.service" /etc/systemd/system/minecraft.service
+install_unit "$REPO_DIR/deploy/mc-discord-bot.service" /etc/systemd/system/mc-discord-bot.service
 
 # 봇이 수정하지 못하도록 권한 상승 도우미를 root 소유로 설치합니다.
 sudo install -d -m 755 /usr/local/lib/raspi-mc-server
@@ -146,6 +147,11 @@ sed -e "s|@REPO_DIR@|$REPO_DIR|g" \
     sudo tee /etc/systemd/system/raspi-mc-updater.service >/dev/null
 sudo systemctl daemon-reload
 
+# 봇 상태 디렉터리(data/)를 서비스 계정 소유로 보정합니다. root로 도는 업데이터가
+# 먼저 만들어 소유권이 어긋난 경우 봇 first-setup의 PermissionError를 막습니다(이슈 E).
+mkdir -p "$STATE_DIR"
+sudo chown -R "$SERVICE_USER:$SERVICE_USER" "$STATE_DIR"
+
 cat <<EOF
 
 ==> Provisioning done. Remaining manual steps:
@@ -155,8 +161,8 @@ cat <<EOF
   3. Enable reboot start: sudo systemctl enable minecraft.service mc-discord-bot.service
   4. Run everything:     $REPO_DIR/.venv/bin/python -m bot.main
      The first run asks for language and Java-only or Java+Bedrock mode.
-  5. Op yourself once:   mcrcon -H 127.0.0.1 -P 25575 -p '<RCON_PASSWORD>' \
-                           'op <YourName>'
+  5. Op yourself once:   $REPO_DIR/.venv/bin/python -m bot.rcon 'op <YourName>'
+     (RCON_HOST/RCON_PORT/RCON_PASSWORD는 .env에서 읽습니다. 별도 mcrcon 불필요.)
 
 See docs/en/setup.md (English) or docs/ko/setup.md (한국어) for details.
 EOF

@@ -41,6 +41,21 @@ class ApplyError(RuntimeError):
     """Raised when a release cannot be applied without risking the host."""
 
 
+def _matchParentOwner(path: Path) -> None:
+    """Keep root-written files owned by the repo user so the bot can rewrite them.
+
+    업데이터는 root로 실행되므로 data/ 아래에 파일을 만들면 root 소유가 됩니다.
+    그 상태에서 mcadmin으로 도는 봇의 first-setup이 PermissionError로 실패하던
+    문제를 막기 위해(이슈 E) 상위 디렉터리 소유자와 동일하게 맞춥니다.
+    """
+    try:
+        parentStat = path.parent.stat()
+        os.chown(path, parentStat.st_uid, parentStat.st_gid)
+    except OSError:
+        # 권한이 없거나(비-root 실행) 지원되지 않으면 조용히 건너뜁니다.
+        pass
+
+
 def _writeJson(path: Path, payload: dict) -> None:
     """Atomically publish updater state for the restarted Discord bot."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,6 +68,7 @@ def _writeJson(path: Path, payload: dict) -> None:
             os.fsync(outputFile.fileno())
         os.replace(temporaryPath, path)
         os.chmod(path, 0o644)
+        _matchParentOwner(path)
     except Exception:
         try:
             os.unlink(temporaryPath)
@@ -280,8 +296,23 @@ def applyUpdate(args: argparse.Namespace) -> None:
     stagingDir = storageRoot / "staging" / "app-updates"
     statusPath = stateDir / "update-status.json"
     requestPath = stateDir / "update-request.json"
+    # "요청 없음"은 정상 상태입니다(부팅 시 유닛이 그냥 실행된 경우 등). 실패로
+    # 종료하지 않고 조용히 성공 처리합니다(이슈 D).
+    if not requestPath.is_file():
+        print("no pending update request; nothing to do")
+        return
+    # data/ 디렉터리를 리포 소유자와 같게 맞춰 root 선점 문제를 예방합니다(이슈 E).
+    try:
+        repoStat = repoDir.stat()
+        stateDir.mkdir(parents=True, exist_ok=True)
+        os.chown(stateDir, repoStat.st_uid, repoStat.st_gid)
+    except OSError:
+        pass
     startedAt = datetime.now(timezone.utc).isoformat()
-    request = json.loads(requestPath.read_text(encoding="utf-8"))
+    try:
+        request = json.loads(requestPath.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ApplyError(f"invalid update request file: {error}") from error
     tag = str(request.get("tag", ""))
     if not tag.startswith("v") or len(tag) > 64:
         raise ApplyError("invalid requested release tag")

@@ -133,6 +133,45 @@ KOREAN_DESCRIPTIONS = {
     "Text to say in chat": "게임 채팅에 보낼 내용",
     "Your exact in-game name or Xbox gamertag": "정확한 게임 닉네임 또는 Xbox 게이머태그",
     "The Minecraft edition you use to join": "접속에 사용하는 마인크래프트 에디션",
+    # 이슈 H(#17): 영어/한국어가 섞여 나오던 나머지 명령·설명을 한국어로 채웁니다.
+    "Whitelist a player by name.": "이름으로 플레이어를 허용목록에 추가합니다.",
+    "Remove a player from the whitelist.": "허용목록에서 플레이어를 제거합니다.",
+    "Create a safe world backup now.": "지금 안전하게 월드를 백업합니다.",
+    "List the newest HDD backups.": "최신 HDD 백업 목록을 표시합니다.",
+    "Show a compact backup timeline with ages and sizes.": "백업 시점과 크기를 간단한 타임라인으로 표시합니다.",
+    "Verify and preview a backup before restoring it.": "복구 전에 백업을 검증하고 미리 봅니다.",
+    "Download a backup if it fits Discord's limit.": "디스코드 용량 한도 안이면 백업을 다운로드합니다.",
+    "Delete one selected backup archive.": "선택한 백업 아카이브 하나를 삭제합니다.",
+    "Restore a backup after an emergency snapshot.": "비상 스냅샷을 만든 뒤 백업을 복구합니다.",
+    "Verify a backup checksum and archive structure.": "백업 체크섬과 아카이브 구조를 검증합니다.",
+    "Apply the saved retention policy immediately.": "저장된 보관 정책을 즉시 적용합니다.",
+    "Show automatic backup and HDD settings.": "자동 백업과 HDD 설정을 표시합니다.",
+    "Change the persistent automatic backup policy.": "자동 백업 정책을 변경해 저장합니다.",
+    "Enable or pause automatic backups.": "자동 백업을 켜거나 일시정지합니다.",
+    "Upload and validate a Java map archive.": "자바 맵 아카이브를 업로드하고 검증합니다.",
+    "List imported maps on the HDD.": "HDD에 가져온 맵 목록을 표시합니다.",
+    "Back up the live world and switch to an imported map.": "현재 월드를 백업하고 가져온 맵으로 교체합니다.",
+    "Download an imported map if it fits Discord's limit.": "디스코드 용량 한도 안이면 가져온 맵을 다운로드합니다.",
+    "Delete one imported map from the HDD.": "HDD에서 가져온 맵 하나를 삭제합니다.",
+    "One-click emergency helpers for common accidents.": "자주 나는 사고를 한 번에 처리하는 긴급 도우미입니다.",
+    "Set the overworld time to day.": "오버월드 시간을 낮으로 설정합니다.",
+    "Clear storm/rain after an accident.": "사고 후 폭풍·비를 갭니다.",
+    "Temporarily switch difficulty to peaceful.": "난이도를 잠시 평화로움으로 바꿉니다.",
+    "Remove dropped item entities to recover from lag.": "떨어진 아이템 엔티티를 제거해 렉을 완화합니다.",
+    "Calculate an on-demand 0-100 server health score.": "0~100 서버 건강 점수를 즉시 계산합니다.",
+    "Write a server-life journal entry.": "서버 일지 항목을 작성합니다.",
+    "Show recent server-life entries.": "최근 서버 일지 항목을 표시합니다.",
+    "Open one server-life entry.": "서버 일지 항목 하나를 엽니다.",
+    "Delete your coordinate or any as admin.": "내 좌표(관리자는 아무 좌표)를 삭제합니다.",
+    "e.g. gamemode creative YourName, time set day, give ...":
+        "예: gamemode creative YourName, time set day, give ...",
+    "Type ACTIVATE to confirm stopping and replacing the live world":
+        "정지하고 현재 월드를 교체하려면 ACTIVATE를 입력하세요",
+    "Type RESTORE to confirm stopping and replacing the live world":
+        "정지하고 현재 월드를 교체하려면 RESTORE를 입력하세요",
+    "Type DELETE to confirm permanent deletion": "영구 삭제를 확인하려면 DELETE를 입력하세요",
+    "Type CLEAR to confirm deleting every dropped item entity":
+        "떨어진 아이템 엔티티를 모두 삭제하려면 CLEAR를 입력하세요",
 }
 
 

@@ -1,5 +1,8 @@
-# Root-owned one-shot application updater. setup_raspberrypi.sh renders paths
-# and installs the executable separately under /usr/local/lib.
+# Root-owned one-shot application updater. 이 파일은 템플릿입니다.
+# deploy/setup_raspberrypi.sh가 @REPO_DIR@/@STATE_DIR@/@STORAGE_ROOT@를 치환해
+# 설치하고, 실행 파일은 /usr/local/lib에 root 소유로 따로 둡니다. 이 유닛은 root로
+# 실행되어야 하므로(파일 교체·서비스 제어) User=는 그대로 root를 유지합니다.
+# 참고: 업데이터가 만드는 data/ 파일은 apply_update.py가 리포 소유자로 chown합니다.
 [Unit]
 Description=Verified updater for raspi-mc-server
 After=network-online.target

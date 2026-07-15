@@ -1,12 +1,21 @@
 # systemd unit for the Discord admin bot.
 #
-# Install:
-#   sudo cp deploy/mc-discord-bot.service /etc/systemd/system/
+# 이 파일은 템플릿입니다. deploy/setup_raspberrypi.sh가 @USER@/@REPO_DIR@를
+# 실제 값으로 치환해 설치합니다. 수동 설치 시 자리표시자를 직접 바꾸세요:
+#   sudo sed -e "s|@USER@|$(id -un)|g" -e "s|@REPO_DIR@|$PWD|g" \
+#     deploy/mc-discord-bot.service | \
+#     sudo tee /etc/systemd/system/mc-discord-bot.service
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now mc-discord-bot.service
 #
 # The bot reads .env from the repo root for its token, RCON password, and
 # admin user IDs. Keep .env readable only by the bot's user (chmod 600).
+#
+# 보안 참고(이슈 B): 봇은 crossplay/서버 제어에서 `sudo systemctl ...`을 호출합니다.
+# sudo는 setuid를 쓰므로 NoNewPrivileges=true와 함께 쓰면 커널이 차단해 봇이
+# crash loop에 빠집니다. 그래서 NoNewPrivileges는 설정하지 않고, 대신
+# ProtectSystem/ProtectHome/PrivateTmp 등으로 하드닝을 보상합니다. 상승 권한은
+# /etc/sudoers.d/raspi-mc-server의 좁은 규칙(지정 서비스 제어)로 한정됩니다.
 [Unit]
 Description=Discord admin bot for raspi-mc-server
 After=network-online.target minecraft.service
@@ -15,13 +24,24 @@ RequiresMountsFor=/mnt/minecraft
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/raspi-mc-server
-EnvironmentFile=/home/pi/raspi-mc-server/.env
-ExecStart=/home/pi/raspi-mc-server/.venv/bin/python -m bot.main
+User=@USER@
+WorkingDirectory=@REPO_DIR@
+EnvironmentFile=@REPO_DIR@/.env
+ExecStart=@REPO_DIR@/.venv/bin/python -m bot.main
 Restart=on-failure
 RestartSec=10
-NoNewPrivileges=true
+# First-setup 미완료는 재시작해도 해결되지 않으므로 재시작을 멈춥니다(이슈 C).
+# 봇은 이 경우 EX_CONFIG(78)로 종료합니다.
+RestartPreventExitStatus=78
+# NoNewPrivileges는 sudo(setuid)와 충돌하므로 두지 않습니다(위 주석 참고).
+# 그 대신 아래 하드닝으로 보안 수준을 보상합니다.
+ProtectSystem=strict
+ProtectHome=read-only
+# 봇이 실제로 써야 하는 경로만 다시 쓰기 허용합니다(data/, bot/logs/, HDD).
+ReadWritePaths=@REPO_DIR@ /mnt/minecraft
+PrivateTmp=true
+ProtectControlGroups=true
+ProtectKernelTunables=true
 
 [Install]
 WantedBy=multi-user.target

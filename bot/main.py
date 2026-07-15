@@ -37,11 +37,13 @@ class McBot(commands.Bot):
         await self.tree.set_translator(CommandTranslator())
         await self.load_extension("bot.cogs.admin")
         await self.load_extension("bot.cogs.friend")
-        if cfg.guild_id:
-            guild = discord.Object(id=int(cfg.guild_id))
-            self.tree.copy_global_to(guild=guild)
-            await self.tree.sync(guild=guild)
-            _log.info("synced commands to guild %s", cfg.guild_id)
+        if cfg.guild_ids:
+            # 여러 길드에 즉시 등록합니다(이슈 G, #18).
+            for guildId in cfg.guild_ids:
+                guild = discord.Object(id=guildId)
+                self.tree.copy_global_to(guild=guild)
+                await self.tree.sync(guild=guild)
+            _log.info("synced commands to guilds %s", cfg.guild_ids)
         else:
             await self.tree.sync()
             _log.info("synced commands globally")

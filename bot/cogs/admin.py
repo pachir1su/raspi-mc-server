@@ -32,7 +32,13 @@ from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
 from bot.player_info import parseOnlinePlayers, summarizeInventory, validatePlayerName
 from bot.performance_report import parseTps, shouldAlert
-from bot.rcon import Rcon, RconError
+from bot.rcon import (
+    Rcon,
+    RconAuthError,
+    RconConnectionError,
+    RconError,
+    RconTimeout,
+)
 from bot.system_metrics import (
     formatDuration,
     readSystemMetrics,
@@ -51,6 +57,32 @@ from bot.world_storage import StorageError, WorldStorage
 
 _log = log.get("cog.admin")
 PUBLIC_COMMANDS = {"portal", "online"}
+
+# 접속자가 0명이면 자동 백업 주기를 이 배수만큼 늘려 부하를 줄입니다(이슈 I, #16).
+IDLE_INTERVAL_MULTIPLIER = 4
+
+
+def _autoBackupDecision(
+    playersOnline: int | None,
+    worldChanged: bool,
+    ageMinutes: float,
+    intervalMinutes: int,
+) -> str:
+    """Decide whether a due auto-backup should run, be skipped, or wait longer.
+
+    playersOnline가 None이면 접속자 수를 확인하지 못한 것이므로(RCON 실패) 안전하게
+    평소 주기대로 백업합니다. 반환값: "backup" | "skip_idle_unchanged" | "skip_not_due".
+    """
+    if playersOnline == 0 and not worldChanged:
+        # 아무도 없고 마지막 백업 이후 변경도 없으면 백업할 게 없습니다.
+        return "skip_idle_unchanged"
+    threshold = intervalMinutes
+    if playersOnline == 0:
+        # 접속자가 없으면 주기를 넉넉하게 늘립니다.
+        threshold = intervalMinutes * IDLE_INTERVAL_MULTIPLIER
+    if ageMinutes < threshold:
+        return "skip_not_due"
+    return "backup"
 
 
 def _is_admin(interaction: discord.Interaction) -> bool:
@@ -335,7 +367,28 @@ class Admin(commands.Cog):
         try:
             out = await _rcon("list")
             e = discord.Embed(title="🟢 Server online", description=out, color=OK_GREEN)
-        except RconError:
+        except RconAuthError as error:
+            # 연결은 됐지만 비밀번호 불일치 — 설정 문제라 사용자에게 따로 안내.
+            _log.warning("status RCON auth failed: %s", error)
+            e = discord.Embed(
+                title="🟠 RCON 인증 실패",
+                description=(
+                    "서버는 응답하지만 RCON 비밀번호가 일치하지 않습니다.\n"
+                    "`.env`의 `RCON_PASSWORD`와 `server.properties`의 "
+                    "`rcon.password`가 같은지 확인하세요."
+                ),
+                color=WARN_YELLOW,
+            )
+        except RconTimeout as error:
+            # TCP는 열렸지만 응답이 늦음 — 대개 기동 중이거나 과부하.
+            _log.warning("status RCON timed out: %s", error)
+            e = discord.Embed(
+                title="🟠 서버 응답 지연",
+                description="RCON 연결은 됐지만 응답이 늦습니다 — 서버가 기동 중이거나 과부하일 수 있습니다.",
+                color=WARN_YELLOW,
+            )
+        except RconError as error:
+            _log.info("status RCON unreachable: %s", error)
             e = discord.Embed(
                 title="🔴 Server offline",
                 description="RCON is unreachable — the server is stopped or starting.",
@@ -1343,16 +1396,43 @@ class Admin(commands.Cog):
             if not settings.enabled or self.operationLock.locked():
                 return
             backups = await asyncio.to_thread(self.storage.listBackups)
+            lastBackupAt = backups[0].modifiedAt if backups else None
             ageMinutes = float("inf")
-            if backups:
-                ageMinutes = (datetime.now(timezone.utc) - backups[0].modifiedAt).total_seconds() / 60
+            if lastBackupAt is not None:
+                ageMinutes = (datetime.now(timezone.utc) - lastBackupAt).total_seconds() / 60
             if ageMinutes < settings.intervalMinutes:
+                return
+            # 접속자 0명 + 월드 변경 없음이면 백업을 건너뛰거나 주기를 늘립니다(이슈 I).
+            playersOnline = await self._onlinePlayerCount()
+            worldChanged = await asyncio.to_thread(self._worldChangedSince, lastBackupAt)
+            decision = _autoBackupDecision(
+                playersOnline, worldChanged, ageMinutes, settings.intervalMinutes
+            )
+            if decision != "backup":
+                _log.info(
+                    "자동 백업 건너뜀 (%s): 접속자=%s, 변경=%s, 경과=%.0f분",
+                    decision, playersOnline, worldChanged, ageMinutes,
+                )
                 return
             async with self.operationLock:
                 archivePath = await self._safeBackup("auto")
             _log.info("automatic backup complete: %s", archivePath.name)
         except (StorageError, RuntimeError, OSError, RconError):
             _log.exception("automatic backup failed")
+
+    async def _onlinePlayerCount(self) -> int | None:
+        """Return the online player count, or None when RCON is unreachable."""
+        try:
+            return len(parseOnlinePlayers(await _rcon("list")))
+        except RconError:
+            return None
+
+    def _worldChangedSince(self, lastBackupAt) -> bool:
+        """Return whether the live world looks newer than the last backup."""
+        newest = self.storage.newestWorldMtime()
+        if lastBackupAt is None or newest is None:
+            return True
+        return newest > lastBackupAt.timestamp()
 
     @tasks.loop(seconds=300)
     async def performanceAlerts(self):
