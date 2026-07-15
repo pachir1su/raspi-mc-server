@@ -438,8 +438,11 @@ class ManagedAccountView(UserView):
         selected = next(
             link for link in self.links if link.linkId == self.selectedLinkId
         )
+        editionLabel = (
+            "Java (PC)" if selected.edition == "java" else "Bedrock (모바일/콘솔)"
+        )
         await interaction.response.send_message(
-            f"`{selected.minecraftName}` 계정만 삭제할까요? "
+            f"**{editionLabel}** `{selected.minecraftName}` 계정만 삭제할까요? "
             "같은 Discord 사용자의 다른 계정은 유지됩니다.",
             view=ConfirmManagedRemovalView(
                 self.controller, self.ownerId, self.selectedLinkId
