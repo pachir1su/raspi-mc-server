@@ -50,6 +50,14 @@ class PanelUxTests(unittest.TestCase):
         self.assertIn("한 Discord 사용자에게 여러 계정", source)
         self.assertIn("/업로드", source)
 
+    def testAccountSelectorsNameDeviceTypes(self):
+        """Users can distinguish PC and mobile profiles before acting."""
+        source = (ROOT / "bot" / "friend_panel.py").read_text(encoding="utf-8")
+
+        self.assertIn("Java (PC)", source)
+        self.assertIn("Bedrock (모바일/콘솔)", source)
+        self.assertIn("사용할 Minecraft 계정 선택", source)
+
 
 if __name__ == "__main__":
     unittest.main()
