@@ -43,8 +43,9 @@ class PlayerAccountSelect(discord.ui.Select):
                 value=link.linkId,
                 description="아래 구조·위치·좌표 버튼이 이 계정에 적용됩니다.",
                 emoji="☕" if link.edition == "java" else "📱",
+                default=index == 0,
             )
-            for link in links[:25]
+            for index, link in enumerate(links[:25])
         ]
         super().__init__(
             placeholder="사용할 Minecraft 계정 선택",
