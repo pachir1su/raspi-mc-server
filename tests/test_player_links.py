@@ -1,12 +1,15 @@
 """Tests for Discord-to-Minecraft account link persistence."""
 
+import json
 import tempfile
 import unittest
+from pathlib import Path
 
 from bot.player_links import (
     PlayerLink,
     PlayerLinkStore,
     buildWhitelistCommand,
+    buildWhitelistRemoveCommand,
     serverPlayerName,
 )
 
@@ -69,6 +72,77 @@ class PlayerLinkStoreTests(unittest.TestCase):
             requestedAt="2026-01-01T00:00:00+00:00",
         )
         self.assertEqual("java", link.edition)
+
+    def testAdminCanAssignMultipleProfilesToOneDiscordUser(self):
+        """One Discord user can own separate Java and Bedrock profiles."""
+        with tempfile.TemporaryDirectory() as stateDir:
+            store = PlayerLinkStore(stateDir)
+            javaLink = store.addManaged(100, "DeskPlayer", "java", 999)
+            bedrockLink = store.addManaged(100, "Pocket Player", "bedrock", 999)
+
+            links = store.listForUser(100)
+
+        self.assertEqual(2, len(links))
+        self.assertEqual({javaLink.linkId, bedrockLink.linkId}, {item.linkId for item in links})
+        self.assertTrue(all(item.approved for item in links))
+
+    def testRemovingOneProfileKeepsTheOthers(self):
+        """The admin delete action targets a stable profile ID, not the user."""
+        with tempfile.TemporaryDirectory() as stateDir:
+            store = PlayerLinkStore(stateDir)
+            javaLink = store.addManaged(100, "DeskPlayer", "java", 999)
+            bedrockLink = store.addManaged(100, "Pocket Player", "bedrock", 999)
+
+            removed = store.removeLink(javaLink.linkId)
+            remaining = store.listForUser(100)
+
+        self.assertEqual(javaLink, removed)
+        self.assertEqual([bedrockLink], remaining)
+
+    def testDuplicateProfileCannotBeAssignedTwice(self):
+        """The same edition and name cannot belong to two Discord users."""
+        with tempfile.TemporaryDirectory() as stateDir:
+            store = PlayerLinkStore(stateDir)
+            store.addManaged(100, "DeskPlayer", "java", 999)
+
+            with self.assertRaises(ValueError):
+                store.addManaged(200, "deskplayer", "java", 999)
+
+    def testLegacySingleUserRecordGetsStableProfileId(self):
+        """Old one-record-per-user JSON loads without a manual migration step."""
+        with tempfile.TemporaryDirectory() as stateDir:
+            path = Path(stateDir) / "player-links.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "100": {
+                            "discordUserId": 100,
+                            "minecraftName": "Legacy",
+                            "approved": True,
+                            "requestedAt": "2026-01-01T00:00:00+00:00",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            store = PlayerLinkStore(stateDir)
+
+            first = store.listForUser(100)[0]
+            second = store.listForUser(100)[0]
+
+        self.assertTrue(first.linkId)
+        self.assertEqual(first.linkId, second.linkId)
+
+    def testWhitelistRemovalMatchesEdition(self):
+        """Removing a profile uses the correct Java or Floodgate command."""
+        javaLink = PlayerLink(100, "DeskPlayer", True, "now", edition="java")
+        bedrockLink = PlayerLink(100, "Pocket Player", True, "now", edition="bedrock")
+
+        self.assertEqual("whitelist remove DeskPlayer", buildWhitelistRemoveCommand(javaLink))
+        self.assertEqual(
+            "fwhitelist remove Pocket Player",
+            buildWhitelistRemoveCommand(bedrockLink),
+        )
 
 
 if __name__ == "__main__":
