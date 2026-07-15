@@ -26,7 +26,7 @@ From Discord, `/admin` → **Logs** previews or attaches the current log file.
 
 ## Players can't connect
 
-1. **Discord link approved?** The owner opens `/admin` → **Account links**, selects the request, and presses **Approve**.
+1. **Minecraft account assigned?** The owner opens `/admin` → **Friend accounts**, selects the Discord user, and adds the exact Java or Bedrock profile.
 2. **Correct endpoint?** Java uses `25565/TCP`; iPhone, Android, and Minecraft
    for Windows use Geyser on `19132/UDP`.
 3. **Correct version/account?** Java must match the Paper-supported protocol;

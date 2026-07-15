@@ -409,12 +409,14 @@ Test from mobile data or another network, not from the same Wi-Fi.
 
 Friends install no Geyser, Floodgate, mod, or separate launcher.
 
-In Discord, the friend opens `/my-tools`, presses **Request link**, selects the
-edition, and enters the exact name or Xbox gamertag. The owner opens `/admin` →
-**Account links**, selects the request, and presses **Approve**.
+In Discord, the owner opens `/admin` → **Friend accounts**, selects the Discord
+user, and adds the exact Java name or Xbox gamertag. Repeat the add action when
+the same friend uses multiple PC and mobile/console profiles. There is no friend
+request or approval queue.
 
-Approval also adds the correct Java/Floodgate whitelist entry. Approved friends
-can use **Rescue to spawn** and **My location** in `/my-tools` only for their linked account.
+Registration also adds the correct Java/Floodgate whitelist entry. Friends
+select one assigned account in `/my-tools` before using **Selected account:
+spawn** or **Selected account: location**.
 
 Floodgate documents that `fwhitelist` can resolve a gamertag only after that Xbox
 account has joined some Geyser server before. If approval fails for a completely

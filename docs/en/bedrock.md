@@ -56,14 +56,15 @@ After that, the saved server is a tap away. There is no Geyser/Floodgate setup
 on the friend's device. Xbox, PlayStation, and Switch use Bedrock too, but their
 custom-server UI is restricted and is not part of this one-tap support target.
 
-## Discord link and admission
+## Discord account assignment and admission
 
-The friend opens `/my-tools`, presses **Request link**, selects the edition, and
-enters the exact Java name or Xbox gamertag. The owner opens `/admin` →
-**Account links** and presses **Approve**. Approval also runs the
+The owner opens `/admin` → **Friend accounts**, selects the Discord user, and
+presses **Add Bedrock (mobile)** to enter the exact Xbox gamertag. Java profiles
+can be added from the same panel, and one Discord user may own multiple profiles.
+Registration also runs the
 correct Paper/Floodgate whitelist command, so no second whitelist step is
 needed. Floodgate names use a `.` prefix internally to avoid colliding with a
-Java account of the same name; the friend still types the ordinary gamertag.
+Java account of the same name; the owner still types the ordinary gamertag.
 
 ## Network warning
 

@@ -27,7 +27,7 @@ from Discord, SSH, or the web.
   - 🌐 **Cloudflare Tunnel** (optional) — reach the server/console with no port
     forwarding.
 - **30-minute HDD backups**, SHA-256 verification, Discord restore/map
-  upload/switching, approved Discord↔Minecraft links, self-rescue, a photo
+  upload/switching, administrator-assigned multi-profile Discord↔Minecraft links, self-rescue, a photo
   coordinate book, server diary, on-demand health score, friend portal commands,
   automatic performance alerts, tuning reports, one-click incident helpers,
   backup timelines, a button-first dashboard,
