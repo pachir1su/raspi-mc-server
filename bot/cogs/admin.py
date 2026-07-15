@@ -32,7 +32,13 @@ from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
 from bot.player_info import parseOnlinePlayers, summarizeInventory, validatePlayerName
 from bot.performance_report import parseTps, shouldAlert
-from bot.rcon import Rcon, RconError
+from bot.rcon import (
+    Rcon,
+    RconAuthError,
+    RconConnectionError,
+    RconError,
+    RconTimeout,
+)
 from bot.system_metrics import (
     formatDuration,
     readSystemMetrics,
@@ -335,7 +341,28 @@ class Admin(commands.Cog):
         try:
             out = await _rcon("list")
             e = discord.Embed(title="🟢 Server online", description=out, color=OK_GREEN)
-        except RconError:
+        except RconAuthError as error:
+            # 연결은 됐지만 비밀번호 불일치 — 설정 문제라 사용자에게 따로 안내.
+            _log.warning("status RCON auth failed: %s", error)
+            e = discord.Embed(
+                title="🟠 RCON 인증 실패",
+                description=(
+                    "서버는 응답하지만 RCON 비밀번호가 일치하지 않습니다.\n"
+                    "`.env`의 `RCON_PASSWORD`와 `server.properties`의 "
+                    "`rcon.password`가 같은지 확인하세요."
+                ),
+                color=WARN_YELLOW,
+            )
+        except RconTimeout as error:
+            # TCP는 열렸지만 응답이 늦음 — 대개 기동 중이거나 과부하.
+            _log.warning("status RCON timed out: %s", error)
+            e = discord.Embed(
+                title="🟠 서버 응답 지연",
+                description="RCON 연결은 됐지만 응답이 늦습니다 — 서버가 기동 중이거나 과부하일 수 있습니다.",
+                color=WARN_YELLOW,
+            )
+        except RconError as error:
+            _log.info("status RCON unreachable: %s", error)
             e = discord.Embed(
                 title="🔴 Server offline",
                 description="RCON is unreachable — the server is stopped or starting.",
