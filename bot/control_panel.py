@@ -56,11 +56,6 @@ class AdminDashboardView(OwnerView):
             "조회할 플레이어를 선택하세요.", view=view, ephemeral=True
         )
 
-    @discord.ui.button(label="지금 백업", emoji="💾", style=discord.ButtonStyle.success, row=0)
-    async def backup(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.controller.panelCreateBackup(interaction)
-
     @discord.ui.button(label="서버 제어", emoji="🎛️", style=discord.ButtonStyle.primary, row=0)
     async def service(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
@@ -69,35 +64,55 @@ class AdminDashboardView(OwnerView):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="로그", emoji="📄", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(label="상태 진단", emoji="🩺", style=discord.ButtonStyle.secondary, row=0)
+    async def health(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = await self.controller.panelHealthEmbed()
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="성능", emoji="📊", style=discord.ButtonStyle.secondary, row=0)
+    async def performance(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        embed = await self.controller.panelMetricsEmbed()
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="백업", emoji="💾", style=discord.ButtonStyle.success, row=1)
+    async def backups(self, interaction: discord.Interaction, button: discord.ui.Button):
+        backups = await self.controller.panelBackups()
+        settings = await self.controller.panelBackupSettings()
+        embed = await self.controller.panelBackupEmbed()
+        await interaction.response.send_message(
+            embed=embed,
+            view=BackupPanelView(self.controller, self.ownerId, backups, settings),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="월드", emoji="🌍", style=discord.ButtonStyle.secondary, row=1)
+    async def worlds(self, interaction: discord.Interaction, button: discord.ui.Button):
+        worlds = await self.controller.panelWorlds()
+        await interaction.response.send_message(
+            "가져온 월드를 선택하세요. 새 파일은 `/업로드 월드`로 추가합니다.",
+            view=WorldPanelView(self.controller, self.ownerId, worlds),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="업데이트", emoji="⬆️", style=discord.ButtonStyle.secondary, row=1)
+    async def updates(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "Release 확인과 최근 설치 결과를 조회합니다. ZIP은 `/업로드 업데이트`를 사용하세요.",
+            view=UpdatePanelView(self.controller, self.ownerId),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="로그", emoji="📄", style=discord.ButtonStyle.secondary, row=1)
     async def logs(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             "확인할 로그를 선택하세요.", view=LogPanelView(self.controller, self.ownerId), ephemeral=True
         )
 
-    @discord.ui.button(label="자동 백업 토글", emoji="⏱️", style=discord.ButtonStyle.secondary, row=1)
-    async def toggleBackup(self, interaction: discord.Interaction, button: discord.ui.Button):
-        enabled = await self.controller.panelToggleBackup(interaction)
-        button.style = discord.ButtonStyle.success if enabled else discord.ButtonStyle.danger
-        button.label = "자동 백업 켜짐" if enabled else "자동 백업 꺼짐"
-        embed = await self.controller.panelOverviewEmbed()
-        await interaction.response.edit_message(embed=embed, view=self)
-
     @discord.ui.button(label="저장공간", emoji="💽", style=discord.ButtonStyle.secondary, row=1)
     async def storage(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = await self.controller.panelStorageEmbed()
         await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="상태 진단", emoji="🩺", style=discord.ButtonStyle.secondary, row=1)
-    async def health(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = await self.controller.panelHealthEmbed()
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="성능", emoji="📊", style=discord.ButtonStyle.secondary, row=1)
-    async def performance(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        embed = await self.controller.panelMetricsEmbed()
-        await interaction.followup.send(embed=embed, ephemeral=True)
 
     @discord.ui.button(label="튜닝 리포트", emoji="🧰", style=discord.ButtonStyle.secondary, row=2)
     async def tuning(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -112,6 +127,18 @@ class AdminDashboardView(OwnerView):
         await interaction.response.send_message(
             "자주 쓰는 사고 대응 작업입니다. 서버 상태를 바꿀 수 있습니다.",
             view=IncidentActionsView(self.controller, self.ownerId),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="연동 관리", emoji="🔗", style=discord.ButtonStyle.secondary, row=2)
+    async def links(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.controller.panelOpenLinkAdmin(interaction)
+
+    @discord.ui.button(label="고급 도구", emoji="⚙️", style=discord.ButtonStyle.secondary, row=2)
+    async def advanced(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "텍스트가 꼭 필요한 공지·RCON·허용목록과 감사 기록입니다.",
+            view=AdvancedPanelView(self.controller, self.ownerId),
             ephemeral=True,
         )
 
@@ -257,6 +284,309 @@ class PlayerPanelView(OwnerView):
     @discord.ui.button(label="효과", emoji="✨", style=discord.ButtonStyle.secondary, row=1)
     async def effects(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._show(interaction, "effects")
+
+
+class StoredFileSelect(discord.ui.Select):
+    """Dropdown shared by backup and imported-world panels."""
+
+    def __init__(self, parentView, items, placeholder: str, emoji: str):
+        self.parentView = parentView
+        options = [
+            discord.SelectOption(
+                label=item.name[:100],
+                value=item.name,
+                description=f"{item.size / 1024 / 1024:.1f} MiB · {item.modifiedAt:%Y-%m-%d %H:%M}"[:100],
+                emoji=emoji,
+            )
+            for item in items[:25]
+        ]
+        super().__init__(placeholder=placeholder, options=options, min_values=1, max_values=1)
+
+    async def callback(self, interaction: discord.Interaction):
+        self.parentView.selectedName = self.values[0]
+        await interaction.response.edit_message(
+            content=f"선택됨: **{self.values[0]}**", view=self.parentView
+        )
+
+
+class ConfirmLegacyActionView(OwnerView):
+    """Require a second button press before a destructive legacy action."""
+
+    def __init__(
+        self,
+        controller,
+        ownerId: int,
+        commandName: str,
+        arguments: tuple,
+        confirmLabel: str,
+    ):
+        super().__init__(controller, ownerId, timeout=120)
+        self.commandName = commandName
+        self.arguments = arguments
+        self.confirm.label = confirmLabel
+
+    @discord.ui.button(label="확인", emoji="⚠️", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction, button):
+        await self.controller.panelLegacyCommand(
+            self.commandName, interaction, *self.arguments
+        )
+        self.stop()
+
+    @discord.ui.button(label="취소", emoji="↩️", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction, button):
+        await interaction.response.edit_message(content="작업을 취소했습니다.", view=None)
+        self.stop()
+
+
+class BackupPanelView(OwnerView):
+    """Backup creation, selection, verification, restore, deletion, and policy."""
+
+    def __init__(self, controller, ownerId: int, backups, settings):
+        super().__init__(controller, ownerId)
+        self.selectedName = backups[0].name if backups else None
+        self.settings = settings
+        self.toggle.label = f"자동 백업: {'켜짐' if settings.enabled else '꺼짐'}"
+        self.toggle.style = (
+            discord.ButtonStyle.success
+            if settings.enabled
+            else discord.ButtonStyle.secondary
+        )
+        if backups:
+            self.add_item(StoredFileSelect(self, backups, "백업 선택", "💾"))
+
+    async def _selected(self, interaction, action: str, *args):
+        if not self.selectedName:
+            await interaction.response.send_message("선택할 백업이 없습니다.", ephemeral=True)
+            return
+        await self.controller.panelLegacyCommand(
+            action, interaction, self.selectedName, *args
+        )
+
+    @discord.ui.button(label="지금 백업", emoji="💾", style=discord.ButtonStyle.success, row=1)
+    async def create(self, interaction, button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelCreateBackup(interaction)
+
+    @discord.ui.button(label="자동 백업", emoji="🔔", style=discord.ButtonStyle.secondary, row=1)
+    async def toggle(self, interaction, button):
+        enabled = await self.controller.panelToggleBackup(interaction)
+        button.label = f"자동 백업: {'켜짐' if enabled else '꺼짐'}"
+        button.style = discord.ButtonStyle.success if enabled else discord.ButtonStyle.secondary
+        embed = await self.controller.panelBackupEmbed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="검증", emoji="✅", style=discord.ButtonStyle.secondary, row=1)
+    async def verify(self, interaction, button):
+        await self._selected(interaction, "backupVerify")
+
+    @discord.ui.button(label="다운로드", emoji="⬇️", style=discord.ButtonStyle.secondary, row=1)
+    async def download(self, interaction, button):
+        await self._selected(interaction, "backupDownload")
+
+    @discord.ui.button(label="복구", emoji="♻️", style=discord.ButtonStyle.danger, row=2)
+    async def restore(self, interaction, button):
+        if not self.selectedName:
+            await interaction.response.send_message("선택한 백업이 없습니다.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"⚠️ `{self.selectedName}` 백업으로 복구할까요? 현재 월드는 교체됩니다.",
+            view=ConfirmLegacyActionView(
+                self.controller,
+                self.ownerId,
+                "backupRestore",
+                (self.selectedName, "RESTORE"),
+                "백업 복구",
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="삭제", emoji="🗑️", style=discord.ButtonStyle.danger, row=2)
+    async def delete(self, interaction, button):
+        if not self.selectedName:
+            await interaction.response.send_message("선택한 백업이 없습니다.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"⚠️ `{self.selectedName}` 백업을 영구 삭제할까요?",
+            view=ConfirmLegacyActionView(
+                self.controller,
+                self.ownerId,
+                "backupDelete",
+                (self.selectedName, "DELETE"),
+                "백업 삭제",
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="정리", emoji="🧹", style=discord.ButtonStyle.secondary, row=2)
+    async def prune(self, interaction, button):
+        await self.controller.panelLegacyCommand("backupPrune", interaction)
+
+    @discord.ui.button(label="정책 설정", emoji="⚙️", style=discord.ButtonStyle.primary, row=2)
+    async def policy(self, interaction, button):
+        await interaction.response.send_message(
+            "각 항목을 선택하면 즉시 저장됩니다.",
+            view=BackupPolicyView(self.controller, self.ownerId, self.settings),
+            ephemeral=True,
+        )
+
+
+class BackupSettingSelect(discord.ui.Select):
+    """Persist one backup policy field immediately after selection."""
+
+    def __init__(self, parentView, field: str, label: str, values: list[int], current: int, row: int):
+        self.parentView = parentView
+        self.field = field
+        options = [
+            discord.SelectOption(
+                label=str(value), value=str(value), default=value == current
+            )
+            for value in values
+        ]
+        super().__init__(placeholder=label, options=options, row=row)
+
+    async def callback(self, interaction: discord.Interaction):
+        settings = await self.parentView.controller.panelUpdateBackupSetting(
+            self.field, int(self.values[0])
+        )
+        await interaction.response.edit_message(
+            content=(
+                "✅ 백업 정책 저장됨 · "
+                f"{settings.intervalMinutes}분 / {settings.retentionHours}시간 / "
+                f"일일 {settings.dailyRetentionDays}일 / "
+                f"사용률 {settings.maxUsagePercent}% / 여유 {settings.minFreeGb}GB"
+            ),
+            view=self.parentView,
+        )
+
+
+class BackupPolicyView(OwnerView):
+    """Common backup values as selects so routine configuration needs no typing."""
+
+    def __init__(self, controller, ownerId: int, settings):
+        super().__init__(controller, ownerId)
+        self.add_item(BackupSettingSelect(self, "intervalMinutes", "백업 주기(분)", [30, 60, 120, 240, 360], settings.intervalMinutes, 0))
+        self.add_item(BackupSettingSelect(self, "retentionHours", "단기 보관(시간)", [24, 48, 72, 168, 336], settings.retentionHours, 1))
+        self.add_item(BackupSettingSelect(self, "dailyRetentionDays", "일일 보관(일)", [7, 14, 30, 60, 90], settings.dailyRetentionDays, 2))
+        self.add_item(BackupSettingSelect(self, "maxUsagePercent", "최대 HDD 사용률(%)", [70, 75, 80, 85, 90, 95], settings.maxUsagePercent, 3))
+        self.add_item(BackupSettingSelect(self, "minFreeGb", "최소 여유 공간(GB)", [5, 10, 20, 30, 50, 100], settings.minFreeGb, 4))
+
+
+class WorldPanelView(OwnerView):
+    """Select imported worlds and perform bounded file actions."""
+
+    def __init__(self, controller, ownerId: int, worlds):
+        super().__init__(controller, ownerId)
+        self.selectedName = worlds[0].name if worlds else None
+        if worlds:
+            self.add_item(StoredFileSelect(self, worlds, "가져온 월드 선택", "🌍"))
+
+    async def _selected(self, interaction, action: str, *args):
+        if not self.selectedName:
+            await interaction.response.send_message("가져온 월드가 없습니다.", ephemeral=True)
+            return
+        await self.controller.panelLegacyCommand(action, interaction, self.selectedName, *args)
+
+    @discord.ui.button(label="적용", emoji="✅", style=discord.ButtonStyle.danger, row=1)
+    async def activate(self, interaction, button):
+        if not self.selectedName:
+            await interaction.response.send_message("가져온 월드가 없습니다.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"⚠️ `{self.selectedName}` 월드를 적용할까요? 서버 월드가 교체됩니다.",
+            view=ConfirmLegacyActionView(
+                self.controller,
+                self.ownerId,
+                "worldActivate",
+                (self.selectedName, "ACTIVATE"),
+                "월드 적용",
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="다운로드", emoji="⬇️", style=discord.ButtonStyle.secondary, row=1)
+    async def download(self, interaction, button):
+        await self._selected(interaction, "worldDownload")
+
+    @discord.ui.button(label="삭제", emoji="🗑️", style=discord.ButtonStyle.danger, row=1)
+    async def delete(self, interaction, button):
+        if not self.selectedName:
+            await interaction.response.send_message("가져온 월드가 없습니다.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"⚠️ `{self.selectedName}` 가져온 월드를 삭제할까요?",
+            view=ConfirmLegacyActionView(
+                self.controller,
+                self.ownerId,
+                "worldDelete",
+                (self.selectedName, "DELETE"),
+                "월드 삭제",
+            ),
+            ephemeral=True,
+        )
+
+
+class UpdatePanelView(OwnerView):
+    """Release check and recent updater result without typed subcommands."""
+
+    @discord.ui.button(label="새 버전 확인", emoji="🔍", style=discord.ButtonStyle.primary)
+    async def check(self, interaction, button):
+        await self.controller.panelLegacyCommand("updateCheck", interaction)
+
+    @discord.ui.button(label="최근 결과", emoji="📊", style=discord.ButtonStyle.secondary)
+    async def status(self, interaction, button):
+        await self.controller.panelLegacyCommand("updateStatus", interaction)
+
+
+class TextActionModal(discord.ui.Modal):
+    """Single-field modal for the few operations that inherently require text."""
+
+    def __init__(self, controller, title: str, label: str, action: str, placeholder: str = ""):
+        super().__init__(title=title)
+        self.controller = controller
+        self.action = action
+        self.value = discord.ui.TextInput(label=label, placeholder=placeholder, max_length=1500)
+        self.add_item(self.value)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.controller.panelTextAction(interaction, self.action, str(self.value))
+
+
+class AdvancedPanelView(OwnerView):
+    """Keep unavoidable text entry and audit lookup out of the routine dashboard."""
+
+    @discord.ui.button(label="게임 공지", emoji="📣", style=discord.ButtonStyle.primary)
+    async def announce(self, interaction, button):
+        await interaction.response.send_modal(
+            TextActionModal(self.controller, "게임 공지", "공지 내용", "say")
+        )
+
+    @discord.ui.button(label="고급 RCON", emoji="⌨️", style=discord.ButtonStyle.danger)
+    async def rcon(self, interaction, button):
+        await interaction.response.send_modal(
+            TextActionModal(
+                self.controller,
+                "고급 RCON 명령",
+                "명령",
+                "mc",
+                "예: time set day",
+            )
+        )
+
+    @discord.ui.button(label="허용 추가", emoji="➕", style=discord.ButtonStyle.success, row=1)
+    async def whitelistAdd(self, interaction, button):
+        await interaction.response.send_modal(
+            TextActionModal(self.controller, "허용목록 추가", "Minecraft 닉네임", "wl_add")
+        )
+
+    @discord.ui.button(label="허용 제거", emoji="➖", style=discord.ButtonStyle.secondary, row=1)
+    async def whitelistRemove(self, interaction, button):
+        await interaction.response.send_modal(
+            TextActionModal(self.controller, "허용목록 제거", "Minecraft 닉네임", "wl_remove")
+        )
+
+    @discord.ui.button(label="감사 기록", emoji="🧾", style=discord.ButtonStyle.secondary, row=2)
+    async def audit(self, interaction, button):
+        await self.controller.panelLegacyCommand("audit", interaction, 10)
 
 
 class LogPanelView(OwnerView):
