@@ -7,10 +7,10 @@ the service, back up the world, and pull logs — all from Discord.
 ## Why a bot?
 
 - Manage the server from your phone without SSH.
-- The `/mc` command is your **remote cheat console** (runs at op level 4).
+- `/admin` → **Advanced tools** → **Advanced RCON** is your remote cheat console (op level 4).
 - Slow actions (backup, restart) show a **loading animation** so you get
   feedback instead of a frozen "thinking…".
-- `/logs` attaches the current log file for quick debugging.
+- `/admin` → **Logs** previews or attaches the current log for quick debugging.
 
 ## 1. Create a Discord application
 
@@ -76,53 +76,24 @@ sudo journalctl -u mc-discord-bot.service -f
 
 ## Commands
 
-`/portal` and `/online` are friend-safe read-only commands. Approved links also
-unlock the narrow `/rescue`, `/place`, `/diary`, and `/server-score` surface.
-All general management commands remain **admin-only** (checked against
-`ADMIN_USER_IDS`). Reopen the stored language/server menu with
-`.venv/bin/python -m bot.main --setup`.
+The bot publishes only four top-level commands. Legacy command callbacks remain
+internal to the panels, so Discord's command picker stays short.
 
 The first-run language controls bot responses and status text. Discord slash
-command names follow each user's **Discord client language**: Korean clients
-receive Korean names such as `/연동 요청` and `/구조 스폰`, while English
-clients retain the canonical names below.
+command names follow each user's **Discord client language**. Korean clients see
+`/서버`, `/관리자`, `/내도구`, and `/업로드`; English clients see the canonical
+names below.
 
 | Command | What it does |
 |---|---|
-| `/status` | Is the server up? Who's online (via RCON `list`). |
-| `/say <message>` | Broadcast a chat message. |
-| `/mc <command>` | **Run ANY server command via RCON** — your cheat console. |
-| `/whitelist add <name>` | Add a player to the whitelist. |
-| `/whitelist remove <name>` | Remove a player from the whitelist. |
-| `/start` | Start the minecraft service. |
-| `/stop` | Save, then stop the service. |
-| `/restart` | Restart the service. |
-| `/backup create/list/download/verify` | Create, list, download, and verify HDD backups. |
-| `/backup timeline/restore-preview` | Show a recent-backup timeline and verify before restoring. |
-| `/backup restore/delete` | Restore or delete with explicit confirmation. |
-| `/backup settings/configure/enabled/prune` | Inspect/change policy or prune immediately. |
-| `/world upload/list/download` | Validate, store, list, and download map archives. |
-| `/world activate/delete` | Snapshot and switch maps, or delete a stored map. |
-| `/storage` | Show HDD mount and capacity status. |
-| `/health` | Check RCON, HDD, backup freshness, and scheduler state. |
-| `/audit [limit]` | Show recent privileged-operation audit records. |
-| `/panel` | Open the button-first combined administration dashboard. |
-| `/players` | Select a live player and inspect inventory, location, stats, or effects. |
-| `/metrics` | Show Pi temperature, load, memory, HDD, TPS, and throttle flags. |
-| `/tuning-report` | Explain current performance risks and Pi-friendly tuning advice. |
-| `/incident day/clear-weather/peaceful/clear-drops` | Accident helpers for day, weather, peaceful mode, and dropped items. `clear-drops` requires `CLEAR` because it deletes every dropped item. |
-| `/portal`, `/online` | Friend-facing server info and online players. |
-| `/link request/status` | Request and inspect your Discord ↔ Minecraft link. |
-| `/link approve/revoke/list` | Admin-only link approval and management. |
-| `/rescue spawn/whereami` | Move only the approved linked player to fixed spawn, or read that player's location. |
-| `/place add/list/show/delete` | Shared coordinate book with durable photos and optional external map links. |
-| `/diary add/recent/show` | Bounded shared server journal with optional photos. |
-| `/server-score` | On-demand 0–100 score from Paper and Pi health metrics. |
-| `/update check/upload/status` | Inspect Releases, install a ZIP matching the official asset SHA-256, and read rollback status (admin). |
-| `/logs` | Open bot and Minecraft log controls. |
+| `/server` | Friend-safe access information, online players, and refresh buttons. |
+| `/admin` | Private owner dashboard for service, players, backups, worlds, updates, logs, storage, performance, incidents, account links, and advanced tools. |
+| `/my-tools` | Private self-service panel for linking, rescue, location, score, coordinates, and diary. |
+| `/upload world/update/place-photo/diary` | Attachment-only flows that Discord buttons cannot provide. World/update remain admin-only; friend media still checks link ownership. |
 
-`/start`, `/stop`, `/restart`, `/backup create`, restore, and activation show the loading animation while
-they run and then edit the message with the result.
+Destructive backup/world/service actions require a second confirmation button.
+Text modals appear only where text is inherent: player name, coordinate name,
+diary text, announcements, raw RCON, and whitelist names.
 
 See [backup.md](backup.md) for the complete retention and file-safety model.
 See [friend-tools.md](friend-tools.md) for exact Pi configuration, approval flow,
@@ -130,16 +101,17 @@ runtime files, command examples, and troubleshooting.
 
 ## Button-first dashboard
 
-Run `/panel` once, then use buttons without typing command arguments for:
+Run `/admin` once, then use buttons without typing command arguments for:
 
 - refreshing server, player, HDD, and latest-backup status
-- creating a safe backup immediately
+- creating, selecting, checking, downloading, restoring, deleting, and pruning backups
+- changing backup policy through dropdowns with the current values preselected
 - starting, or confirming stop/restart of, the Minecraft service
 - toggling automatic backups
-- storage and health diagnostics
+- imported-world selection, update status, storage, and health diagnostics
 - Pi temperature, memory, TPS, undervoltage, throttle metrics, and tuning report
 - emergency buttons for day, weather, peaceful difficulty, and dropped-item cleanup. Dropped-item cleanup asks for confirmation because it can delete friends' items.
-- the live-player selector
+- the live-player and account-link selectors
 - bot and Minecraft log controls
 
 The ephemeral panel is visible only to the administrator who opened it and
@@ -148,7 +120,7 @@ leaving an apparently dead button.
 
 ## Player inspection
 
-`/players` or the dashboard **Players** button builds a dropdown from Paper's
+The `/admin` dashboard **Players** button builds a dropdown from Paper's
 current `list` output. After selecting a player, buttons show:
 
 - **Inventory** — hotbar, normal slots, armour, offhand item, and counts
@@ -161,7 +133,7 @@ they cannot be turned into arbitrary RCON input.
 
 ## Log panel
 
-`/logs` now opens buttons instead of immediately attaching one file. It reads a
+The dashboard **Logs** button opens controls instead of immediately attaching one file. It reads a
 bounded tail of the bot log or Paper `latest.log` and supports:
 
 - bot or Minecraft previews
