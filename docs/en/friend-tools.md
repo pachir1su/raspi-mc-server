@@ -59,29 +59,29 @@ sudo systemctl status mc-discord-bot.service --no-pager
 sudo journalctl -u mc-discord-bot.service -n 100 --no-pager
 ```
 
-## 2. Link each friend
+## 2. Assign each friend's accounts
 
-The friend runs `/my-tools`, presses **Request link**, chooses Java or Bedrock,
-and types only the exact Minecraft name in the modal. The owner runs `/admin`,
-opens **Account links**, selects the request, and presses **Approve**. The friend
-uses **Link status** in `/my-tools` to verify the result. The owner presses
-**Revoke** in the same account-link panel if the
-Discord account or Minecraft name changes. Java names follow the normal 1–16
-character format. Bedrock gamertags may also contain spaces. Unsafe command
+The owner runs `/admin`, opens **Friend accounts**, and selects a Discord user.
+Press **Add Java (PC)** or **Add Bedrock (mobile)** and type only the exact
+Minecraft name in the modal. There is no friend request or approval queue. The
+owner may add multiple Java and Bedrock profiles to the same Discord user and
+may remove one selected profile without affecting the others. The friend sees
+all assigned profiles under **My accounts** in `/my-tools`.
+
+Adding a profile runs `whitelist add` for Java or Floodgate's `fwhitelist add`
+for Bedrock. Removing it runs the matching removal command. These server
+mutations remain behind `ADMIN_USER_IDS`. Java names follow the normal 1–16
+character format; Bedrock gamertags may also contain spaces. Unsafe command
 characters are rejected in both cases.
-
-Approval runs `whitelist add` for Java or Floodgate's `fwhitelist add` for
-Bedrock before recording approval. This is a server mutation, so approval
-remains behind `ADMIN_USER_IDS`. The friend needs no second admission step.
 
 ## 3. Rescue only the linked account
 
-- **Rescue to spawn** in `/my-tools` teleports only the Minecraft name approved for the caller. The
+- Select an account in `/my-tools`, then press **Selected account: spawn**. It teleports only a Minecraft profile assigned to the caller. The
   player must be online. The destination is the fixed `MC_SPAWN_*` configuration;
   the friend cannot enter a target, coordinates, or RCON command.
 - **My location** reads only that linked online player's dimension and XYZ.
 
-The account-link approval is the delegated authorization for this one fixed
+The administrator's account assignment is the delegated authorization for this one fixed
 teleport. All general server mutation, raw Advanced RCON, lifecycle, backup, whitelist,
 incident, and world-management commands remain behind `ADMIN_USER_IDS`.
 
@@ -134,9 +134,9 @@ your host-level HDD backup. They are ignored by Git.
 | Symptom | Check |
 |---|---|
 | Friend sees the feature-disabled message | Set `PUBLIC_COMMANDS_ENABLED=true`, then restart the bot. |
-| Link remains pending | Owner opens `/admin` → **Account links**, selects the request, then presses **Approve**. |
+| No account appears in `/my-tools` | Owner opens `/admin` → **Friend accounts**, selects the Discord user, then adds a Java or Bedrock profile. |
 | Rescue says spawn is not configured | Set all four `MC_SPAWN_DIMENSION/X/Y/Z` values and restart. |
-| Bedrock approval says the whitelist command is unknown | Re-run `python -m bot.main --setup`, select Java+Bedrock, and check both plugin configs were generated. |
+| Bedrock registration says the whitelist command is unknown | Re-run `python -m bot.main --setup`, select Java+Bedrock, and check both plugin configs were generated. |
 | Rescue or whereami cannot find the player | The exact linked Java/Floodgate account must currently be online. |
 | Photo upload fails | Use a supported image type below 5 MiB and check `MC_STATE_DIR` permissions/free space. |
 | Map link is missing | Set `MC_MAP_URL_TEMPLATE`; no map plugin means no live map link. |
@@ -147,7 +147,7 @@ your host-level HDD backup. They are ignored by Git.
 
 Floodgate documents that `fwhitelist add <gamertag>` can resolve only accounts
 that have previously joined a Geyser server. A completely new Xbox account can
-therefore fail its first approval before it is known to Floodgate.
+therefore fail its first registration before it is known to Floodgate.
 
 Prefer doing this on LAN before public Bedrock port forwarding is enabled. In a
 short maintenance window, with the exact friend ready to connect:
@@ -162,7 +162,7 @@ whitelist reload
 
 Run these through local RCON or `/admin` → **Advanced tools** → **Advanced RCON**; never delegate them to the
 friend. Re-enable the whitelist immediately even if another step fails, verify
-it with `whitelist list`, and then press **Approve** again. Do not operate the
+it with `whitelist list`, and then add the Bedrock profile again. Do not operate the
 server with the whitelist left off. See the official
 [Geyser whitelist FAQ](https://geysermc.org/wiki/geyser/faq/).
 
