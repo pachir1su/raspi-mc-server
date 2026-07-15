@@ -1,78 +1,115 @@
-# Death Box design (Paper plugin follow-up)
+# Death Box (Paper plugin)
 
-Death Box is intentionally **not implemented through the Discord RCON bot**.
-RCON can react only after death messages reach the log, by which time dropped
-items may already have burned, exploded, or despawned. It also cannot safely
-reconstruct item metadata, nested containers, enchantments, or ownership.
+Death Box stores a player's dropped items in a protected, owner-only chest on
+death, instead of leaving them to burn, explode, or despawn. It is implemented
+as a small **Paper plugin** under [`plugin/deathbox`](../../plugin/deathbox),
+**not** through the Discord RCON bot: RCON can only react after death messages
+reach the log, by which time dropped items may already be gone, and it cannot
+safely reconstruct item metadata, nested containers, enchantments, or ownership.
 
-## Recommended implementation
+## How it works
 
-Build a small Paper plugin as a separate follow-up change. A datapack is possible
-for a simpler server, but a plugin is the reliable choice for exact inventories,
-ownership, protected access, recovery after restart, and version-aware tests.
+The plugin is event-driven and does work only on death, on container access, and
+on a light hourly expiry sweep. It never polls RCON, parses logs, scans
+entities, or keeps chunks loaded.
 
-The plugin should be event-driven:
-
-1. Listen to Paper's player-death event at normal priority and ignore cancelled or
-   `keepInventory` deaths.
-2. Copy the event's complete item stacks in memory, including armor and offhand.
-3. Clear only the captured event drops so items never exist as vulnerable ground
+1. It listens to the player-death event at **normal** priority and ignores
+   `keepInventory` or empty-drop deaths, so gravestone-style plugins at a higher
+   priority win.
+2. It copies the event's complete item stacks in memory (inventory, armor, and
+   offhand are all part of the death drops).
+3. It clears the captured drops so items never exist as vulnerable ground
    entities.
-4. Find a safe container position using a small bounded search around the death
-   block. Never scan a whole chunk or world.
-5. Create a double chest or another 54-slot container and write the captured
-   stacks. If no safe block exists (void, lava, protected region, or full area),
-   retain a plugin-owned virtual inventory and notify the player instead of
-   deleting items.
-6. Tag the container with the dead player's UUID and a unique box ID using Paper's
-   persistent data APIs. Display the coordinates to that player only.
-7. Remove the metadata record when the box becomes empty. Optional expiry should
-   be owner-configurable and default to disabled.
+4. It runs a small **bounded** search around the death block (default radius 4,
+   hard-capped at 8) for a safe spot — never a whole chunk or world.
+5. It places a double chest (54 slots, enough for a completely full inventory)
+   and writes the captured stacks. Placement is verified at runtime to confirm
+   the two halves actually merged. If no safe block exists (void, lava, world
+   border, or a full area), it keeps the items in a plugin-owned **virtual box**
+   and tells the player instead of deleting them.
+6. It tags the container's block(s) with the dead player's UUID and a unique box
+   ID using Paper's persistent data API, and shows the coordinates to that
+   player only.
+7. It removes the record when the box becomes empty (detected on close). An
+   optional expiry is owner-configurable and defaults to disabled.
 
-This performs work only on death, container access, and bounded cleanup. It does
-not poll RCON, parse logs, scan entities, or keep chunks loaded.
+Physical boxes carry their owner/id tag on the block itself (so access checks
+survive restarts without any index), and a small atomically-written
+`boxes.yml` index lets `/deathbox list|locate` answer queries and holds virtual
+boxes — all without scanning the world. On startup only known records are
+loaded; no chunk is force-loaded.
 
-## Ownership and safety rules
+## Ownership and safety
 
-- Default access: the dead player and `ADMIN_USER_IDS`-equivalent Minecraft
-  operators only. An optional `friends-can-open` setting may loosen this.
-- Never run arbitrary commands supplied by Discord users.
-- Preserve exact `ItemStack` metadata; do not serialize items as command strings.
-- Detect an existing block, protected region, world border, and unloaded/unsafe
-  destination before placing a container.
-- Define compatibility with `keepInventory`, gravestone plugins, claim plugins,
-  and death-drop modifiers. If another gravestone plugin is active, disable this
-  plugin rather than duplicating items.
-- Write metadata atomically. On startup, reconcile only known box records; never
-  scan every loaded chunk.
+- Default access: the dead player and operators (`deathbox.admin`) only. When
+  `friends-can-open` is enabled, players with the `deathbox.friend` permission
+  may also open boxes.
+- Boxes are protected from unauthorized opening, hopper siphoning, explosions,
+  piston moves, and manual breaking. To retrieve items, the owner opens the box
+  and empties it; the box then removes itself.
+- Item metadata is preserved exactly — stacks are stored as real `ItemStack`s
+  (virtual boxes use Bukkit object serialization), never as command strings.
+- Placement respects the world border, world height limits, existing blocks, and
+  liquids. If another gravestone plugin is detected (Graves, GravesX, AngelChest,
+  DeadChest, SavageDeathChest, and similar), DeathBox disables itself on startup
+  rather than duplicating items.
 
-## Suggested configuration
+> Region/claim plugins: DeathBox does not place inside occupied blocks, but it
+> does not yet integrate with WorldGuard/GriefPrevention claim checks. If you run
+> a claim plugin, verify placement behaviour before relying on it (see the
+> checklist below), or keep `search-radius` small.
+
+## Build
+
+Requires JDK 21 and Maven. The PaperMC Maven repository must be reachable.
+
+```bash
+cd plugin/deathbox
+mvn -B package
+# → target/DeathBox-1.0.0.jar
+```
+
+Set `<paper.api.version>` in `plugin/deathbox/pom.xml` to match the Paper version
+you run on the Pi. CI also builds the plugin on every change under
+`plugin/deathbox/` via `.github/workflows/plugin-build.yml`.
+
+## Install
+
+1. Copy `target/DeathBox-1.0.0.jar` into the server's `plugins/` directory.
+2. Start (or restart) the server once to generate `plugins/DeathBox/config.yml`.
+3. Edit the config if needed, then restart.
+
+## Configuration
+
+`plugins/DeathBox/config.yml` (these settings belong to the plugin, not the
+bot's `.env` and not `server.properties`):
 
 ```yaml
 enabled: true
-container: double-chest
-search-radius: 4
-expire-hours: 0        # 0 means never expire
+container: double-chest   # double-chest | chest | barrel
+search-radius: 4          # bounded; clamped to 1..8
+expire-hours: 0           # 0 means never expire
 friends-can-open: false
 fallback-virtual-box: true
 ```
 
-These settings belong to the Paper plugin's own configuration, not `.env` and not
-the Discord bot.
-
-## Suggested commands
+## Commands
 
 | Command | Access | Purpose |
 |---|---|---|
 | `/deathbox locate` | box owner | Show the player's newest box coordinates. |
 | `/deathbox list` | box owner | List that player's active boxes. |
-| `/deathbox recover <id>` | admin | Recover a virtual fallback box after inspection. |
-| `/deathbox purge <id>` | admin | Delete a box only after explicit confirmation. |
+| `/deathbox recover <id>` | admin | Recover a virtual fallback box into your inventory. |
+| `/deathbox purge <id> confirm` | admin | Delete a box after explicit confirmation. |
 
-Discord may later expose **read-only** box locations returned by a narrow plugin
-API. Creation, inventory capture, recovery, and deletion must remain inside Paper.
+Permissions: `deathbox.use` (default: all), `deathbox.friend` (default: none),
+`deathbox.admin` (default: op). Discord may later expose **read-only** box
+locations; creation, capture, recovery, and deletion stay inside the plugin.
 
-## Verification required for the follow-up
+## Verification checklist (run on a real server)
+
+Static review and CI compilation do not exercise gameplay. Before trusting the
+plugin on the live Pi, verify:
 
 - Normal inventory, armor, offhand, enchanted items, bundles, and shulker boxes.
 - Lava, void, explosion, cramped cave, water, world border, and protected regions.
@@ -82,6 +119,3 @@ API. Creation, inventory capture, recovery, and deletion must remain inside Pape
 - `keepInventory=true`, another death plugin, hopper access, explosions, and
   unauthorized players.
 - Paper timings/profile comparison confirming no idle tick or chunk-load overhead.
-
-Implement and release this as its own plugin-focused PR after selecting the exact
-Paper version and region-protection compatibility requirements.
