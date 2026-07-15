@@ -138,13 +138,14 @@ Once Paper reports `Done (…)!`, op **only yourself** with local RCON:
 This is what makes you the only in-game cheater. See
 [cheats-and-ops.md](cheats-and-ops.md).
 
-## 5. Let a friend request access
+## 5. Add a friend's accounts
 
-The friend opens `/my-tools` → **Request link** and types only the Minecraft
-name. The owner opens `/admin` → **Account links**, selects the request, and
-presses **Approve**.
+The owner opens `/admin` → **Friend accounts**, selects the Discord user, then
+presses **Add Java (PC)** or **Add Bedrock (mobile)** and enters the exact
+Minecraft name. Repeat to assign multiple PC and mobile/console profiles to the
+same Discord user. There is no request or approval queue.
 
-Approval adds the account to the appropriate Java or Floodgate whitelist. The
+Registration adds the account to the appropriate Java or Floodgate whitelist. The
 friend is not made op and can rescue only their own linked player.
 
 ## 6. Reopen setup later
