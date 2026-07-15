@@ -83,6 +83,25 @@ class WorldStorage:
             raise StorageError(f"No world directories found in {self.serverDir}")
         return existing
 
+    def newestWorldMtime(self) -> float | None:
+        """Return the newest mtime among live worlds as a cheap change signal.
+
+        전체 트리를 걷지 않고 각 차원의 디렉터리와 level.dat만 확인합니다. Paper는
+        저장 시 level.dat를 갱신하므로 마지막 백업 이후 변경 여부의 근사치로 씁니다
+        (이슈 I, #16). 파일이 없으면 None을 반환합니다.
+        """
+        newest = None
+        for name in WORLD_NAMES:
+            base = self.serverDir / name
+            for candidate in (base, base / "level.dat"):
+                try:
+                    mtime = candidate.stat().st_mtime
+                except OSError:
+                    continue
+                if newest is None or mtime > newest:
+                    newest = mtime
+        return newest
+
     async def createBackup(self, settings: BackupSettings, label: str = "auto") -> Path:
         """Create a compressed archive in a worker thread under the job lock."""
         async with self.jobLock:
