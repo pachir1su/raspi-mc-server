@@ -3,8 +3,10 @@ package io.github.pachir1su.raspimcops;
 import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.TileState;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -24,9 +26,17 @@ import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.persistence.PersistentDataType;
 
 /** Event-level spawn safe zone with a persistent owner toggle. */
 public final class SpawnProtectionService implements Listener {
+    /**
+     * Containers tagged by the DeathBox plugin. Interacting with them must stay
+     * possible inside the safe zone, or players who die at spawn can never
+     * retrieve their items (DeathBox itself keeps the box owner-only).
+     */
+    private static final NamespacedKey DEATH_BOX_ID = NamespacedKey.fromString("deathbox:box_id");
+
     private final RaspiMcOpsPlugin plugin;
 
     public SpawnProtectionService(RaspiMcOpsPlugin plugin) {
@@ -139,10 +149,17 @@ public final class SpawnProtectionService implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
         Block block = event.getClickedBlock();
-        if (block != null && isProtected(block.getLocation()) && !canBypass(event.getPlayer())) {
+        if (block != null && isProtected(block.getLocation()) && !canBypass(event.getPlayer())
+                && !isDeathBox(block)) {
             event.setCancelled(true);
             deny(event.getPlayer());
         }
+    }
+
+    private boolean isDeathBox(Block block) {
+        return DEATH_BOX_ID != null
+            && block.getState() instanceof TileState state
+            && state.getPersistentDataContainer().has(DEATH_BOX_ID, PersistentDataType.STRING);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
