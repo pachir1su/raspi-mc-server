@@ -85,7 +85,7 @@ class PlaceNameModal(discord.ui.Modal, title="현재 위치 저장"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.controller.panelSaveCurrentPlace(
-            interaction, self.linkId, str(self.placeName), str(self.description)
+            interaction, self.linkId, self.placeName.value, self.description.value
         )
 
 
@@ -166,7 +166,7 @@ class DiaryModal(discord.ui.Modal, title="서버 일지 작성"):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.controller.panelAddDiary(interaction, str(self.message))
+        await self.controller.panelAddDiary(interaction, self.message.value)
 
 
 class DiarySelect(discord.ui.Select):
@@ -312,7 +312,7 @@ class ManagedAccountModal(discord.ui.Modal):
         await self.controller.panelAddManagedLink(
             interaction,
             self.discordUserId,
-            str(self.minecraftName),
+            self.minecraftName.value,
             self.edition,
         )
 
