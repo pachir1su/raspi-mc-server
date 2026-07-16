@@ -83,7 +83,7 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
-          for _ in {1..20}; do
+          for _ in {1..120}; do
             if gh release upload "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
               "dist/raspi-mc-server-${TAG}.zip" \
@@ -95,7 +95,7 @@ jobs:
               echo "failed to upload assets to existing release: $TAG" >&2
               exit 1
             fi
-            sleep 3
+            sleep 5
           done
           echo "release not found after retries: $TAG" >&2
           exit 1
