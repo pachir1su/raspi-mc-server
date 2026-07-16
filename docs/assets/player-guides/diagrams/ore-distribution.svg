@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Overworld ore height ranges / 오버월드 광물 높이 범위</title>
+  <desc id="desc">Approximate Java 26.1 generation ranges and practical recommended mining heights for eight Overworld ores.</desc>
+  <defs><style>
+    text{font-family:Arial,"Noto Sans KR",sans-serif;fill:#172033}.h{font-size:27px;font-weight:700}.t{font-size:17px}.s{font-size:14px}.grid{stroke:#cbd5e1;stroke-width:1}.axis{stroke:#475569;stroke-width:2}.range{stroke-width:18;stroke-linecap:round}.peak{stroke:#172033;stroke-width:3}
+  </style></defs>
+  <rect width="1200" height="650" rx="24" fill="#f8fafc"/>
+  <text x="48" y="48" class="h">Overworld ore ranges · 오버월드 광물 범위 (Java 26.1)</text>
+  <text x="48" y="78" class="s">Dots mark practical targets; bands show main generation ranges. Terrain clips the highest definitions. · 점은 추천 높이, 선은 주 생성 범위입니다.</text>
+  <g>
+    <line x1="240" y1="110" x2="240" y2="585" class="axis"/>
+    <line x1="240" y1="135" x2="1140" y2="135" class="grid"/><text x="225" y="140" text-anchor="end" class="s">Y 320</text>
+    <line x1="240" y1="230" x2="1140" y2="230" class="grid"/><text x="225" y="235" text-anchor="end" class="s">Y 232</text>
+    <line x1="240" y1="325" x2="1140" y2="325" class="grid"/><text x="225" y="330" text-anchor="end" class="s">Y 136</text>
+    <line x1="240" y1="365" x2="1140" y2="365" class="grid"/><text x="225" y="370" text-anchor="end" class="s">Y 96</text>
+    <line x1="240" y1="413" x2="1140" y2="413" class="grid"/><text x="225" y="418" text-anchor="end" class="s">Y 48</text>
+    <line x1="240" y1="445" x2="1140" y2="445" class="grid"/><text x="225" y="450" text-anchor="end" class="s">Y 16</text>
+    <line x1="240" y1="461" x2="1140" y2="461" class="grid"/><text x="225" y="466" text-anchor="end" class="s">Y 0</text>
+    <line x1="240" y1="477" x2="1140" y2="477" class="grid"/><text x="225" y="482" text-anchor="end" class="s">Y -16</text>
+    <line x1="240" y1="520" x2="1140" y2="520" class="grid"/><text x="225" y="525" text-anchor="end" class="s">Y -59</text>
+    <line x1="240" y1="525" x2="1140" y2="525" class="grid"/><text x="225" y="545" text-anchor="end" class="s">Y -64</text>
+  </g>
+  <g text-anchor="middle" class="t">
+    <text x="300" y="615">Coal<tspan x="300" dy="19" class="s">석탄</tspan></text><line x1="300" y1="461" x2="300" y2="135" stroke="#334155" class="range"/><circle cx="300" cy="365" r="8" fill="#fff" class="peak"/>
+    <text x="410" y="615">Iron<tspan x="410" dy="19" class="s">철</tspan></text><line x1="410" y1="485" x2="410" y2="135" stroke="#b45309" class="range"/><circle cx="410" cy="445" r="8" fill="#fff" class="peak"/><circle cx="410" cy="230" r="8" fill="#fff" class="peak"/>
+    <text x="520" y="615">Copper<tspan x="520" dy="19" class="s">구리</tspan></text><line x1="520" y1="477" x2="520" y2="349" stroke="#ea580c" class="range"/><circle cx="520" cy="413" r="8" fill="#fff" class="peak"/>
+    <text x="630" y="615">Gold<tspan x="630" dy="19" class="s">금</tspan></text><line x1="630" y1="525" x2="630" y2="429" stroke="#eab308" class="range"/><circle cx="630" cy="477" r="8" fill="#fff" class="peak"/>
+    <text x="740" y="615">Lapis<tspan x="740" dy="19" class="s">청금석</tspan></text><line x1="740" y1="525" x2="740" y2="397" stroke="#2563eb" class="range"/><circle cx="740" cy="461" r="8" fill="#fff" class="peak"/>
+    <text x="850" y="615">Diamond<tspan x="850" dy="19" class="s">다이아</tspan></text><line x1="850" y1="525" x2="850" y2="445" stroke="#06b6d4" class="range"/><circle cx="850" cy="520" r="8" fill="#fff" class="peak"/>
+    <text x="960" y="615">Redstone<tspan x="960" dy="19" class="s">레드스톤</tspan></text><line x1="960" y1="525" x2="960" y2="446" stroke="#dc2626" class="range"/><circle cx="960" cy="520" r="8" fill="#fff" class="peak"/>
+    <text x="1070" y="615">Emerald<tspan x="1070" dy="19" class="s">에메랄드</tspan></text><line x1="1070" y1="477" x2="1070" y2="135" stroke="#16a34a" class="range"/><circle cx="1070" cy="230" r="8" fill="#fff" class="peak"/>
+  </g>
+</svg>
