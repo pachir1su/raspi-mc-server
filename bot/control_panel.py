@@ -160,7 +160,8 @@ class MoreToolsView(OwnerView):
     @discord.ui.button(label="고급 도구", emoji="⚙️", style=discord.ButtonStyle.secondary, row=1)
     async def advanced(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
-            "텍스트가 꼭 필요한 공지·RCON·허용목록과 감사 기록입니다.",
+            "게임 공지, 인게임 명령어(마인크래프트 콘솔 명령 직접 실행), "
+            "접속 허용목록과 감사 기록입니다.",
             view=AdvancedPanelView(self.controller, self.ownerId),
             ephemeral=True,
         )
@@ -597,15 +598,17 @@ class AdvancedPanelView(OwnerView):
             TextActionModal(self.controller, "게임 공지", "공지 내용", "say")
         )
 
-    @discord.ui.button(label="고급 RCON", emoji="⌨️", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="인게임 명령어", emoji="⌨️", style=discord.ButtonStyle.danger)
     async def rcon(self, interaction, button):
+        # 마인크래프트 콘솔 명령을 입력한 그대로 실행하는 자유 입력 채널.
+        # 자주 쓰는 명령은 접속자 관리·빠른 명령 버튼을 먼저 확인하세요.
         await interaction.response.send_modal(
             TextActionModal(
                 self.controller,
-                "고급 RCON 명령",
-                "명령",
+                "인게임 명령어 실행",
+                "마인크래프트 콘솔 명령 (/ 없이 입력)",
                 "mc",
-                "예: time set day",
+                "예: time set day, gamemode creative 닉네임",
             )
         )
 
