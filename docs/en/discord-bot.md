@@ -96,6 +96,32 @@ See [backup.md](backup.md) for the complete retention and file-safety model.
 See [friend-tools.md](friend-tools.md) for exact Pi configuration, approval flow,
 runtime files, command examples, and troubleshooting.
 
+## Flat quick commands
+
+The most-used actions run as a **single top-level slash command** instead of
+digging through panels (issue #79). Every command reuses the same validated RCON
+builders as the panel buttons, and replies are visible only to the caller.
+
+| Command | Access | What it does |
+|---|---|---|
+| `/cmd <command>` | Admin | Run one server console command as-is (cheats included). |
+| `/who` | Admin | Show who is online right now. |
+| `/notice <message>` | Admin | Broadcast to everyone in-game. |
+| `/time <day·noon·night·midnight>` | Admin | Set the world time preset. |
+| `/weather <clear·rain·thunder>` | Admin | Set the world weather preset. |
+| `/invincible <player> [seconds]` | Admin | Make a player temporarily invincible (default 5s): regeneration, resistance, fire resistance, and saturation with hidden particles (issue #75). |
+| `/mortal <player>` | Admin | Remove only the invincibility effects granted above. |
+| `/give <player> <item> [count]` | Admin | Give an item, accepting Korean aliases. |
+| `/stats <player>` | Admin | Show a player's death/kill totals. |
+| `/my-stats` | Friend | Show your own linked player's death/kill totals (issue #68). |
+| `/wiki <page>` | Public | Jump to a GitHub help doc — brewing, enchantments, farming, and more (issue #71). |
+
+Commands that take a player offer **online-player autocomplete**, so names never
+have to be typed from memory. Invincibility hides its particles, and stats are
+tracked by scoreboards from the moment the bot first starts (no retroactive
+history). The wiki base URL defaults to the repository docs and can be changed
+with `MC_WIKI_BASE_URL` in `.env`.
+
 ## Button-first dashboard
 
 Run `/admin` once, then use buttons without typing command arguments. The
