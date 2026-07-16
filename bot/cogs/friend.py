@@ -33,7 +33,7 @@ from bot.player_links import (
 )
 from bot.player_names import buildPlayerSelector
 from bot.rcon import Rcon, RconError
-from bot.rescue import buildAutomaticSpawnCommand, buildSpawnCommand, parsePosition
+from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.system_metrics import readSystemMetrics, readThrottleFlags
 
 _log = log.get("cog.friend")
@@ -290,24 +290,22 @@ class Friend(commands.Cog):
             playerName = serverPlayerName(
                 link, self.appSettings.bedrockUsernamePrefix
             )
-            try:
-                destination = cfg.rescueDestination()
-            except ValueError:
-                # The plugin reads the authoritative live world spawn when the
-                # optional operator override is intentionally left unset.
-                output = await _rcon(buildAutomaticSpawnCommand(playerName))
-                destinationLabel = "world spawn"
-            else:
-                output = await _rcon(buildSpawnCommand(playerName, destination))
-                destinationLabel = "configured spawn"
+            # 스폰 기준은 월드 스폰 하나입니다. 관리자가 관리 패널의
+            # "빠른 명령 → 스폰 지정"으로 옮기면 죽었을 때 리스폰과 이 버튼이
+            # 같은 곳으로 통합됩니다. (과거 MC_SPAWN_* 좌표 오버라이드는 두
+            # 위치가 어긋나는 원인이라 제거 — bot/rescue.py 상단 안내 참고)
+            output = await _rcon(buildAutomaticSpawnCommand(playerName))
+            # 플러그인은 실패도 일반 텍스트로 답하므로 응답을 검증해야
+            # 미접속 플레이어에게 허위 성공을 보여주지 않습니다(이슈 #45 댓글).
+            ensureRescueSucceeded(output)
             await asyncio.to_thread(
                 self.diaryStore.record,
                 "rescue",
-                f"{playerName} returned to {destinationLabel}.",
+                f"{playerName} 님이 스폰으로 귀환했습니다.",
                 interaction.user.id,
             )
             await interaction.followup.send(
-                f"✅ `{link.minecraftName}`만 스폰으로 이동했습니다.\n`{output.strip() or 'done'}`",
+                f"✅ `{link.minecraftName}` 님을 스폰으로 이동했습니다.",
                 ephemeral=True,
             )
             _log.info("self rescue by %s -> %s", userTag(interaction.user), link.minecraftName)
