@@ -23,6 +23,10 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
         this.plugin = plugin;
     }
 
+    private Messages msg() {
+        return plugin.messages();
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "help" : args[0].toLowerCase();
@@ -31,7 +35,7 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
             case "list" -> list(sender, args);
             case "recover" -> recover(sender, args);
             case "purge" -> purge(sender, args);
-            default -> sender.sendMessage("§6[DeathBox] §f/deathbox <locate|list|recover|purge>");
+            default -> sender.sendMessage(msg().get("cmd.usage"));
         }
         return true;
     }
@@ -44,7 +48,7 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
             }
             OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
             if (!target.hasPlayedBefore() && !target.isOnline()) {
-                sender.sendMessage("§6[DeathBox] §cPlayer §e" + args[1] + "§c not found.");
+                sender.sendMessage(msg().get("cmd.player-not-found", "name", args[1]));
                 return null;
             }
             return target.getUniqueId();
@@ -52,7 +56,7 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
         if (sender instanceof Player player) {
             return player.getUniqueId();
         }
-        sender.sendMessage("§6[DeathBox] §fUsage from console: /deathbox locate <player>");
+        sender.sendMessage(msg().get("cmd.console-usage"));
         return null;
     }
 
@@ -61,10 +65,10 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
         if (owner == null) return;
         List<BoxRecord> boxes = plugin.index().ownedBy(owner);
         if (boxes.isEmpty()) {
-            sender.sendMessage("§6[DeathBox] §fNo active death boxes.");
+            sender.sendMessage(msg().get("cmd.none"));
             return;
         }
-        sender.sendMessage("§6[DeathBox] §fNewest box: " + describe(boxes.get(0)));
+        sender.sendMessage(msg().get("cmd.newest", "desc", describe(boxes.get(0))));
     }
 
     private void list(CommandSender sender, String[] args) {
@@ -72,12 +76,12 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
         if (owner == null) return;
         List<BoxRecord> boxes = plugin.index().ownedBy(owner);
         if (boxes.isEmpty()) {
-            sender.sendMessage("§6[DeathBox] §fNo active death boxes.");
+            sender.sendMessage(msg().get("cmd.none"));
             return;
         }
-        sender.sendMessage("§6[DeathBox] §fBoxes (" + boxes.size() + "):");
+        sender.sendMessage(msg().get("cmd.list-header", "count", boxes.size()));
         for (BoxRecord box : boxes) {
-            sender.sendMessage("  §7- §e" + box.id + " §f" + describe(box));
+            sender.sendMessage(msg().get("cmd.list-item", "id", box.id, "desc", describe(box)));
         }
     }
 
@@ -87,21 +91,20 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 2) {
-            sender.sendMessage("§6[DeathBox] §f/deathbox recover <id>");
+            sender.sendMessage(msg().get("cmd.recover-usage"));
             return;
         }
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("§6[DeathBox] §cRun this in-game so the items have somewhere to go.");
+            sender.sendMessage(msg().get("cmd.recover-ingame"));
             return;
         }
         BoxRecord box = plugin.index().get(args[1]);
         if (box == null) {
-            sender.sendMessage("§6[DeathBox] §cNo box with id §e" + args[1] + "§c.");
+            sender.sendMessage(msg().get("cmd.no-box", "id", args[1]));
             return;
         }
         if (!box.virtual) {
-            sender.sendMessage("§6[DeathBox] §fBox §e" + box.id + " §fis a physical chest at "
-                    + describe(box) + ". Visit it instead of recovering.");
+            sender.sendMessage(msg().get("cmd.recover-physical", "id", box.id, "desc", describe(box)));
             return;
         }
         try {
@@ -115,10 +118,9 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
                 }
             }
             plugin.index().remove(box.id);
-            sender.sendMessage("§6[DeathBox] §fRecovered box §e" + box.id + " §f(owner "
-                    + box.ownerName + ") into your inventory.");
+            sender.sendMessage(msg().get("cmd.recovered", "id", box.id, "owner", box.ownerName));
         } catch (Exception ex) {
-            sender.sendMessage("§6[DeathBox] §cCould not decode box §e" + box.id + "§c; see console.");
+            sender.sendMessage(msg().get("cmd.recover-failed", "id", box.id));
             plugin.getLogger().warning("Failed to recover box " + box.id + ": " + ex.getMessage());
         }
     }
@@ -129,32 +131,31 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 2) {
-            sender.sendMessage("§6[DeathBox] §f/deathbox purge <id> confirm");
+            sender.sendMessage(msg().get("cmd.purge-usage"));
             return;
         }
         BoxRecord box = plugin.index().get(args[1]);
         if (box == null) {
-            sender.sendMessage("§6[DeathBox] §cNo box with id §e" + args[1] + "§c.");
+            sender.sendMessage(msg().get("cmd.no-box", "id", args[1]));
             return;
         }
         if (args.length < 3 || !args[2].equalsIgnoreCase("confirm")) {
-            sender.sendMessage("§6[DeathBox] §eThis permanently deletes box " + box.id
-                    + " and its contents. Re-run §f/deathbox purge " + box.id + " confirm§e to proceed.");
+            sender.sendMessage(msg().get("cmd.purge-confirm", "id", box.id));
             return;
         }
         plugin.purgeBox(box);
-        sender.sendMessage("§6[DeathBox] §fPurged box §e" + box.id + "§f.");
+        sender.sendMessage(msg().get("cmd.purged", "id", box.id));
     }
 
     private String describe(BoxRecord box) {
         if (box.virtual) {
-            return "§7(held virtually — /deathbox recover " + box.id + ")";
+            return msg().get("desc.virtual", "id", box.id);
         }
-        return "§e" + box.x + ", " + box.y + ", " + box.z + " §7(" + box.world + ")";
+        return msg().get("desc.physical", "x", box.x, "y", box.y, "z", box.z, "world", box.world);
     }
 
     private void deny(CommandSender sender) {
-        sender.sendMessage("§6[DeathBox] §cYou don't have permission for that.");
+        sender.sendMessage(msg().get("cmd.deny"));
     }
 
     @Override

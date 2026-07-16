@@ -42,7 +42,7 @@ final class ProtectionListener implements Listener {
         }
         if (!canOpen(player, block)) {
             event.setCancelled(true);
-            player.sendMessage("§6[DeathBox] §cThis death box is not yours.");
+            player.sendMessage(plugin.messages().get("protect.not-yours"));
         }
     }
 
@@ -72,8 +72,7 @@ final class ProtectionListener implements Listener {
     public void onBreak(BlockBreakEvent event) {
         if (plugin.placement().boxIdAt(event.getBlock()) != null) {
             event.setCancelled(true);
-            event.getPlayer().sendMessage("§6[DeathBox] §fOpen the box and take your items; "
-                    + "it removes itself once empty.");
+            event.getPlayer().sendMessage(plugin.messages().get("protect.break"));
         }
     }
 
