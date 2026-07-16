@@ -1,0 +1,53 @@
+# RaspiMcOps Paper 플러그인
+
+Release ZIP에는 Java 25용 `RaspiMcOps` 플러그인이 포함됩니다. 봇 시작 시
+번들 JAR을 검증하고 `/mnt/minecraft/live/plugins/raspi-mc-ops.jar`에 원자적으로
+복사합니다. JAR이 바뀐 경우에만 Paper를 재시작합니다. Release 빌드 JAR이 없는
+일반 소스 체크아웃에서는 이 단계를 건너뜁니다.
+
+플러그인 설정은
+`/mnt/minecraft/live/plugins/RaspiMcOps/config.yml`에 생성됩니다. 이 설정은
+`.env`에 넣지 않습니다.
+
+## 채팅 로그
+
+`chat-log.enabled: true`이면 실제 게임 채팅을
+`plugins/RaspiMcOps/chat.log`에 기록합니다. 이벤트 방식이므로 폴링하지 않고,
+채팅이 없으면 쓰지 않으며, 첫 채팅이 발생할 때만 파일을 만듭니다. Discord
+`/관리자` → **로그** 패널에서 미리 보거나 파일을 받을 수 있습니다.
+
+## 스폰 자동 귀환
+
+`MC_SPAWN_X/Y/Z`는 서버장이 특정 좌표를 강제할 때만 사용하는 선택 설정입니다.
+값이 비어 있으면 Discord 스폰 구조 버튼이 제한된 `raspiops rescue` 명령을
+호출합니다. 플러그인은 검증된 온라인 플레이어 정확히 한 명만 찾아 Paper의 실제
+주 월드 스폰으로 이동합니다.
+
+## 스폰 안전 구역
+
+기본값은 주 월드의 현재 스폰을 중심으로 반경 16블록의 정사각형 구역입니다.
+우회 권한이 없는 플레이어의 블록 파괴·설치·상호작용, 양동이 사용, 엔티티 공격,
+피스톤 이동과 폭발 블록 피해를 막습니다. OP는
+`raspimcops.spawn.bypass` 권한으로 우회합니다.
+
+비공개 `/관리자` → **스폰 보호** 버튼이나 콘솔 명령을 사용합니다.
+
+```text
+spawnprotection status
+spawnprotection on
+spawnprotection off
+spawnprotection toggle
+```
+
+토글 상태는 플러그인 설정에 저장됩니다. 반경이나 월드를 바꾸려면 서버를 정지한
+뒤 `spawn-protection.radius` 또는 `spawn-protection.world`를 수정하고 Paper를
+다시 시작합니다.
+
+Death Box는 [death-box-design.md](death-box-design.md)에 설명된 별도
+[`plugin/deathbox`](../../plugin/deathbox) 구현을 그대로 사용합니다. 다른 사망
+보관 구현을 중복 설치하지 마세요.
+
+## 빌드 검증
+
+Paper API `26.1.2.build.74-stable`, Java 25, Gradle 9.1을 기준으로 합니다.
+Release 워크플로는 JAR을 검증된 배포 ZIP에 넣기 전에 `clean test jar`를 실행합니다.
