@@ -99,6 +99,7 @@ sudo systemctl enable minecraft.service mc-discord-bot.service
 | 디스코드 봇 | [디스코드 봇](docs/ko/discord-bot.md) | [discord-bot](docs/en/discord-bot.md) |
 | 친구 연동·구조·일지 | [친구 도구](docs/ko/friend-tools.md) | [friend-tools](docs/en/friend-tools.md) |
 | Death Box 플러그인 | [Death Box 설계](docs/ko/death-box-design.md) | [death-box-design](docs/en/death-box-design.md) |
+| Paper 운영 플러그인 | [Paper 운영 플러그인](docs/ko/paper-ops-plugin.md) | [paper-ops-plugin](docs/en/paper-ops-plugin.md) |
 | 원격 접속(RCON / Cloudflare) | [원격 접속](docs/ko/remote-access.md) | [remote-access](docs/en/remote-access.md) |
 | 백업 | [백업](docs/ko/backup.md) | [backup](docs/en/backup.md) |
 | 성능 튜닝 | [성능 튜닝](docs/ko/performance.md) | [performance](docs/en/performance.md) |
