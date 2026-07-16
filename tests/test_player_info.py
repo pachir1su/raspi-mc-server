@@ -9,9 +9,20 @@ class PlayerInfoTests(unittest.TestCase):
     """Cover Paper list output, injection rejection, and SNBT item formats."""
 
     def testParsesOnlinePlayers(self):
-        """Only valid Java usernames survive list parsing."""
-        output = "There are 2 of a max of 6 players online: Steve, Alex_01"
-        self.assertEqual(["Steve", "Alex_01"], parseOnlinePlayers(output))
+        """Valid Java and Floodgate names survive one mixed list response."""
+        output = (
+            "There are 4 of a max of 6 players online: "
+            "Steve, Alex_01, .QUI203, .Friend_1"
+        )
+        self.assertEqual(
+            ["Steve", "Alex_01", ".QUI203", ".Friend_1"],
+            parseOnlinePlayers(output),
+        )
+
+    def testDropsMalformedOnlineNames(self):
+        """List parsing still discards selector and command injection text."""
+        output = "There are 3 of a max of 6 players online: Steve, @a, .bad;op"
+        self.assertEqual(["Steve"], parseOnlinePlayers(output))
 
     def testRejectsUnsafePlayerName(self):
         """RCON command separators and spaces cannot enter a player query."""
