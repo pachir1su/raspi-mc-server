@@ -105,6 +105,17 @@ final class BoxIndex {
         return new ArrayList<>(byId.values());
     }
 
+    /** Count a player's active PHYSICAL (block) boxes, for the anti-grief cap. */
+    synchronized int countPhysicalOwnedBy(UUID owner) {
+        int count = 0;
+        for (BoxRecord r : byId.values()) {
+            if (!r.virtual && r.owner.equals(owner)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     synchronized List<BoxRecord> ownedBy(UUID owner) {
         List<BoxRecord> out = new ArrayList<>();
         for (BoxRecord r : byId.values()) {

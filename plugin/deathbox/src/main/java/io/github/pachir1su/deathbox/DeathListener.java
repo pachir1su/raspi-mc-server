@@ -50,27 +50,37 @@ final class DeathListener implements Listener {
         Player player = event.getEntity();
         Location death = player.getLocation();
         String boxId = plugin.index().newId();
+        Messages msg = plugin.messages();
 
-        Placement.Placed placed = plugin.placement().place(death, cfg, boxId, player.getUniqueId());
+        // Anti-grief cap (#65): a player at the physical-box limit gets a virtual
+        // box instead of another unbreakable chest at someone else's doorstep.
+        boolean atBoxLimit = cfg.maxPhysicalBoxesPerPlayer > 0
+                && plugin.index().countPhysicalOwnedBy(player.getUniqueId())
+                        >= cfg.maxPhysicalBoxesPerPlayer;
+
+        Placement.Placed placed = atBoxLimit
+                ? null
+                : plugin.placement().place(death, cfg, boxId, player.getUniqueId());
         if (placed != null) {
             drops.clear();
             Placement.fill(placed.inventory, captured, placed.blocks.get(0).getLocation());
             Location box = placed.blocks.get(0).getLocation();
             plugin.index().put(BoxRecord.physical(boxId, player.getUniqueId(), player.getName(), box));
-            player.sendMessage("§6[DeathBox] §fYour items are stored at §e"
-                    + box.getBlockX() + ", " + box.getBlockY() + ", " + box.getBlockZ()
-                    + " §7(" + box.getWorld().getName() + ")§f. Use §e/deathbox locate§f any time.");
+            player.sendMessage(msg.get("death.stored",
+                    "x", box.getBlockX(), "y", box.getBlockY(), "z", box.getBlockZ(),
+                    "world", box.getWorld().getName()));
             return;
         }
 
-        // No safe spot. Keep the items rather than dropping them into danger.
+        // No safe spot, or the player is at the box cap. Keep the items rather
+        // than dropping them into danger, holding them in a virtual box.
         if (cfg.fallbackVirtualBox) {
             try {
                 String encoded = Items.encode(captured.toArray(new ItemStack[0]));
                 drops.clear();
                 plugin.index().put(BoxRecord.virtual(boxId, player.getUniqueId(), player.getName(), encoded));
-                player.sendMessage("§6[DeathBox] §fNo safe spot to place a chest, so your items are held "
-                        + "safely as box §e" + boxId + "§f. Ask an admin to §e/deathbox recover " + boxId + "§f.");
+                player.sendMessage(
+                        msg.get(atBoxLimit ? "death.limit-virtual" : "death.virtual", "id", boxId));
             } catch (Exception ex) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to store a virtual death box; leaving vanilla drops", ex);
             }
