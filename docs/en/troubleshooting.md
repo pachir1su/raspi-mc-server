@@ -45,7 +45,7 @@ From Discord, `/admin` → **Logs** previews or attaches the current log file.
 | Commands don't appear | Global sync delay | Set `DISCORD_GUILD_ID` for instant guild sync |
 | `Missing required config` at start | `.env` incomplete | Set `DISCORD_TOKEN`, `RCON_PASSWORD`, `ADMIN_USER_IDS` |
 | `⛔ not authorised` | Your ID not in allowlist | Add your Discord user ID to `ADMIN_USER_IDS` |
-| **Advanced RCON** returns an RCON error | RCON off/mismatch | `enable-rcon=true`; `RCON_PASSWORD` must match `server.properties` |
+| **In-game command** returns an RCON error | RCON off/mismatch | `enable-rcon=true`; `RCON_PASSWORD` must match `server.properties` |
 | Server-control buttons fail | sudoers rule missing | Re-run `deploy/setup_raspberrypi.sh` |
 | Bot crash-loops with `The "no new privileges" flag is set` | Old unit had `NoNewPrivileges=true`, which blocks `sudo` (setuid) | Reinstall `deploy/mc-discord-bot.service` (it no longer sets `NoNewPrivileges`; hardening is preserved with `ProtectSystem`/`ProtectHome`/`ReadWritePaths`). See [discord-bot.md](discord-bot.md#security-hardening-and-sudo). |
 | Bot restarts every 10s right after install | First setup not completed | Run `.venv/bin/python -m bot.main` once in a terminal. The service now exits `EX_CONFIG` (78) and `RestartPreventExitStatus=78` stops the loop. |
