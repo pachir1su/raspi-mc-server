@@ -45,6 +45,27 @@ The toggle is persisted in the plugin configuration. Change
 `spawn-protection.radius` or `spawn-protection.world` in `config.yml` while the
 server is stopped, then start Paper again.
 
+## Container locks
+
+`chest-lock.enabled: true` records who places each chest, trapped chest,
+barrel, or shulker box, and blocks everyone else from opening or breaking it.
+Placing a chest directly against someone else's locked chest is also refused so
+a double chest cannot expose foreign items. Operators bypass locks with the
+`raspimcops.chestlock.bypass` permission. Hopper item transfer is not blocked;
+keep valuables in barrels or shulker boxes if that matters.
+
+Use the private `/admin` → **Chest lock** button or the console command:
+
+```text
+chestlock status
+chestlock on
+chestlock off
+chestlock toggle
+```
+
+The toggle is persisted in the plugin configuration. Turning the feature off
+keeps recorded owners, so locks resume when it is turned back on.
+
 Death Box remains the separate [`plugin/deathbox`](../../plugin/deathbox)
 implementation documented in [death-box-design.md](death-box-design.md). Do not
 install a second death-container implementation alongside it.

@@ -43,6 +43,26 @@ spawnprotection toggle
 뒤 `spawn-protection.radius` 또는 `spawn-protection.world`를 수정하고 Paper를
 다시 시작합니다.
 
+## 상자 잠금
+
+`chest-lock.enabled: true`이면 상자·덫 상자·통·셜커 상자를 설치한 사람을
+기록하고, 다른 플레이어가 열거나 부수지 못하게 막습니다. 남의 잠긴 상자에
+붙여서 상자를 설치해 겹상자로 여는 것도 거부합니다. OP는
+`raspimcops.chestlock.bypass` 권한으로 우회합니다. 호퍼를 통한 아이템 이동은
+막지 않으므로, 중요하면 통이나 셜커 상자를 사용하세요.
+
+비공개 `/관리자` → **상자 잠금** 버튼이나 콘솔 명령을 사용합니다.
+
+```text
+chestlock status
+chestlock on
+chestlock off
+chestlock toggle
+```
+
+토글 상태는 플러그인 설정에 저장됩니다. 기능을 꺼도 기록된 소유자는 유지되어
+다시 켜면 잠금이 그대로 살아납니다.
+
 Death Box는 [death-box-design.md](death-box-design.md)에 설명된 별도
 [`plugin/deathbox`](../../plugin/deathbox) 구현을 그대로 사용합니다. 다른 사망
 보관 구현을 중복 설치하지 마세요.
