@@ -155,6 +155,13 @@ class AdminDashboardView(OwnerView):
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.controller.panelToggleSpawnProtection(interaction)
 
+    @discord.ui.button(label="상자 잠금", emoji="🔒", style=discord.ButtonStyle.secondary, row=3)
+    async def chestLock(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelToggleChestLock(interaction)
+
 
 class IncidentActionsView(OwnerView):
     """One-click emergency shortcuts for common small-server accidents."""
