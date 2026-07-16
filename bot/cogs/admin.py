@@ -35,8 +35,25 @@ from bot.loading import animate_while
 from bot.player_info import parseOnlinePlayers, summarizeInventory
 from bot.player_names import buildPlayerSelector, validateServerPlayerName
 from bot.performance_report import parseTps, shouldAlert
+from bot.places import PlaceStore
 from bot.public_panel import PublicServerView
-from bot.quick_commands import parseDaysPlayed
+from bot.quick_commands import (
+    COMMON_EFFECTS,
+    GAMEMODES,
+    buildEffectClearCommand,
+    buildEffectCommand,
+    buildEnchantCommand,
+    buildGamemodeCommand,
+    buildGiveCommand,
+    buildHealCommands,
+    buildKickCommand,
+    buildTeleportToCoordsCommand,
+    buildTeleportToPlayerCommand,
+    buildXpCommand,
+    ensureServerAccepted,
+    parseDaysPlayed,
+)
+from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded
 from bot.rcon import (
     Rcon,
     RconAuthError,
@@ -140,6 +157,8 @@ class Admin(commands.Cog):
             cfg.storage_root, cfg.server_dir, cfg.require_storage_mount
         )
         self.updateStore = UpdateStore(cfg.state_dir, cfg.storage_root)
+        # 접속자 관리의 TP 버튼이 공유 좌표북을 읽습니다(쓰기는 친구 cog 담당).
+        self.placeStore = PlaceStore(cfg.state_dir)
         self.operationLock = asyncio.Lock()
         self.lastAlertAt: dict[str, datetime] = {}
 
@@ -1300,6 +1319,187 @@ class Admin(commands.Cog):
         if commandName is None:
             raise ValueError("unsupported text action")
         await self.panelLegacyCommand(commandName, interaction, value)
+
+    # --- 접속자 관리 조작 버튼 (빠른 명령) ------------------------------
+    # 버튼 → 명령 대응은 bot/quick_commands.py의 빌더가 담당하고, 여기서는
+    # 실행 + 응답 검증 + 감사 기록 + 한글 안내만 합니다.
+    async def _quickPlayerAction(
+        self,
+        interaction: discord.Interaction,
+        commands: list[str],
+        auditAction: str,
+        successMessage: str,
+    ) -> None:
+        """Run one quick action (already deferred), verify, audit, and reply."""
+        try:
+            for command in commands:
+                ensureServerAccepted(await _rcon(command))
+            await self._audit(interaction, auditAction, "success", commands[-1][:200])
+            await interaction.followup.send(f"✅ {successMessage}", ephemeral=True)
+            _log.info("%s by %s", auditAction, userTag(interaction.user))
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, auditAction, "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelGiveItem(
+        self, interaction: discord.Interaction, playerName: str, rawItem: str, rawCount: str
+    ) -> None:
+        try:
+            command = buildGiveCommand(playerName, rawItem, rawCount)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        itemId, count = command.split()[-2:]
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.give",
+            f"`{playerName}` 에게 `{itemId.removeprefix('minecraft:')}` {count}개를 지급했습니다.",
+        )
+
+    async def panelApplyEffect(
+        self,
+        interaction: discord.Interaction,
+        playerName: str,
+        effectId: str,
+        seconds: int,
+        amplifier: int,
+    ) -> None:
+        try:
+            command = buildEffectCommand(playerName, effectId, seconds, amplifier)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        label = next(
+            (label for eid, label, _s, _a in COMMON_EFFECTS if eid == effectId.strip().lower()),
+            effectId.strip().lower(),
+        )
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.effect",
+            f"`{playerName}` 에게 **{label}** 효과를 {seconds // 60}분 적용했습니다.",
+        )
+
+    async def panelClearEffects(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            [buildEffectClearCommand(playerName)],
+            "player.effect_clear",
+            f"`{playerName}` 의 모든 포션 효과를 해제했습니다.",
+        )
+
+    async def panelEnchant(
+        self, interaction: discord.Interaction, playerName: str, enchantId: str, level: int
+    ) -> None:
+        try:
+            command = buildEnchantCommand(playerName, enchantId, level)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.enchant",
+            f"`{playerName}` 가 들고 있는 아이템에 `{enchantId.strip().lower()}` {level}레벨을 부여했습니다.",
+        )
+
+    async def panelGamemode(
+        self, interaction: discord.Interaction, playerName: str, mode: str
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            [buildGamemodeCommand(playerName, mode)],
+            "player.gamemode",
+            f"`{playerName}` 의 게임모드를 **{GAMEMODES[mode]}** 로 바꿨습니다.",
+        )
+
+    async def panelTeleportToPlayer(
+        self, interaction: discord.Interaction, playerName: str, targetName: str
+    ) -> None:
+        try:
+            command = buildTeleportToPlayerCommand(playerName, targetName)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.tp",
+            f"`{playerName}` 를 `{targetName}` 에게 이동시켰습니다.",
+        )
+
+    async def panelTeleportToPlace(
+        self, interaction: discord.Interaction, playerName: str, placeName: str
+    ) -> None:
+        place = await asyncio.to_thread(self.placeStore.get, placeName)
+        if place is None:
+            await interaction.followup.send("❌ 저장된 좌표를 찾지 못했습니다.", ephemeral=True)
+            return
+        try:
+            command = buildTeleportToCoordsCommand(
+                playerName, place.dimension, place.x, place.y, place.z
+            )
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.tp_place",
+            f"`{playerName}` 를 좌표 **{place.name}** 으로 이동시켰습니다.",
+        )
+
+    async def panelTeleportToSpawn(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        # 스폰 귀환과 같은 플러그인 경로를 쓰므로 월드 스폰과 항상 일치합니다.
+        try:
+            output = await _rcon(buildAutomaticSpawnCommand(playerName))
+            ensureRescueSucceeded(output)
+            await self._audit(interaction, "player.tp_spawn", "success", playerName)
+            await interaction.followup.send(
+                f"✅ `{playerName}` 를 스폰으로 이동시켰습니다.", ephemeral=True
+            )
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "player.tp_spawn", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelXp(
+        self, interaction: discord.Interaction, playerName: str, levels: int
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            [buildXpCommand(playerName, levels)],
+            "player.xp",
+            f"`{playerName}` 에게 경험치 {levels}레벨을 지급했습니다.",
+        )
+
+    async def panelHeal(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            buildHealCommands(playerName),
+            "player.heal",
+            f"`{playerName}` 의 체력과 배고픔을 회복시켰습니다.",
+        )
+
+    async def panelKick(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            [buildKickCommand(playerName)],
+            "player.kick",
+            f"`{playerName}` 를 서버에서 추방했습니다.",
+        )
+
+    async def panelSharedPlaces(self):
+        """Return the shared coordinate book for the teleport dropdown."""
+        return await asyncio.to_thread(self.placeStore.list)
 
     async def panelOpenLinkAdmin(self, interaction: discord.Interaction) -> None:
         """Open direct multi-profile account management for one Discord user."""
