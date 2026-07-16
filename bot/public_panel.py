@@ -2,6 +2,8 @@
 
 import discord
 
+from bot.error_text import describeError
+
 
 class PublicServerView(discord.ui.View):
     """Keep common read-only server actions one click away."""
@@ -27,7 +29,7 @@ class PublicServerView(discord.ui.View):
         item: discord.ui.Item,
     ) -> None:
         """Return callback failures as a useful private response."""
-        message = f"❌ 서버 정보를 불러오지 못했습니다: {str(error)[:1500]}"
+        message = f"❌ 서버 정보를 불러오지 못했습니다: {describeError(error)}"
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
         else:

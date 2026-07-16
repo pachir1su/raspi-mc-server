@@ -2,6 +2,8 @@
 
 import discord
 
+from bot.error_text import describeError
+
 
 class UserView(discord.ui.View):
     """Bind a private component panel to the user who opened it."""
@@ -25,7 +27,7 @@ class UserView(discord.ui.View):
         error: Exception,
         item: discord.ui.Item,
     ) -> None:
-        message = f"❌ 작업을 완료하지 못했습니다: {str(error)[:1500]}"
+        message = f"❌ {describeError(error)}"
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
         else:

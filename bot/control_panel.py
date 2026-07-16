@@ -3,6 +3,7 @@
 import discord
 
 from bot.config import cfg
+from bot.error_text import describeError
 from bot.i18n import t
 
 
@@ -30,7 +31,7 @@ class OwnerView(discord.ui.View):
         item: discord.ui.Item,
     ):
         """Convert callback failures into an ephemeral message instead of a dead button."""
-        message = f"❌ 작업을 완료하지 못했습니다: {str(error)[:1500]}"
+        message = f"❌ {describeError(error)}"
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
         else:
