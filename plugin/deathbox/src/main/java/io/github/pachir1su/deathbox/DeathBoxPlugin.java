@@ -26,6 +26,7 @@ public final class DeathBoxPlugin extends JavaPlugin {
             "GravestoneReborn", "Gravestones", "DeathChest");
 
     private DeathBoxConfig config;
+    private Messages messages;
     private Keys keys;
     private BoxIndex index;
     private Placement placement;
@@ -34,6 +35,7 @@ public final class DeathBoxPlugin extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
         this.config = DeathBoxConfig.from(getConfig());
+        this.messages = new Messages(getConfig());
 
         String conflict = detectConflict();
         if (conflict != null) {
@@ -63,7 +65,8 @@ public final class DeathBoxPlugin extends JavaPlugin {
         getServer().getScheduler().runTaskTimer(this, this::expireSweep, 72000L, 72000L);
 
         getLogger().info("DeathBox enabled (container=" + config.container
-                + ", radius=" + config.searchRadius + ", expire-hours=" + config.expireHours + ").");
+                + ", radius=" + config.searchRadius + ", expire-hours=" + config.expireHours
+                + ", max-physical-boxes=" + config.maxPhysicalBoxesPerPlayer + ").");
     }
 
     private String detectConflict() {
@@ -78,6 +81,10 @@ public final class DeathBoxPlugin extends JavaPlugin {
 
     DeathBoxConfig config() {
         return config;
+    }
+
+    Messages messages() {
+        return messages;
     }
 
     BoxIndex index() {

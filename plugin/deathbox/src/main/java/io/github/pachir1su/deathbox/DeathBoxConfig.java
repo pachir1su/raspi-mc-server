@@ -21,15 +21,18 @@ final class DeathBoxConfig {
     final Container container;
     final int searchRadius;
     final int expireHours;
+    final int maxPhysicalBoxesPerPlayer;
     final boolean friendsCanOpen;
     final boolean fallbackVirtualBox;
 
     private DeathBoxConfig(boolean enabled, Container container, int searchRadius,
-                           int expireHours, boolean friendsCanOpen, boolean fallbackVirtualBox) {
+                           int expireHours, int maxPhysicalBoxesPerPlayer,
+                           boolean friendsCanOpen, boolean fallbackVirtualBox) {
         this.enabled = enabled;
         this.container = container;
         this.searchRadius = searchRadius;
         this.expireHours = expireHours;
+        this.maxPhysicalBoxesPerPlayer = maxPhysicalBoxesPerPlayer;
         this.friendsCanOpen = friendsCanOpen;
         this.fallbackVirtualBox = fallbackVirtualBox;
     }
@@ -42,12 +45,14 @@ final class DeathBoxConfig {
         };
         // Clamp the radius so a misconfiguration can never trigger a huge search.
         int radius = Math.max(1, Math.min(8, c.getInt("search-radius", 4)));
-        int expire = Math.max(0, c.getInt("expire-hours", 0));
+        int expire = Math.max(0, c.getInt("expire-hours", 72));
+        int maxBoxes = Math.max(0, c.getInt("max-physical-boxes-per-player", 3));
         return new DeathBoxConfig(
                 c.getBoolean("enabled", true),
                 container,
                 radius,
                 expire,
+                maxBoxes,
                 c.getBoolean("friends-can-open", false),
                 c.getBoolean("fallback-virtual-box", true));
     }
