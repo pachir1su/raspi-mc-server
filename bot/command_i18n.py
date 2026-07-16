@@ -92,6 +92,23 @@ KOREAN_NAMES = {
     "min_free_gb": "최소여유기가",
     "retention_count": "보관개수",
     "enabled": "활성화",
+    # 평면 관리 명령어(이슈 #79)와 위키(#71)·통계(#68)·무적(#75).
+    "who": "접속자목록",
+    "cmd": "명령어",
+    "notice": "전체공지",
+    "time": "시간",
+    "weather": "날씨",
+    "invincible": "무적",
+    "mortal": "무적해제",
+    "give": "지급",
+    "stats": "통계",
+    "my-stats": "내통계",
+    "wiki": "위키",
+    "preset": "프리셋",
+    "seconds": "시간초",
+    "item": "아이템",
+    "count": "수량",
+    "page": "문서",
 }
 
 
@@ -180,6 +197,29 @@ KOREAN_DESCRIPTIONS = {
     "Type DELETE to confirm permanent deletion": "영구 삭제를 확인하려면 DELETE를 입력하세요",
     "Type CLEAR to confirm deleting every dropped item entity":
         "떨어진 아이템 엔티티를 모두 삭제하려면 CLEAR를 입력하세요",
+    # 평면 관리 명령어(#79)·위키(#71)·통계(#68)·무적(#75) 설명.
+    "Show who is online right now.": "지금 접속 중인 사람을 표시합니다.",
+    "Run one server command via RCON.": "서버 콘솔 명령 하나를 그대로 실행합니다(치트 포함).",
+    "Broadcast a message to everyone in-game.": "게임 안의 모든 플레이어에게 공지합니다.",
+    "Set the world time to a preset.": "월드 시간을 프리셋으로 바꿉니다(낮/정오/밤/자정).",
+    "Set the world weather to a preset.": "월드 날씨를 프리셋으로 바꿉니다(맑음/비/천둥).",
+    "Grant temporary invincibility to a player.": "플레이어를 일시적으로 무적으로 만듭니다.",
+    "Remove invincibility from a player.": "플레이어의 무적을 해제합니다.",
+    "Give an item to a player (Korean aliases ok).": "플레이어에게 아이템을 지급합니다(한글 별칭 가능).",
+    "Show a player's tracked stats (deaths/kills).": "플레이어의 사망·처치 통계를 표시합니다.",
+    "Show your own tracked stats (deaths/kills).": "내 캐릭터의 사망·처치 통계를 표시합니다.",
+    "Open an in-game help wiki page.": "게임 도움말 위키 문서를 엽니다.",
+    "예: gamemode creative Steve, give Steve diamond 8":
+        "예: gamemode creative Steve, give Steve diamond 8",
+    "게임 채팅에 보낼 공지 내용": "게임 채팅에 보낼 공지 내용",
+    "설정할 시간대": "설정할 시간대",
+    "설정할 날씨": "설정할 날씨",
+    "대상 접속자": "대상 접속자",
+    "지속 시간(초, 기본 5)": "지속 시간(초, 기본 5)",
+    "아이템(한글 별칭 가능)": "아이템(한글 별칭 가능)",
+    "수량(기본 1)": "수량(기본 1)",
+    "조회할 접속자": "조회할 접속자",
+    "열어볼 문서": "열어볼 문서",
 }
 
 
