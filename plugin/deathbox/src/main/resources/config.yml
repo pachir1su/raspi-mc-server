@@ -16,8 +16,16 @@ container: double-chest
 search-radius: 4
 
 # Boxes older than this many hours are removed on the hourly sweep.
-# 0 means boxes never expire.
-expire-hours: 0
+# 0 means boxes never expire. Default 72h so griefed boxes self-clean and the
+# index cannot grow without bound (see max-physical-boxes-per-player).
+expire-hours: 72
+
+# Anti-grief cap on how many PHYSICAL (block) boxes one player may have active
+# at once. Once a player is at the cap, further deaths are stored in a virtual
+# box (no block placed) that an admin recovers, so a player who dies over and
+# over — e.g. at someone else's door — cannot pile up unbreakable chests.
+# 0 disables the cap (unlimited physical boxes).
+max-physical-boxes-per-player: 3
 
 # When true, players holding the deathbox.friend permission may open other
 # players' boxes. When false, only the owner and operators can.
@@ -28,3 +36,37 @@ friends-can-open: false
 # told to ask an admin to recover them. When false, the items are dropped
 # normally as a last resort.
 fallback-virtual-box: true
+
+# Player-facing text. Every line has a Korean default baked into the plugin;
+# override any of them here to reword or translate. Placeholders in {braces}
+# are filled by the plugin — keep them as-is. Legacy §colour codes are allowed.
+# Any key you omit falls back to the built-in Korean default.
+messages:
+  # 사망 시
+  death.stored: "§6[데스박스] §f아이템을 §e{x}, {y}, {z} §7({world})§f 에 보관했어요. 언제든 §e/deathbox locate §f로 찾을 수 있어요."
+  death.virtual: "§6[데스박스] §f상자를 놓을 안전한 자리가 없어 아이템을 §e{id} §f상자에 안전하게 보관했어요. 관리자에게 §e/deathbox recover {id} §f를 요청하세요."
+  death.limit-virtual: "§6[데스박스] §f활성 데스박스가 너무 많아 이번 아이템은 §e{id} §f상자에 보관했어요. 관리자에게 §e/deathbox recover {id} §f를 요청하세요."
+  # 보호
+  protect.not-yours: "§6[데스박스] §c다른 사람의 데스박스예요."
+  protect.break: "§6[데스박스] §f상자를 열어 아이템을 꺼내세요. 비면 저절로 사라져요."
+  # 명령어
+  cmd.usage: "§6[데스박스] §f/deathbox <locate|list|recover|purge>"
+  cmd.player-not-found: "§6[데스박스] §c플레이어 §e{name}§c 을(를) 찾을 수 없어요."
+  cmd.console-usage: "§6[데스박스] §f콘솔에서는: /deathbox locate <플레이어>"
+  cmd.none: "§6[데스박스] §f활성화된 데스박스가 없어요."
+  cmd.newest: "§6[데스박스] §f가장 최근 상자: {desc}"
+  cmd.list-header: "§6[데스박스] §f상자 ({count}개):"
+  cmd.list-item: "  §7- §e{id} §f{desc}"
+  cmd.recover-usage: "§6[데스박스] §f/deathbox recover <id>"
+  cmd.recover-ingame: "§6[데스박스] §c아이템을 받을 공간이 필요하니 게임 안에서 실행하세요."
+  cmd.no-box: "§6[데스박스] §c§e{id}§c 상자를 찾을 수 없어요."
+  cmd.recover-physical: "§6[데스박스] §f§e{id} §f상자는 {desc} 에 있는 실제 상자예요. 회수 대신 직접 방문하세요."
+  cmd.recovered: "§6[데스박스] §f§e{id} §f상자(주인 {owner})를 인벤토리로 회수했어요."
+  cmd.recover-failed: "§6[데스박스] §c§e{id}§c 상자를 해독할 수 없어요. 콘솔을 확인하세요."
+  cmd.purge-usage: "§6[데스박스] §f/deathbox purge <id> confirm"
+  cmd.purge-confirm: "§6[데스박스] §e상자 {id} 와 내용물을 영구 삭제합니다. §f/deathbox purge {id} confirm §e를 다시 실행하세요."
+  cmd.purged: "§6[데스박스] §f§e{id}§f 상자를 삭제했어요."
+  cmd.deny: "§6[데스박스] §c그 작업을 할 권한이 없어요."
+  # 설명 조각
+  desc.virtual: "§7(가상 보관 중 — /deathbox recover {id})"
+  desc.physical: "§e{x}, {y}, {z} §7({world})"
