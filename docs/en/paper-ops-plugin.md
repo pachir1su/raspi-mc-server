@@ -32,6 +32,10 @@ placing, interacting, using buckets, attacking entities, moving blocks with
 pistons, or causing explosion block damage in the zone. Operators have the
 `raspimcops.spawn.bypass` permission.
 
+Death boxes placed by the DeathBox plugin are the one exception: opening them
+stays allowed inside the zone, so a player who dies at spawn can still retrieve
+their items. DeathBox itself keeps the box owner-only.
+
 Use the private `/admin` → **Spawn protection** button or the console command:
 
 ```text
