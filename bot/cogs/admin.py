@@ -32,7 +32,13 @@ from bot.backup_settings import SettingsStore
 from bot.control_panel import AdminDashboardView, LogPanelView, PlayerPanelView
 from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
-from bot.player_info import parseOnlinePlayers, summarizeInventory
+from bot.player_info import (
+    parseOnlinePlayers,
+    summarizeEffects,
+    summarizeEnderChest,
+    summarizeInventorySections,
+    summarizePlayerStats,
+)
 from bot.player_names import buildPlayerSelector, validateServerPlayerName
 from bot.performance_report import parseTps, shouldAlert
 from bot.places import PlaceStore
@@ -1962,9 +1968,17 @@ class Admin(commands.Cog):
             "effects": "✨ 상태 효과",
         }
         try:
+            fields: list[tuple[str, str]] = []
             if detailType == "inventory":
-                output = await _rcon(f"data get entity {playerTarget} Inventory")
-                description = summarizeInventory(output)
+                inventoryOutput, enderOutput = await asyncio.gather(
+                    _rcon(f"data get entity {playerTarget} Inventory"),
+                    _rcon(f"data get entity {playerTarget} EnderItems"),
+                )
+                fields = summarizeInventorySections(inventoryOutput)
+                enderBody = summarizeEnderChest(enderOutput)
+                if enderBody:
+                    fields.append(("🟣 엔더상자", enderBody))
+                description = "모든 칸이 비어 있습니다." if not fields else ""
             elif detailType == "position":
                 position, dimension = await asyncio.gather(
                     _rcon(f"data get entity {playerTarget} Pos"),
@@ -1978,21 +1992,21 @@ class Admin(commands.Cog):
                     _rcon(f"data get entity {playerTarget} XpLevel"),
                     _rcon(f"data get entity {playerTarget} playerGameType"),
                 )
-                description = (
-                    f"**체력** `{health[:300]}`\n**허기** `{food[:300]}`\n"
-                    f"**경험치 레벨** `{level[:300]}`\n**게임 모드** `{mode[:300]}`"
-                )
+                description = summarizePlayerStats(health, food, level, mode)
             elif detailType == "effects":
-                description = discordPreview(
-                    await _rcon(f"data get entity {playerTarget} active_effects"), 1500
+                description = summarizeEffects(
+                    await _rcon(f"data get entity {playerTarget} active_effects")
                 )
             else:
                 raise ValueError("Unknown player detail type")
-            return discord.Embed(
+            embed = discord.Embed(
                 title=f"{titleMap[detailType]} — {player}",
                 description=description[:4000],
                 color=BRAND_BLUE,
             )
+            for fieldTitle, fieldBody in fields[:24]:
+                embed.add_field(name=fieldTitle, value=fieldBody[:1024], inline=False)
+            return embed
         except (RconError, ValueError) as error:
             return discord.Embed(
                 title=f"❌ {player} 조회 실패", description=str(error), color=ERR_RED
