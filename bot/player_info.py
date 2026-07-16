@@ -2,8 +2,16 @@
 
 import re
 
+from bot.player_names import (
+    FLOODGATE_SERVER_NAME,
+    JAVA_PLAYER_NAME,
+    validateJavaName,
+)
 
-PLAYER_NAME = re.compile(r"^[A-Za-z0-9_]{1,16}$")
+PLAYER_NAME = JAVA_PLAYER_NAME
+ONLINE_PLAYER_NAME = re.compile(
+    rf"(?:{JAVA_PLAYER_NAME.pattern}|{FLOODGATE_SERVER_NAME.pattern})"
+)
 ITEM_PATTERN = re.compile(
     r"Slot:\s*(-?\d+)b?.*?id:\s*[\"'](?:minecraft:)?([^\"']+)[\"']"
     r".*?(?:count|Count):\s*(\d+)b?",
@@ -13,9 +21,7 @@ ITEM_PATTERN = re.compile(
 
 def validatePlayerName(name: str) -> str:
     """Return a safe Java username or reject command-injection characters."""
-    if not PLAYER_NAME.fullmatch(name or ""):
-        raise ValueError("Invalid Java player name")
-    return name
+    return validateJavaName(name)
 
 
 def parseOnlinePlayers(output: str) -> list[str]:
@@ -27,7 +33,7 @@ def parseOnlinePlayers(output: str) -> list[str]:
         return []
     return [
         name for rawName in namesPart.split(",")
-        if PLAYER_NAME.fullmatch(name := rawName.strip())
+        if ONLINE_PLAYER_NAME.fullmatch(name := rawName.strip())
     ]
 
 
