@@ -110,7 +110,7 @@ KOREAN_DESCRIPTIONS = {
     "Show who is online without exposing admin controls.": "관리 기능을 노출하지 않고 접속자를 표시합니다.",
     "Show whether the server is up and who is online.": "서버 실행 상태와 접속자를 표시합니다.",
     "Broadcast a message to everyone in-game.": "게임 안의 모든 플레이어에게 공지합니다.",
-    "Run ANY server command via RCON (owner cheat channel).": "RCON으로 모든 서버 명령을 실행합니다(관리자 전용).",
+    "Run ANY server command via RCON (owner cheat channel).": "마인크래프트 콘솔 명령을 그대로 실행합니다(치트 포함, 관리자 전용).",
     "Manage the whitelist.": "서버 접속 허용 목록을 관리합니다.",
     "Start the Minecraft service.": "마인크래프트 서비스를 시작합니다.",
     "Stop the Minecraft service (saves first).": "저장 후 마인크래프트 서비스를 정지합니다.",
