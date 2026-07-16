@@ -13,7 +13,7 @@ from discord import app_commands
 KOREAN_NAMES = {
     "server": "서버",
     "admin": "관리자",
-    "my-tools": "내도구",
+    "tools": "도구",
     "help": "도움말",
     "place-photo": "좌표사진",
     "portal": "접속안내",
