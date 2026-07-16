@@ -482,20 +482,35 @@ class CustomEffectModal(QuickActionModal):
         self.seconds = discord.ui.TextInput(
             label="지속 시간(초, 비우면 300)", required=False, max_length=7
         )
+        self.level = discord.ui.TextInput(
+            label="강도 (1~10, 비우면 1)", required=False, max_length=2
+        )
+        self.particles = discord.ui.TextInput(
+            label="거품 파티클 표시? (y 입력 시 표시, 기본 숨김)",
+            required=False,
+            max_length=1,
+        )
         self.add_item(self.effectId)
         self.add_item(self.seconds)
+        self.add_item(self.level)
+        self.add_item(self.particles)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         secondsText = (self.seconds.value or "").strip()
         if secondsText and not secondsText.isdigit():
             raise ValueError("지속 시간은 숫자(초)로 입력하세요.")
+        levelText = (self.level.value or "").strip()
+        if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 10):
+            raise ValueError("강도는 1~10 사이의 숫자로 입력하세요.")
+        showParticles = (self.particles.value or "").strip().lower() == "y"
         await self.controller.panelApplyEffect(
             interaction,
             self.playerName,
             self.effectId.value,
             int(secondsText) if secondsText else 300,
-            0,
+            (int(levelText) - 1) if levelText else 0,
+            hideParticles=not showParticles,
         )
 
 

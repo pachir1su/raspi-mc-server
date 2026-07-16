@@ -167,14 +167,24 @@ def buildGiveCommand(playerName: str, rawItemName: str, rawCount: str = "") -> s
 
 
 def buildEffectCommand(
-    playerName: str, effectId: str, seconds: int = 300, amplifier: int = 0
+    playerName: str,
+    effectId: str,
+    seconds: int = 300,
+    amplifier: int = 0,
+    hideParticles: bool = True,
 ) -> str:
+    """포션 효과 부여. 기본적으로 파티클(거품)을 숨깁니다(#57).
+
+    hideParticles는 바닐라 `effect give`의 마지막 인자로, true면 거품이
+    보이지 않습니다. 표시를 원할 때만 False를 넘기세요.
+    """
     safeEffect = _validateResourceId(effectId, "효과")
     safeSeconds = max(1, min(int(seconds), 1_000_000))
     safeAmplifier = max(0, min(int(amplifier), 255))
     return (
         f"effect give {buildPlayerSelector(playerName)} "
         f"minecraft:{safeEffect} {safeSeconds} {safeAmplifier}"
+        f" {'true' if hideParticles else 'false'}"
     )
 
 
@@ -233,8 +243,8 @@ def buildHealCommands(playerName: str) -> list[str]:
     """체력과 배고픔을 함께 회복시키는 두 개의 즉발 효과."""
     selector = buildPlayerSelector(playerName)
     return [
-        f"effect give {selector} minecraft:instant_health 1 10",
-        f"effect give {selector} minecraft:saturation 1 10",
+        f"effect give {selector} minecraft:instant_health 1 10 true",
+        f"effect give {selector} minecraft:saturation 1 10 true",
     ]
 
 

@@ -50,8 +50,12 @@ class CommandBuilderTests(unittest.TestCase):
 
     def testEffects(self):
         self.assertEqual(
-            'effect give @a[name=".Pocket",limit=1] minecraft:speed 300 0',
+            'effect give @a[name=".Pocket",limit=1] minecraft:speed 300 0 true',
             qc.buildEffectCommand(".Pocket", "speed"),
+        )
+        self.assertEqual(
+            'effect give @a[name=".Pocket",limit=1] minecraft:speed 120 4 false',
+            qc.buildEffectCommand(".Pocket", "speed", 120, 4, hideParticles=False),
         )
         self.assertEqual(
             'effect clear @a[name="Friend_1",limit=1]',

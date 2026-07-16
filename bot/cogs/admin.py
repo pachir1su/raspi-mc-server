@@ -1410,9 +1410,12 @@ class Admin(commands.Cog):
         effectId: str,
         seconds: int,
         amplifier: int,
+        hideParticles: bool = True,
     ) -> None:
         try:
-            command = buildEffectCommand(playerName, effectId, seconds, amplifier)
+            command = buildEffectCommand(
+                playerName, effectId, seconds, amplifier, hideParticles
+            )
         except ValueError as error:
             await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
             return
@@ -1420,11 +1423,12 @@ class Admin(commands.Cog):
             (label for eid, label, _s, _a in COMMON_EFFECTS if eid == effectId.strip().lower()),
             effectId.strip().lower(),
         )
+        levelText = f" {amplifier + 1}단계" if amplifier else ""
         await self._quickPlayerAction(
             interaction,
             [command],
             "player.effect",
-            f"`{playerName}` 에게 **{label}** 효과를 {seconds // 60}분 적용했습니다.",
+            f"`{playerName}` 에게 **{label}**{levelText} 효과를 {seconds // 60}분 적용했습니다.",
         )
 
     async def panelClearEffects(
