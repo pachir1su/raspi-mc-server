@@ -250,7 +250,7 @@ class Friend(commands.Cog):
     ) -> None:
         """Send one journal entry with its durable local image if available."""
         embed = self._diaryEmbed(entry)
-        imagePath = self.imageStore.safePath(place.imagePath)
+        imagePath = self.imageStore.safePath(entry.imagePath)
         if imagePath and imagePath.is_file():
             file = discord.File(imagePath, filename=imagePath.name)
             embed.set_image(url=f"attachment://{imagePath.name}")
