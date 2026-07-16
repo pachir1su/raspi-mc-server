@@ -163,6 +163,12 @@ whitelist reload
 관리자 **친구 계정** 패널에서 Bedrock 계정을 다시 추가합니다. 화이트리스트를 끈 상태로 계속 운영하지 마세요.
 공식 [Geyser 화이트리스트 FAQ](https://geysermc.org/wiki/geyser/faq/)도 참고합니다.
 
+## 데스박스 버튼
+
+`/내도구` 패널에 **데스박스 찾기**와 **데스박스 목록** 버튼이 있습니다. RCON으로
+DeathBox 플러그인 명령(`deathbox locate <플레이어>`, `deathbox list <플레이어>`)을
+실행하므로 게임 안에서 명령어를 직접 칠 필요가 없습니다.
+
 Death Box는 의도적으로 분리했습니다 — 봇이 아니라 Paper 플러그인입니다. 동작 방식,
 빌드·설치 방법, 검증 체크리스트는 [death-box-design.md](death-box-design.md)를
 참고하세요.
