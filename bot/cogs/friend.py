@@ -40,7 +40,13 @@ from bot.player_info import (
     summarizePlayerStats,
 )
 from bot.player_names import buildPlayerSelector
-from bot.quick_commands import buildTeleportToPlayerCommand, ensureServerAccepted
+from bot.quick_commands import (
+    SCOREBOARD_STATS,
+    buildScoreboardGetCommand,
+    buildTeleportToPlayerCommand,
+    ensureServerAccepted,
+    parseScoreboardValue,
+)
 from bot.rcon import Rcon, RconError
 from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.system_metrics import readSystemMetrics, readThrottleFlags
@@ -181,6 +187,34 @@ class Friend(commands.Cog):
             inline=False,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(
+        name="my-stats", description="Show your own tracked stats (deaths/kills)."
+    )
+    async def myStats(self, interaction: discord.Interaction) -> None:
+        """Look up the invoking friend's own death/kill scoreboard totals (#68)."""
+        link = await self._approvedLink(interaction)
+        if not link:
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        playerName = serverPlayerName(link, self.appSettings.bedrockUsernamePrefix)
+        try:
+            lines = []
+            for _, objective, _, label in SCOREBOARD_STATS:
+                value = parseScoreboardValue(
+                    await _rcon(buildScoreboardGetCommand(playerName, objective))
+                )
+                lines.append(f"• {label}: **{value}**")
+        except (ValueError, RconError) as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        embed = discord.Embed(
+            title=f"📊 `{link.minecraftName}` 통계",
+            description="\n".join(lines),
+            color=BRAND_BLUE,
+        )
+        embed.set_footer(text="통계는 봇이 처음 실행된 시점부터 집계됩니다.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Allow the friend surface only when its owner-controlled switch is enabled."""
