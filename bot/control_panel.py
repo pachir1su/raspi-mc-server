@@ -38,7 +38,11 @@ class OwnerView(discord.ui.View):
 
 
 class AdminDashboardView(OwnerView):
-    """Main dashboard with the most common tasks reachable in one click."""
+    """Main dashboard with the most common tasks reachable in one click.
+
+    Only everyday actions live here; everything else moves behind 더보기 so
+    the first screen stays two short rows instead of a wall of buttons.
+    """
 
     @discord.ui.button(label="새로고침", emoji="🔄", style=discord.ButtonStyle.secondary, row=0)
     async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -64,18 +68,7 @@ class AdminDashboardView(OwnerView):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="상태 진단", emoji="🩺", style=discord.ButtonStyle.secondary, row=0)
-    async def health(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = await self.controller.panelHealthEmbed()
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="성능 상세", emoji="📊", style=discord.ButtonStyle.secondary, row=0)
-    async def performance(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        embed = await self.controller.panelMetricsEmbed()
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="백업", emoji="💾", style=discord.ButtonStyle.success, row=1)
+    @discord.ui.button(label="백업", emoji="💾", style=discord.ButtonStyle.success, row=0)
     async def backups(self, interaction: discord.Interaction, button: discord.ui.Button):
         backups = await self.controller.panelBackups()
         settings = await self.controller.panelBackupSettings()
@@ -85,6 +78,66 @@ class AdminDashboardView(OwnerView):
             view=BackupPanelView(self.controller, self.ownerId, backups, settings),
             ephemeral=True,
         )
+
+    @discord.ui.button(label="긴급 복구", emoji="🚑", style=discord.ButtonStyle.danger, row=0)
+    async def incident(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "자주 쓰는 사고 대응 작업입니다. 서버 상태를 바꿀 수 있습니다.",
+            view=IncidentActionsView(self.controller, self.ownerId),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="상태 진단", emoji="🩺", style=discord.ButtonStyle.secondary, row=1)
+    async def health(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = await self.controller.panelHealthEmbed()
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="친구 계정", emoji="👤", style=discord.ButtonStyle.secondary, row=1)
+    async def links(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.controller.panelOpenLinkAdmin(interaction)
+
+    @discord.ui.button(label="관리 도움말", emoji="❓", style=discord.ButtonStyle.primary, row=1)
+    async def help(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            embed=self.controller.panelHelpEmbed(), ephemeral=True
+        )
+
+    @discord.ui.button(label="더보기", emoji="🧰", style=discord.ButtonStyle.secondary, row=1)
+    async def more(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "자주 쓰지 않는 도구와 설정입니다.",
+            view=MoreToolsView(self.controller, self.ownerId),
+            ephemeral=True,
+        )
+
+
+class MoreToolsView(OwnerView):
+    """Second-tier dashboard tools that are useful but not everyday actions."""
+
+    @discord.ui.button(label="성능 상세", emoji="📊", style=discord.ButtonStyle.secondary, row=0)
+    async def performance(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        embed = await self.controller.panelMetricsEmbed()
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="렉 원인", emoji="🧰", style=discord.ButtonStyle.secondary, row=0)
+    async def tuning(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        warnings, embed = await self.controller._collectPerformanceWarnings()
+        if warnings:
+            embed.add_field(name="경고", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="로그", emoji="📄", style=discord.ButtonStyle.secondary, row=0)
+    async def logs(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "확인할 로그를 선택하세요.", view=LogPanelView(self.controller, self.ownerId), ephemeral=True
+        )
+
+    @discord.ui.button(label="저장공간", emoji="💽", style=discord.ButtonStyle.secondary, row=0)
+    async def storage(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = await self.controller.panelStorageEmbed()
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(label="월드", emoji="🌍", style=discord.ButtonStyle.secondary, row=1)
     async def worlds(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -103,38 +156,7 @@ class AdminDashboardView(OwnerView):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="로그", emoji="📄", style=discord.ButtonStyle.secondary, row=1)
-    async def logs(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "확인할 로그를 선택하세요.", view=LogPanelView(self.controller, self.ownerId), ephemeral=True
-        )
-
-    @discord.ui.button(label="저장공간", emoji="💽", style=discord.ButtonStyle.secondary, row=1)
-    async def storage(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = await self.controller.panelStorageEmbed()
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="렉 원인", emoji="🧰", style=discord.ButtonStyle.secondary, row=2)
-    async def tuning(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        warnings, embed = await self.controller._collectPerformanceWarnings()
-        if warnings:
-            embed.add_field(name="Warnings", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="긴급 복구", emoji="🚑", style=discord.ButtonStyle.danger, row=2)
-    async def incident(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "자주 쓰는 사고 대응 작업입니다. 서버 상태를 바꿀 수 있습니다.",
-            view=IncidentActionsView(self.controller, self.ownerId),
-            ephemeral=True,
-        )
-
-    @discord.ui.button(label="친구 계정", emoji="👤", style=discord.ButtonStyle.secondary, row=2)
-    async def links(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.controller.panelOpenLinkAdmin(interaction)
-
-    @discord.ui.button(label="고급 도구", emoji="⚙️", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="고급 도구", emoji="⚙️", style=discord.ButtonStyle.secondary, row=1)
     async def advanced(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             "텍스트가 꼭 필요한 공지·RCON·허용목록과 감사 기록입니다.",
@@ -142,20 +164,14 @@ class AdminDashboardView(OwnerView):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="관리 도움말", emoji="❓", style=discord.ButtonStyle.primary, row=2)
-    async def help(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            embed=self.controller.panelHelpEmbed(), ephemeral=True
-        )
-
-    @discord.ui.button(label="스폰 보호", emoji="🛡️", style=discord.ButtonStyle.secondary, row=3)
+    @discord.ui.button(label="스폰 보호", emoji="🛡️", style=discord.ButtonStyle.secondary, row=2)
     async def spawnProtection(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.controller.panelToggleSpawnProtection(interaction)
 
-    @discord.ui.button(label="상자 잠금", emoji="🔒", style=discord.ButtonStyle.secondary, row=3)
+    @discord.ui.button(label="상자 잠금", emoji="🔒", style=discord.ButtonStyle.secondary, row=2)
     async def chestLock(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
