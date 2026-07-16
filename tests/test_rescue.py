@@ -4,9 +4,8 @@ import unittest
 
 from bot.rescue import (
     buildAutomaticSpawnCommand,
-    buildSpawnCommand,
+    ensureRescueSucceeded,
     parsePosition,
-    validateDestination,
 )
 from bot.player_names import buildPlayerSelector, escapeSelectorValue
 
@@ -14,40 +13,59 @@ from bot.player_names import buildPlayerSelector, escapeSelectorValue
 class RescueTests(unittest.TestCase):
     """Exercise safe command construction and RCON output parsing."""
 
-    def testBuildsFixedSelfTeleport(self):
-        """Only a validated player and configured destination enter the command."""
-        destination = validateDestination("overworld", 0.5, 80, -2.5)
-        self.assertEqual(
-            'execute in minecraft:overworld run tp @a[name="Friend_1",limit=1] 0.5 80 -2.5',
-            buildSpawnCommand("Friend_1", destination),
-        )
-
-    def testBuildsFloodgateSelfTeleport(self):
-        """A linked Bedrock entity can use the same bounded rescue command."""
-        destination = validateDestination("overworld", 0, 80, 0)
-        self.assertEqual(
-            'execute in minecraft:overworld run tp @a[name=".Pocket_Friend",limit=1] 0 80 0',
-            buildSpawnCommand(".Pocket_Friend", destination),
-        )
-
-    def testBuildsAutomaticWorldSpawnFallback(self):
-        """The plugin fallback receives only one validated exact server identity."""
+    def testBuildsAutomaticWorldSpawnRescue(self):
+        """The plugin command receives only one validated exact server identity."""
         self.assertEqual(
             "raspiops rescue .QUI203",
             buildAutomaticSpawnCommand(".QUI203"),
         )
-        with self.assertRaises(ValueError):
-            buildAutomaticSpawnCommand("@a")
+        self.assertEqual(
+            "raspiops rescue Friend_1",
+            buildAutomaticSpawnCommand("Friend_1"),
+        )
+        for unsafeName in ("@a", "Friend;op", 'bad"name'):
+            with self.subTest(name=unsafeName), self.assertRaises(ValueError):
+                buildAutomaticSpawnCommand(unsafeName)
 
-    def testRejectsInjectionAndInvalidDestination(self):
-        """Free-form RCON text and invalid dimensions cannot reach the builder."""
-        destination = validateDestination("overworld", 0, 80, 0)
-        with self.assertRaises(ValueError):
-            buildSpawnCommand("Friend;op", destination)
-        with self.assertRaises(ValueError):
-            validateDestination("moon", 0, 80, 0)
-        with self.assertRaises(ValueError):
-            validateDestination("overworld", float("nan"), 80, 0)
+    def testAcceptsRealTeleportOutput(self):
+        """The plugin's success reply passes the strict verification."""
+        ensureRescueSucceeded(
+            "Teleported Friend_1 to world spawn at 12 64 -30"
+        )
+
+    def testRejectsOfflinePlayerOutput(self):
+        """이슈 #45 댓글: 미접속 플레이어가 성공으로 보이면 안 됩니다."""
+        for output in (
+            "Player is not online: Friend_1",
+            "No entity was found",
+        ):
+            with self.subTest(output=output):
+                with self.assertRaises(ValueError) as caught:
+                    ensureRescueSucceeded(output)
+                self.assertIn("접속 중이 아닙니다", str(caught.exception))
+
+    def testRejectsOtherFailuresWithKoreanGuidance(self):
+        """Every known plugin failure reply becomes a Korean, actionable error."""
+        cases = {
+            "Usage: /raspiops rescue <exact-player-name>": "형식",
+            "Invalid exact player name.": "이름",
+            "No world is loaded.": "월드",
+            "Paper rejected the spawn teleport.": "거부",
+            "You do not have permission to use this command.": "권한",
+            "Unknown command. Type /help for help.": "플러그인",
+            "Command failed safely: boom": "실패",
+        }
+        for output, keyword in cases.items():
+            with self.subTest(output=output):
+                with self.assertRaises(ValueError) as caught:
+                    ensureRescueSucceeded(output)
+                self.assertIn(keyword, str(caught.exception))
+
+    def testRejectsUnknownAndEmptyOutput(self):
+        """Unexpected replies fail closed instead of claiming success."""
+        for output in ("", None, "something new and strange"):
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                ensureRescueSucceeded(output)
 
     def testSelectorConstructionAndEscaping(self):
         """Selectors quote validated names and escaping remains explicit."""
