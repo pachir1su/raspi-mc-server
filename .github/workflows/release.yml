@@ -83,7 +83,14 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
+          for _ in {1..10}; do
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 3
+          done
           gh release upload "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
             "dist/raspi-mc-server-${TAG}.zip" \
             dist/SHA256SUMS \
             --clobber
