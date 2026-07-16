@@ -1371,7 +1371,7 @@ class Admin(commands.Cog):
             inline=False,
         )
         embed.set_footer(
-            text="일반 친구에게는 /서버와 /내도구만 안내하면 됩니다."
+            text="일반 친구에게는 /서버와 /도구만 안내하면 됩니다."
         )
         return embed
 

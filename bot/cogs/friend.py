@@ -68,7 +68,7 @@ class Friend(commands.Cog):
         self.imageStore = ImageStore(cfg.state_dir)
 
     @app_commands.command(
-        name="my-tools", description="Choose one of your Minecraft accounts and use quick tools."
+        name="tools", description="Choose one of your Minecraft accounts and use quick tools."
     )
     async def myTools(self, interaction: discord.Interaction) -> None:
         """Open the text-light self-service panel for the invoking user."""
