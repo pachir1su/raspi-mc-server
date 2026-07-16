@@ -128,6 +128,19 @@ class Friend(commands.Cog):
             value="이 안내를 다시 표시합니다.",
             inline=False,
         )
+        embed.add_field(
+            name="🧭 이럴 땐 이렇게",
+            value=(
+                "• **서버 주소를 알고 싶다** → `/서버`\n"
+                "• **죽어서 아이템을 잃었다** → `/내도구` → **데스박스 찾기** "
+                "(아이템은 상자에 안전하게 보관됩니다)\n"
+                "• **길을 잃었다/끼었다** → `/내도구` → **선택 계정 스폰 귀환**\n"
+                "• **좋은 장소를 공유하고 싶다** → `/내도구` → **공유 좌표북** → "
+                "**현재 위치 저장**\n"
+                "• **서버가 느린 것 같다** → `/내도구` → **서버 상태 점수**"
+            ),
+            inline=False,
+        )
         embed.set_footer(text="관리 기능은 ADMIN_USER_IDS에 등록된 서버장에게만 표시됩니다.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 

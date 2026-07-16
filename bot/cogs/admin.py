@@ -1396,10 +1396,10 @@ class Admin(commands.Cog):
         except RconError:
             pass
         settings = self.settingsStore.load()
-        storageText = "HDD unavailable"
+        storageText = "HDD 확인 불가"
         try:
             total, used, free = await asyncio.to_thread(self.storage.storageUsage)
-            storageText = f"{self._formatBytes(free)} free / {self._formatBytes(total)}"
+            storageText = f"여유 {self._formatBytes(free)} / 전체 {self._formatBytes(total)}"
         except StorageError:
             pass
         backups = []
