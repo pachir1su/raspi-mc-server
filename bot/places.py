@@ -44,11 +44,11 @@ class ImageStore:
         """Validate and save one image, returning its runtime-relative path."""
         suffix = Path(filename).suffix.lower()
         if not contentType or not contentType.lower().startswith("image/"):
-            raise ValueError("Attachment must be an image")
+            raise ValueError("첨부 파일은 이미지여야 합니다")
         if suffix not in IMAGE_SUFFIXES:
-            raise ValueError("Image must be PNG, JPEG, WebP, or GIF")
+            raise ValueError("이미지는 PNG, JPEG, WebP, GIF만 가능합니다")
         if not content or len(content) > MAX_IMAGE_BYTES:
-            raise ValueError("Image must be between 1 byte and 5 MiB")
+            raise ValueError("이미지는 1바이트 이상 5 MiB 이하여야 합니다")
         self.root.mkdir(parents=True, exist_ok=True)
         path = self.root / f"{uuid.uuid4().hex}{suffix}"
         path.write_bytes(content)
@@ -92,7 +92,7 @@ class PlaceStore:
         with self.path.open("r", encoding="utf-8") as file:
             raw = json.load(file)
         if not isinstance(raw, dict):
-            raise RuntimeError("Invalid coordinate book")
+            raise RuntimeError("좌표북 파일이 손상되었습니다")
         return raw
 
     def _saveUnlocked(self, raw: dict[str, dict]) -> None:
@@ -120,7 +120,7 @@ class PlaceStore:
         """Validate a display name and return its case-insensitive key."""
         cleanedName = (name or "").strip()
         if not PLACE_NAME.fullmatch(cleanedName):
-            raise ValueError("Place name must be 1-40 characters on one line")
+            raise ValueError("좌표 이름은 한 줄, 1-40자여야 합니다")
         return cleanedName.casefold()
 
     def save(
@@ -139,10 +139,10 @@ class PlaceStore:
         cleanedName = name.strip()
         cleanedDimension = dimension.strip().lower()
         if cleanedDimension not in DIMENSIONS:
-            raise ValueError("Dimension must be overworld, nether, or the_end")
+            raise ValueError("차원은 overworld, nether, the_end 중 하나여야 합니다")
         cleanedDescription = (description or "").strip()
         if len(cleanedDescription) > 500:
-            raise ValueError("Description must be 500 characters or fewer")
+            raise ValueError("설명은 500자 이하여야 합니다")
         place = Place(
             name=cleanedName,
             dimension=cleanedDimension,
@@ -157,7 +157,7 @@ class PlaceStore:
         with self.lock:
             raw = self._loadUnlocked()
             if key not in raw and len(raw) >= self.limit:
-                raise ValueError(f"Coordinate book is limited to {self.limit} places")
+                raise ValueError(f"좌표북에는 최대 {self.limit}개까지만 저장할 수 있습니다")
             previous = Place(**raw[key]) if key in raw else None
             raw[key] = asdict(place)
             self._saveUnlocked(raw)
@@ -193,7 +193,7 @@ def buildMapLink(template: str, place: Place) -> str | None:
     if not cleanedTemplate:
         return None
     if not cleanedTemplate.startswith(("https://", "http://")):
-        raise ValueError("MC_MAP_URL_TEMPLATE must start with http:// or https://")
+        raise ValueError("MC_MAP_URL_TEMPLATE은 http:// 또는 https://로 시작해야 합니다")
     values = {
         "dimension": quote(place.dimension, safe=""),
         "x": str(place.x),
@@ -203,4 +203,4 @@ def buildMapLink(template: str, place: Place) -> str | None:
     try:
         return cleanedTemplate.format_map(values)
     except (KeyError, ValueError) as error:
-        raise ValueError("Invalid MC_MAP_URL_TEMPLATE placeholder") from error
+        raise ValueError("MC_MAP_URL_TEMPLATE의 자리표시자가 잘못되었습니다") from error

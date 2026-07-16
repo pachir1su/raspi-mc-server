@@ -57,7 +57,7 @@ def summarizeInventory(output: str, limit: int = 40) -> str:
     matches = ITEM_PATTERN.findall(output)
     if not matches:
         cleaned = " ".join(output.split())
-        return cleaned[:1800] or "Inventory is empty or unavailable."
+        return cleaned[:1800] or "인벤토리가 비어 있거나 확인할 수 없습니다."
     lines = [
         f"**{slotLabel(int(slot))}** — `{itemId}` × {count}"
         for slot, itemId, count in matches[:limit]

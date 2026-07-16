@@ -23,7 +23,7 @@ def buildWhitelistCommand(link: "PlayerLink") -> str:
         return f"whitelist add {validateJavaName(link.minecraftName)}"
     if link.edition == "bedrock":
         return f"fwhitelist add {validateBedrockName(link.minecraftName)}"
-    raise ValueError("Unsupported Minecraft edition")
+    raise ValueError("지원하지 않는 마인크래프트 에디션입니다")
 
 
 def buildWhitelistRemoveCommand(link: "PlayerLink") -> str:
@@ -32,7 +32,7 @@ def buildWhitelistRemoveCommand(link: "PlayerLink") -> str:
         return f"whitelist remove {validateJavaName(link.minecraftName)}"
     if link.edition == "bedrock":
         return f"fwhitelist remove {validateBedrockName(link.minecraftName)}"
-    raise ValueError("Unsupported Minecraft edition")
+    raise ValueError("지원하지 않는 마인크래프트 에디션입니다")
 
 
 @dataclass(frozen=True)
@@ -70,11 +70,11 @@ class PlayerLinkStore:
         with self.path.open("r", encoding="utf-8") as file:
             raw = json.load(file)
         if not isinstance(raw, dict):
-            raise RuntimeError("Invalid player link store")
+            raise RuntimeError("계정 연동 저장 파일이 손상되었습니다")
         normalized = {}
         for oldKey, item in raw.items():
             if not isinstance(item, dict):
-                raise RuntimeError("Invalid player link record")
+                raise RuntimeError("계정 연동 기록이 손상되었습니다")
             discordUserId = int(item["discordUserId"])
             edition = str(item.get("edition", "java"))
             linkId = str(item.get("linkId") or self._legacyLinkId(oldKey, discordUserId, edition))
@@ -119,7 +119,7 @@ class PlayerLinkStore:
                 and str(item.get("edition", "java")) == edition
                 and str(item["minecraftName"]).casefold() == wantedName
             ):
-                raise ValueError("Minecraft name is already assigned")
+                raise ValueError("이미 다른 사용자에게 연동된 마인크래프트 닉네임입니다")
 
     @staticmethod
     def _validateName(minecraftName: str, edition: str) -> tuple[str, str]:
@@ -129,7 +129,7 @@ class PlayerLinkStore:
             return validateJavaName(minecraftName), cleanedEdition
         if cleanedEdition == "bedrock":
             return validateBedrockName(minecraftName), cleanedEdition
-        raise ValueError("edition must be java or bedrock")
+        raise ValueError("에디션은 java 또는 bedrock이어야 합니다")
 
     def addManaged(
         self,
@@ -192,7 +192,7 @@ class PlayerLinkStore:
                 None,
             )
             if current is None:
-                raise KeyError("No pending link request for that Discord user")
+                raise KeyError("해당 Discord 사용자의 대기 중인 연동 요청이 없습니다")
             self._assertNameAvailable(
                 raw, current.minecraftName, current.edition, current.linkId
             )

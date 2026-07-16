@@ -108,12 +108,12 @@ class Rcon:
         if resp_id == -1:
             await self.close()
             _log.warning("RCON authentication rejected (wrong password)")
-            raise RconAuthError("RCON authentication failed (wrong password)")
+            raise RconAuthError("RCON 인증 실패 (비밀번호 불일치)")
         if resp_id != req_id:
             # 정상 서버는 request id를 그대로 돌려줍니다. 다르면 프로토콜 오류.
             await self.close()
             _log.warning("unexpected RCON auth response id %s (sent %s)", resp_id, req_id)
-            raise RconAuthError("unexpected RCON authentication response")
+            raise RconAuthError("예상치 못한 RCON 인증 응답입니다")
 
     async def close(self):
         if self._writer is not None:
@@ -161,10 +161,10 @@ class Rcon:
                 self._reader.readexactly(length), self._timeout
             )
         except asyncio.TimeoutError as e:
-            _log.warning("RCON response timed out after %.0fs", self._timeout)
-            raise RconTimeout("RCON response timed out") from e
+            _log.warning("RCON 응답 시간 초과 after %.0fs", self._timeout)
+            raise RconTimeout("RCON 응답 시간 초과") from e
         except (asyncio.IncompleteReadError, OSError) as e:
-            raise RconConnectionError("RCON connection closed early") from e
+            raise RconConnectionError("RCON 연결이 일찍 끊어졌습니다") from e
         resp_id, ptype = struct.unpack("<ii", data[:8])
         self._last_body = data[8:-2].decode("utf-8", errors="replace")  # strip two nulls
         return resp_id, ptype, self._last_body
@@ -191,7 +191,7 @@ def _main(argv=None) -> int:
         return 2
     password = os.getenv("RCON_PASSWORD", "")
     if not password:
-        print("RCON_PASSWORD is not set", file=sys.stderr)
+        print("RCON_PASSWORD가 설정되지 않았습니다", file=sys.stderr)
         return 2
     host = os.getenv("RCON_HOST", "127.0.0.1")
     port = int(os.getenv("RCON_PORT", "25575"))
