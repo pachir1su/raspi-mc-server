@@ -330,9 +330,9 @@ class Admin(commands.Cog):
             for label in throttleFlags
         ):
             warnings.append(
-                "Current undervoltage/throttle flag: " + ", ".join(throttleFlags)
+                "현재 저전압/스로틀 플래그: " + ", ".join(throttleFlags)
             )
-        tpsText = "RCON unavailable"
+        tpsText = "RCON 연결 불가"
         tpsValue = None
         try:
             tpsText = stripMinecraftFormatting(await _rcon("tps"))
@@ -340,43 +340,43 @@ class Admin(commands.Cog):
             if tpsValue is not None and tpsValue < cfg.alert_tps_threshold:
                 warnings.append(f"TPS {tpsValue:.1f} < {cfg.alert_tps_threshold:.1f}")
         except RconError:
-            warnings.append("RCON/TPS check failed")
-        hddText = "HDD unavailable"
+            warnings.append("RCON/TPS 확인 실패")
+        hddText = "HDD 확인 불가"
         try:
             total, used, free = await asyncio.to_thread(self.storage.storageUsage)
             hddText = (
                 f"{self._formatBytes(used)} / {self._formatBytes(total)} "
-                f"(free {self._formatBytes(free)})"
+                f"(여유 {self._formatBytes(free)})"
             )
             freeGb = free / 1024 ** 3
             if freeGb < cfg.alert_min_free_gb:
-                warnings.append(f"HDD free {freeGb:.1f} GB < {cfg.alert_min_free_gb:.0f} GB")
+                warnings.append(f"HDD 여유 {freeGb:.1f} GB < {cfg.alert_min_free_gb:.0f} GB")
         except StorageError:
-            warnings.append("HDD check failed")
+            warnings.append("HDD 확인 실패")
         recommendations = []
         if tpsValue is not None and tpsValue < 18:
             recommendations.append(
-                "Lower view-distance/simulation-distance and check mob farms "
-                "or chunk loaders."
+                "view-distance/simulation-distance를 낮추고 몹 농장이나 "
+                "청크 로더를 점검하세요."
             )
         if memoryPercent >= 85:
             recommendations.append(
-                "Avoid raising MC_MEMORY; first reduce loaded chunks/entities "
-                "or restart during off-hours."
+                "MC_MEMORY를 올리기보다, 먼저 로드된 청크/엔티티를 줄이거나 "
+                "한가한 시간에 재시작하세요."
             )
         if systemMetrics.temperatureCelsius is not None and systemMetrics.temperatureCelsius >= 75:
             recommendations.append(
-                "Improve cooling, case airflow, or power supply before "
-                "increasing player load."
+                "플레이어를 더 받기 전에 쿨링, 케이스 공기 흐름, 전원부터 "
+                "개선하세요."
             )
         if any("전압" in label or "undervoltage" in label.lower() for label in throttleFlags):
             recommendations.append(
-                "Use a stronger USB-C power supply/cable; undervoltage "
-                "causes lag spikes."
+                "더 강한 USB-C 전원 어댑터/케이블을 사용하세요. 저전압은 "
+                "렉 스파이크의 원인입니다."
             )
         recommendations.append(
-            "For a Pi 4B 4GB, keep 3-4 players, modest farms, and "
-            "conservative render/simulation distance."
+            "Pi 4B 4GB에서는 플레이어 3-4명, 적당한 규모의 농장, 보수적인 "
+            "렌더/시뮬레이션 거리를 유지하세요."
         )
         embed = discord.Embed(
             title=t("tuning_title"),
@@ -384,11 +384,11 @@ class Admin(commands.Cog):
             color=ERR_RED if warnings else OK_GREEN,
         )
         embed.add_field(name="TPS", value=f"```{tpsText[:900]}```", inline=False)
-        embed.add_field(name="CPU", value=f"Temp: {systemMetrics.temperatureCelsius if systemMetrics.temperatureCelsius is not None else 'n/a'}°C\nLoad: {systemMetrics.load1:.2f}/{systemMetrics.load5:.2f}/{systemMetrics.load15:.2f}", inline=True)
-        embed.add_field(name="Memory", value=f"{self._formatBytes(usedMemory)} / {self._formatBytes(systemMetrics.memoryTotalBytes)} ({memoryPercent:.1f}%)", inline=True)
+        embed.add_field(name="CPU", value=f"온도: {systemMetrics.temperatureCelsius if systemMetrics.temperatureCelsius is not None else 'n/a'}°C\n부하: {systemMetrics.load1:.2f}/{systemMetrics.load5:.2f}/{systemMetrics.load15:.2f}", inline=True)
+        embed.add_field(name="메모리", value=f"{self._formatBytes(usedMemory)} / {self._formatBytes(systemMetrics.memoryTotalBytes)} ({memoryPercent:.1f}%)", inline=True)
         embed.add_field(name="HDD", value=hddText, inline=False)
-        embed.add_field(name="Power/throttle", value=", ".join(throttleFlags), inline=False)
-        embed.add_field(name="Recommendations", value="\n".join(f"• {item}" for item in recommendations)[:1000], inline=False)
+        embed.add_field(name="전원·스로틀", value=", ".join(throttleFlags), inline=False)
+        embed.add_field(name="권장 조치", value="\n".join(f"• {item}" for item in recommendations)[:1000], inline=False)
         return warnings, embed
 
     # --- player-facing portal ------------------------------------------
@@ -446,7 +446,7 @@ class Admin(commands.Cog):
     async def status(self, interaction: discord.Interaction):
         try:
             out = await _rcon("list")
-            e = discord.Embed(title="🟢 Server online", description=out, color=OK_GREEN)
+            e = discord.Embed(title="🟢 서버 온라인", description=out, color=OK_GREEN)
         except RconAuthError as error:
             # 연결은 됐지만 비밀번호 불일치 — 설정 문제라 사용자에게 따로 안내.
             _log.warning("status RCON auth failed: %s", error)
@@ -470,8 +470,8 @@ class Admin(commands.Cog):
         except RconError as error:
             _log.info("status RCON unreachable: %s", error)
             e = discord.Embed(
-                title="🔴 Server offline",
-                description="RCON is unreachable — the server is stopped or starting.",
+                title="🔴 서버 오프라인",
+                description="RCON에 연결할 수 없습니다 — 서버가 꺼져 있거나 시작 중입니다.",
                 color=ERR_RED,
             )
         await interaction.response.send_message(embed=e)
@@ -483,7 +483,7 @@ class Admin(commands.Cog):
     async def say(self, interaction: discord.Interaction, message: str):
         try:
             await _rcon(f"say {message}")
-            await interaction.response.send_message(f"📢 Sent: {message}", ephemeral=True)
+            await interaction.response.send_message(f"📢 공지 전송: {message}", ephemeral=True)
             _log.info("say by %s: %s", userTag(interaction.user), message)
             await self._audit(interaction, "server.say", "success")
         except RconError as e:
@@ -496,9 +496,9 @@ class Admin(commands.Cog):
         # This is the "only I can cheat" channel: it runs at op level 4.
         try:
             out = await _rcon(command)
-            body = out.strip() or "(no output)"
+            body = out.strip() or "(출력 없음)"
             e = discord.Embed(
-                title="🎛️ Command executed",
+                title="🎛️ 명령 실행 완료",
                 description=f"`/{command}`\n```\n{body[:1800]}\n```",
                 color=BRAND_BLUE,
             )
@@ -534,7 +534,7 @@ class Admin(commands.Cog):
     # --- lifecycle (systemd) -------------------------------------------
     @internalAction(description="Start the Minecraft service.")
     async def start(self, interaction: discord.Interaction):
-        await self._lifecycle(interaction, "start", "Starting the server")
+        await self._lifecycle(interaction, "start", "서버 시작 중")
 
     @internalAction(description="Stop the Minecraft service (saves first).")
     async def stop(self, interaction: discord.Interaction):
@@ -543,11 +543,11 @@ class Admin(commands.Cog):
             await _rcon("save-all")
         except RconError:
             pass
-        await self._lifecycle(interaction, "stop", "Stopping the server")
+        await self._lifecycle(interaction, "stop", "서버 정지 중")
 
     @internalAction(description="Restart the Minecraft service.")
     async def restart(self, interaction: discord.Interaction):
-        await self._lifecycle(interaction, "restart", "Restarting the server")
+        await self._lifecycle(interaction, "restart", "서버 재시작 중")
 
     async def _lifecycle(self, interaction, action, label):
         async def work():
@@ -558,7 +558,7 @@ class Admin(commands.Cog):
         mark = "✅" if ok else "❌"
         e = discord.Embed(
             title=f"{mark} {label}",
-            description=f"```\n{(out or 'done')[:1500]}\n```",
+            description=f"```\n{(out or '완료')[:1500]}\n```",
             color=color,
         )
         await interaction.edit_original_response(embed=e)
@@ -596,10 +596,10 @@ class Admin(commands.Cog):
                 return await self._safeBackup("manual")
 
         try:
-            archivePath = await animate_while(interaction, work(), "Backing up the world")
+            archivePath = await animate_while(interaction, work(), "월드 백업 중")
             await interaction.edit_original_response(
                 embed=discord.Embed(
-                    title="✅ Backup complete",
+                    title="✅ 백업 완료",
                     description=f"`{archivePath.name}`",
                     color=OK_GREEN,
                 )
@@ -619,7 +619,7 @@ class Admin(commands.Cog):
                 for item in backups[:20]
             ]
             await interaction.response.send_message(
-                "\n".join(lines) or "No backups yet.", ephemeral=True
+                "\n".join(lines) or "아직 백업이 없습니다.", ephemeral=True
             )
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
@@ -629,7 +629,7 @@ class Admin(commands.Cog):
         try:
             backups = await asyncio.to_thread(self.storage.listBackups)
             if not backups:
-                await interaction.response.send_message("No backups yet.", ephemeral=True)
+                await interaction.response.send_message("아직 백업이 없습니다.", ephemeral=True)
                 return
             lines = []
             for index, item in enumerate(backups[:10], start=1):
@@ -658,10 +658,10 @@ class Admin(commands.Cog):
             digest = await asyncio.to_thread(self.storage.verifyBackup, name)
             description = (
                 f"{t('restore_preview_ok')}\n"
-                f"File: `{path.name}`\n"
-                f"Size: **{self._formatBytes(path.stat().st_size)}**\n"
+                f"파일: `{path.name}`\n"
+                f"크기: **{self._formatBytes(path.stat().st_size)}**\n"
                 f"SHA-256: `{digest}`\n\n"
-                "Run `/backup restore` with confirm `RESTORE` only when you are ready to stop and replace the live world."
+                "실제 복구는 서버를 정지하고 현재 월드를 교체합니다. 준비됐을 때만 `/backup restore`에서 확인문구에 `RESTORE`를 입력해 실행하세요."
             )
             await interaction.followup.send(
                 embed=discord.Embed(
@@ -679,7 +679,7 @@ class Admin(commands.Cog):
     async def backupDownload(self, interaction: discord.Interaction, name: str):
         try:
             path = self.storage.resolveBackup(name)
-            await self._sendFile(interaction, path, "World backup")
+            await self._sendFile(interaction, path, "월드 백업")
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
@@ -688,11 +688,11 @@ class Admin(commands.Cog):
     @app_commands.autocomplete(name=backupNameAutocomplete)
     async def backupDelete(self, interaction: discord.Interaction, name: str, confirm: str):
         if confirm != "DELETE":
-            await interaction.response.send_message("❌ Type `DELETE` exactly to confirm.", ephemeral=True)
+            await interaction.response.send_message("❌ 확인문구에 `DELETE`를 정확히 입력해야 삭제됩니다.", ephemeral=True)
             return
         try:
             await asyncio.to_thread(self.storage.deleteBackup, name)
-            await interaction.response.send_message(f"✅ Deleted `{name}`.", ephemeral=True)
+            await interaction.response.send_message(f"✅ `{name}` 백업을 삭제했습니다.", ephemeral=True)
             await self._audit(interaction, "backup.delete", "success", name)
             _log.warning("backup delete by %s: %s", userTag(interaction.user), name)
         except StorageError as error:
@@ -703,7 +703,7 @@ class Admin(commands.Cog):
     @app_commands.autocomplete(name=backupNameAutocomplete)
     async def backupRestore(self, interaction: discord.Interaction, name: str, confirm: str):
         if confirm != "RESTORE":
-            await interaction.response.send_message("❌ Type `RESTORE` exactly to confirm.", ephemeral=True)
+            await interaction.response.send_message("❌ 확인문구에 `RESTORE`를 정확히 입력해야 복구됩니다.", ephemeral=True)
             return
 
         async def work():
@@ -712,18 +712,18 @@ class Admin(commands.Cog):
                 await self._safeBackup("pre-restore")
                 stopped, stopOutput = await asyncio.to_thread(_systemctl, "stop")
                 if not stopped:
-                    raise StorageError(f"Could not stop Minecraft: {stopOutput}")
+                    raise StorageError(f"마인크래프트를 정지하지 못했습니다: {stopOutput}")
                 try:
                     await self.storage.restoreBackup(name)
                 finally:
                     started, startOutput = await asyncio.to_thread(_systemctl, "start")
                     if not started:
-                        raise StorageError(f"World changed but Minecraft failed to start: {startOutput}")
+                        raise StorageError(f"월드는 교체됐지만 마인크래프트 시작에 실패했습니다: {startOutput}")
 
         try:
-            await animate_while(interaction, work(), "Restoring the world")
+            await animate_while(interaction, work(), "월드 복구 중")
             await interaction.edit_original_response(
-                embed=discord.Embed(title="✅ World restored", description=f"`{name}`", color=OK_GREEN)
+                embed=discord.Embed(title="✅ 월드 복구 완료", description=f"`{name}`", color=OK_GREEN)
             )
             _log.warning("backup restore by %s: %s", userTag(interaction.user), name)
             await self._audit(interaction, "backup.restore", "success", name)
@@ -738,7 +738,7 @@ class Admin(commands.Cog):
         try:
             digest = await asyncio.to_thread(self.storage.verifyBackup, name)
             await interaction.followup.send(
-                f"✅ `{name}` is intact.\nSHA-256: `{digest}`", ephemeral=True
+                f"✅ `{name}` 백업이 손상 없이 온전합니다.\nSHA-256: `{digest}`", ephemeral=True
             )
         except StorageError as error:
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
@@ -749,7 +749,7 @@ class Admin(commands.Cog):
             settings = self.settingsStore.load()
             deletedCount = await asyncio.to_thread(self.storage.pruneBackups, settings)
             await interaction.response.send_message(
-                f"✅ Retention applied; deleted **{deletedCount}** expired backup(s).",
+                f"✅ 보관 정책을 적용해 만료된 백업 **{deletedCount}개**를 삭제했습니다.",
                 ephemeral=True,
             )
             await self._audit(interaction, "backup.prune", "success", str(deletedCount))
@@ -762,26 +762,26 @@ class Admin(commands.Cog):
             settings = self.settingsStore.load()
             total, used, free = await asyncio.to_thread(self.storage.storageUsage)
             description = (
-                f"Enabled: **{settings.enabled}**\n"
-                f"Interval: **{settings.intervalMinutes} minutes**\n"
-                f"Dense retention: **{settings.retentionHours} hours**\n"
-                f"Daily retention: **{settings.dailyRetentionDays} days**\n"
-                f"Usage ceiling: **{settings.maxUsagePercent}%**\n"
-                f"Minimum free: **{settings.minFreeGb} GB**\n"
+                f"자동 백업: **{'켜짐' if settings.enabled else '꺼짐'}**\n"
+                f"간격: **{settings.intervalMinutes}분**\n"
+                f"단기 보관: **{settings.retentionHours}시간**\n"
+                f"일일 보관: **{settings.dailyRetentionDays}일**\n"
+                f"최대 사용률: **{settings.maxUsagePercent}%**\n"
+                f"최소 여유 공간: **{settings.minFreeGb} GB**\n"
                 f"HDD: **{self._formatBytes(used)} / {self._formatBytes(total)}**, "
-                f"free **{self._formatBytes(free)}**"
+                f"여유 **{self._formatBytes(free)}**"
             )
             backups = await asyncio.to_thread(self.storage.listBackups)
             if settings.enabled and backups:
                 nextTimestamp = int(
                     backups[0].modifiedAt.timestamp() + settings.intervalMinutes * 60
                 )
-                description += f"\nNext due: <t:{nextTimestamp}:R>"
+                description += f"\n다음 백업: <t:{nextTimestamp}:R>"
             elif settings.enabled:
-                description += "\nNext due: **as soon as the scheduler starts**"
+                description += "\n다음 백업: **스케줄러가 시작되는 즉시**"
             else:
-                description += "\nNext due: **paused**"
-            await interaction.response.send_message(embed=discord.Embed(title="Backup settings", description=description, color=BRAND_BLUE), ephemeral=True)
+                description += "\n다음 백업: **일시 중지됨**"
+            await interaction.response.send_message(embed=discord.Embed(title="백업 설정", description=description, color=BRAND_BLUE), ephemeral=True)
         except (StorageError, RuntimeError) as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
@@ -806,7 +806,7 @@ class Admin(commands.Cog):
             }
             settings = replace(settings, **{key: value for key, value in changes.items() if value is not None})
             self.settingsStore.save(settings)
-            await interaction.response.send_message("✅ Backup settings saved. Use `/backup settings` to review them.", ephemeral=True)
+            await interaction.response.send_message("✅ 백업 설정을 저장했습니다. `/backup settings`로 확인하세요.", ephemeral=True)
             _log.warning("backup settings changed by %s", userTag(interaction.user))
             await self._audit(interaction, "backup.configure", "success", str(changes))
         except (ValueError, RuntimeError, OSError) as error:
@@ -817,7 +817,7 @@ class Admin(commands.Cog):
         try:
             settings = replace(self.settingsStore.load(), enabled=enabled)
             self.settingsStore.save(settings)
-            await interaction.response.send_message(f"✅ Automatic backups: **{enabled}**", ephemeral=True)
+            await interaction.response.send_message(f"✅ 자동 백업: **{'켜짐' if enabled else '꺼짐'}**", ephemeral=True)
             await self._audit(interaction, "backup.enabled", "success", str(enabled))
         except (ValueError, RuntimeError, OSError) as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
@@ -834,7 +834,7 @@ class Admin(commands.Cog):
             await file.save(uploadPath)
             async with self.operationLock:
                 targetPath = await asyncio.to_thread(self.storage.importWorldArchive, uploadPath, name)
-            await interaction.followup.send(f"✅ Map `{targetPath.name}` validated and stored on the HDD.", ephemeral=True)
+            await interaction.followup.send(f"✅ 맵 `{targetPath.name}`을(를) 검증해 HDD에 저장했습니다.", ephemeral=True)
             _log.info("world upload by %s: %s", userTag(interaction.user), targetPath.name)
             await self._audit(interaction, "world.upload", "success", targetPath.name)
         except (StorageError, OSError) as error:
@@ -848,7 +848,7 @@ class Admin(commands.Cog):
         try:
             worlds = await asyncio.to_thread(self.storage.listWorlds)
             lines = [f"`{item.name}` — {self._formatBytes(item.size)}" for item in worlds[:20]]
-            await interaction.response.send_message("\n".join(lines) or "No imported maps.", ephemeral=True)
+            await interaction.response.send_message("\n".join(lines) or "업로드된 맵이 없습니다.", ephemeral=True)
         except StorageError as error:
             await interaction.response.send_message(f"❌ {error}", ephemeral=True)
 
@@ -857,7 +857,7 @@ class Admin(commands.Cog):
     @app_commands.autocomplete(name=worldNameAutocomplete)
     async def worldActivate(self, interaction: discord.Interaction, name: str, confirm: str):
         if confirm != "ACTIVATE":
-            await interaction.response.send_message("❌ Type `ACTIVATE` exactly to confirm.", ephemeral=True)
+            await interaction.response.send_message("❌ 확인문구에 `ACTIVATE`를 정확히 입력해야 적용됩니다.", ephemeral=True)
             return
 
         async def work():
@@ -865,17 +865,17 @@ class Admin(commands.Cog):
                 await self._safeBackup("pre-activate")
                 stopped, stopOutput = await asyncio.to_thread(_systemctl, "stop")
                 if not stopped:
-                    raise StorageError(f"Could not stop Minecraft: {stopOutput}")
+                    raise StorageError(f"마인크래프트를 정지하지 못했습니다: {stopOutput}")
                 try:
                     await self.storage.activateWorld(name)
                 finally:
                     started, startOutput = await asyncio.to_thread(_systemctl, "start")
                     if not started:
-                        raise StorageError(f"Map changed but Minecraft failed to start: {startOutput}")
+                        raise StorageError(f"맵은 교체됐지만 마인크래프트 시작에 실패했습니다: {startOutput}")
 
         try:
-            await animate_while(interaction, work(), "Activating the uploaded map")
-            await interaction.edit_original_response(embed=discord.Embed(title="✅ Map activated", description=f"`{name}`", color=OK_GREEN))
+            await animate_while(interaction, work(), "업로드한 맵 적용 중")
+            await interaction.edit_original_response(embed=discord.Embed(title="✅ 맵 적용 완료", description=f"`{name}`", color=OK_GREEN))
             _log.warning("world activate by %s: %s", userTag(interaction.user), name)
             await self._audit(interaction, "world.activate", "success", name)
         except (StorageError, RuntimeError) as error:
@@ -889,7 +889,7 @@ class Admin(commands.Cog):
         outputPath = None
         try:
             outputPath = await self.storage.exportWorld(name)
-            await self._sendFile(interaction, outputPath, "Stored map", deferred=True)
+            await self._sendFile(interaction, outputPath, "저장된 맵", deferred=True)
         except StorageError as error:
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
         finally:
@@ -901,11 +901,11 @@ class Admin(commands.Cog):
     @app_commands.autocomplete(name=worldNameAutocomplete)
     async def worldDelete(self, interaction: discord.Interaction, name: str, confirm: str):
         if confirm != "DELETE":
-            await interaction.response.send_message("❌ Type `DELETE` exactly to confirm.", ephemeral=True)
+            await interaction.response.send_message("❌ 확인문구에 `DELETE`를 정확히 입력해야 삭제됩니다.", ephemeral=True)
             return
         try:
             await asyncio.to_thread(self.storage.deleteWorld, name)
-            await interaction.response.send_message(f"✅ Deleted imported map `{name}`.", ephemeral=True)
+            await interaction.response.send_message(f"✅ 업로드된 맵 `{name}`을(를) 삭제했습니다.", ephemeral=True)
             _log.warning("world delete by %s: %s", userTag(interaction.user), name)
             await self._audit(interaction, "world.delete", "success", name)
         except StorageError as error:
@@ -916,9 +916,9 @@ class Admin(commands.Cog):
         try:
             total, used, free = self.storage.storageUsage()
             await interaction.response.send_message(
-                f"✅ HDD mounted at `{self.storage.storageRoot}`\n"
-                f"Used: **{self._formatBytes(used)} / {self._formatBytes(total)}**\n"
-                f"Free: **{self._formatBytes(free)}**",
+                f"✅ HDD 마운트 위치: `{self.storage.storageRoot}`\n"
+                f"사용량: **{self._formatBytes(used)} / {self._formatBytes(total)}**\n"
+                f"여유: **{self._formatBytes(free)}**",
                 ephemeral=True,
             )
         except StorageError as error:
@@ -935,7 +935,7 @@ class Admin(commands.Cog):
         try:
             total, used, free = await asyncio.to_thread(self.storage.storageUsage)
             results.append(
-                f"✅ HDD: {self._formatBytes(free)} free of {self._formatBytes(total)}"
+                f"✅ HDD: 전체 {self._formatBytes(total)} 중 {self._formatBytes(free)} 여유"
             )
             settings = self.settingsStore.load()
             backups = await asyncio.to_thread(self.storage.listBackups)
@@ -944,15 +944,15 @@ class Admin(commands.Cog):
                     (datetime.now(timezone.utc) - backups[0].modifiedAt).total_seconds() / 60
                 )
                 freshnessMark = "✅" if ageMinutes <= settings.intervalMinutes * 2 else "⚠️"
-                results.append(f"{freshnessMark} Latest backup: {ageMinutes} minute(s) old")
+                results.append(f"{freshnessMark} 최근 백업: {ageMinutes}분 전")
             else:
-                results.append("⚠️ Latest backup: none")
+                results.append("⚠️ 최근 백업: 없음")
             results.append(
-                f"{'✅' if settings.enabled else '⏸️'} Scheduler: "
-                f"{'enabled' if settings.enabled else 'paused'} ({settings.intervalMinutes} min)"
+                f"{'✅' if settings.enabled else '⏸️'} 스케줄러: "
+                f"{'켜짐' if settings.enabled else '일시 중지'} ({settings.intervalMinutes}분 간격)"
             )
         except (StorageError, RuntimeError) as error:
-            results.append(f"❌ Storage/scheduler: {error}")
+            results.append(f"❌ 저장소/스케줄러: {error}")
         await interaction.response.send_message("\n".join(results), ephemeral=True)
 
     @internalAction(name="audit", description="Show recent privileged-operation audit records.")
@@ -965,7 +965,7 @@ class Admin(commands.Cog):
             for record in records
         ]
         await interaction.response.send_message(
-            "\n".join(lines)[:1900] or "No audit records yet.", ephemeral=True
+            "\n".join(lines)[:1900] or "아직 감사 기록이 없습니다.", ephemeral=True
         )
 
     # --- button-first control panel ------------------------------------
@@ -1005,7 +1005,7 @@ class Admin(commands.Cog):
         try:
             warnings, embed = await self._collectPerformanceWarnings()
             if warnings:
-                embed.add_field(name="Warnings", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
+                embed.add_field(name="경고", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
         except (OSError, RuntimeError, ValueError) as error:
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
@@ -1124,7 +1124,7 @@ class Admin(commands.Cog):
                 source = "upload"
             ok, output = await asyncio.to_thread(_startUpdater)
             if not ok:
-                raise UpdateError(output or "updater service did not start")
+                raise UpdateError(output or "업데이트 서비스가 시작되지 않았습니다")
             await self._audit(interaction, "app.update", "queued", f"{tag} via {source}")
             _log.info(
                 "application update queued by %s: %s via %s",
@@ -1756,7 +1756,7 @@ class Admin(commands.Cog):
         if not fresh:
             return
         embed.title = t("alerts_title")
-        embed.add_field(name="New warnings", value="\n".join(f"• {item}" for item in fresh)[:1000], inline=False)
+        embed.add_field(name="새 경고", value="\n".join(f"• {item}" for item in fresh)[:1000], inline=False)
         try:
             await channel.send(embed=embed)
         except discord.HTTPException:
@@ -1777,8 +1777,8 @@ class Admin(commands.Cog):
         uploadLimit = interaction.guild.filesize_limit if interaction.guild else 10 * 1024 * 1024
         if path.stat().st_size > uploadLimit:
             message = (
-                f"❌ `{path.name}` is {self._formatBytes(path.stat().st_size)}, above this server's "
-                f"Discord limit of {self._formatBytes(uploadLimit)}. Download it from the HDD over SSH/SFTP."
+                f"❌ `{path.name}`은(는) {self._formatBytes(path.stat().st_size)}로, 이 서버의 Discord 업로드 한도 "
+                f"{self._formatBytes(uploadLimit)}를 넘습니다. SSH/SFTP로 HDD에서 직접 내려받으세요."
             )
             if deferred:
                 await interaction.followup.send(message, ephemeral=True)
@@ -1793,7 +1793,7 @@ class Admin(commands.Cog):
     async def _editError(self, interaction, error: Exception):
         """Replace a loading embed with a concise failure result."""
         await interaction.edit_original_response(
-            embed=discord.Embed(title="❌ Operation failed", description=str(error)[:1800], color=ERR_RED)
+            embed=discord.Embed(title="❌ 작업 실패", description=str(error)[:1800], color=ERR_RED)
         )
 
     @staticmethod
