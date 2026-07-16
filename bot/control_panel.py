@@ -39,6 +39,17 @@ class OwnerView(discord.ui.View):
             await interaction.response.send_message(message, ephemeral=True)
 
 
+class QuickActionModal(discord.ui.Modal):
+    """Shared error handling for the few quick actions that need typed input."""
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception):
+        message = f"❌ {describeError(error)}"
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+
+
 class AdminDashboardView(OwnerView):
     """Main dashboard with the most common tasks reachable in one click.
 
@@ -81,11 +92,13 @@ class AdminDashboardView(OwnerView):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="긴급 복구", emoji="🚑", style=discord.ButtonStyle.danger, row=0)
-    async def incident(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="빠른 명령", emoji="⚡", style=discord.ButtonStyle.danger, row=0)
+    async def quickCommands(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # 기존 '긴급 복구'를 흡수한 월드 빠른 명령. 플레이어 대상 명령
+        # (아이템·효과·TP 등)은 '접속자 관리'에서 접속자를 고른 뒤 사용합니다.
         await interaction.response.send_message(
-            "자주 쓰는 사고 대응 작업입니다. 서버 상태를 바꿀 수 있습니다.",
-            view=IncidentActionsView(self.controller, self.ownerId),
+            "시간·날씨·난이도·게임룰·스폰을 버튼으로 바꿉니다. 서버 상태가 즉시 바뀝니다.",
+            view=WorldCommandsView(self.controller, self.ownerId),
             ephemeral=True,
         )
 
@@ -182,26 +195,107 @@ class MoreToolsView(OwnerView):
         await self.controller.panelToggleChestLock(interaction)
 
 
-class IncidentActionsView(OwnerView):
-    """One-click emergency shortcuts for common small-server accidents."""
+class DifficultySelect(discord.ui.Select):
+    """난이도 4단계 — 고르는 즉시 적용됩니다."""
 
-    async def _run(self, interaction: discord.Interaction, command: str, label: str):
+    def __init__(self, controller):
+        self.controller = controller
+        emojis = {"peaceful": "🕊️", "easy": "🙂", "normal": "⚖️", "hard": "🔥"}
+        options = [
+            discord.SelectOption(label=f"난이도: {label}", value=key, emoji=emojis[key])
+            for key, label in DIFFICULTIES.items()
+        ]
+        super().__init__(placeholder="난이도 변경", min_values=1, max_values=1, options=options, row=2)
+
+    async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.controller._incidentCommand(interaction, command, label)
+        await self.controller.panelSetDifficulty(interaction, self.values[0])
 
-    @discord.ui.button(label="낮으로", emoji="☀️", style=discord.ButtonStyle.primary)
-    async def day(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._run(interaction, "time set day", "incident_day")
 
-    @discord.ui.button(label="맑게", emoji="🌤️", style=discord.ButtonStyle.primary)
-    async def clearWeather(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._run(interaction, "weather clear", "incident_clear")
+class SpawnCoordsModal(QuickActionModal):
+    """예외적으로 좌표를 직접 입력해 월드 스폰을 지정할 때만 씁니다."""
 
-    @discord.ui.button(label="평화 난이도", emoji="🛡️", style=discord.ButtonStyle.danger)
-    async def peaceful(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._run(interaction, "difficulty peaceful", "incident_peaceful")
+    def __init__(self, controller):
+        super().__init__(title="월드 스폰 좌표 직접 입력")
+        self.controller = controller
+        self.x = discord.ui.TextInput(label="X", max_length=9, placeholder="예: 120")
+        self.y = discord.ui.TextInput(label="Y", max_length=5, placeholder="예: 64")
+        self.z = discord.ui.TextInput(label="Z", max_length=9, placeholder="예: -35")
+        self.add_item(self.x)
+        self.add_item(self.y)
+        self.add_item(self.z)
 
-    @discord.ui.button(label="드롭템 정리", emoji="🧹", style=discord.ButtonStyle.danger)
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelSetSpawnCoords(
+            interaction, self.x.value, self.y.value, self.z.value
+        )
+
+
+class SpawnPlayerSelect(discord.ui.Select):
+    """접속자가 서 있는 자리를 월드 스폰으로 — 고르는 즉시 지정됩니다."""
+
+    def __init__(self, controller, players: list[str]):
+        self.controller = controller
+        options = [
+            discord.SelectOption(label=f"{name} 위치로 지정", value=name, emoji="🧍")
+            for name in players[:25]
+        ]
+        super().__init__(
+            placeholder="이 접속자가 서 있는 자리로 스폰 지정",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelSetSpawnFromPlayer(interaction, self.values[0])
+
+
+class SpawnSetView(OwnerView):
+    """월드 스폰 지정 — 죽었을 때 리스폰과 /도구 스폰 귀환이 함께 바뀝니다."""
+
+    def __init__(self, controller, ownerId: int, players: list[str]):
+        super().__init__(controller, ownerId, timeout=300)
+        if players:
+            self.add_item(SpawnPlayerSelect(controller, players))
+
+    @discord.ui.button(label="좌표 직접 입력", emoji="⌨️", style=discord.ButtonStyle.secondary, row=1)
+    async def coords(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(SpawnCoordsModal(self.controller))
+
+
+class WorldCommandsView(OwnerView):
+    """시간·날씨·난이도·게임룰·스폰을 버튼으로 바꾸는 빠른 명령 패널.
+
+    기존 '긴급 복구' 버튼(낮·맑음·평화·드롭템 정리)을 흡수·확장했습니다.
+    버튼 → 명령 대응과 게임룰 목록은 bot/quick_commands.py에 있습니다.
+    """
+
+    async def _run(self, interaction: discord.Interaction, command: str, message: str, audit: str):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelWorldCommand(interaction, command, message, audit)
+
+    async def _toggle(self, interaction: discord.Interaction, gameruleKey: str):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelToggleGamerule(interaction, gameruleKey)
+
+    # ── 1행: 시간·드롭템 ─────────────────────────────────────
+    @discord.ui.button(label="낮으로", emoji="☀️", style=discord.ButtonStyle.primary, row=0)
+    async def day(self, interaction, button):
+        await self._run(interaction, "time set day", "☀️ 시간을 낮으로 바꿨습니다.", "world.day")
+
+    @discord.ui.button(label="밤으로", emoji="🌙", style=discord.ButtonStyle.secondary, row=0)
+    async def night(self, interaction, button):
+        await self._run(interaction, "time set night", "🌙 시간을 밤으로 바꿨습니다.", "world.night")
+
+    @discord.ui.button(label="시간 흐름", emoji="⏰", style=discord.ButtonStyle.secondary, row=0)
+    async def daylightCycle(self, interaction, button):
+        await self._toggle(interaction, "doDaylightCycle")
+
+    @discord.ui.button(label="드롭템 정리", emoji="🧹", style=discord.ButtonStyle.danger, row=0)
     async def clearDrops(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             t("incident_clear_drops_prompt"),
@@ -211,6 +305,60 @@ class IncidentActionsView(OwnerView):
                 "kill @e[type=item]",
                 "incident_kill_items",
             ),
+            ephemeral=True,
+        )
+
+    # ── 2행: 날씨 ────────────────────────────────────────────
+    @discord.ui.button(label="맑음", emoji="🌤️", style=discord.ButtonStyle.primary, row=1)
+    async def clearWeather(self, interaction, button):
+        await self._run(interaction, "weather clear", "🌤️ 날씨를 맑게 바꿨습니다.", "world.weather")
+
+    @discord.ui.button(label="비", emoji="🌧️", style=discord.ButtonStyle.secondary, row=1)
+    async def rain(self, interaction, button):
+        await self._run(interaction, "weather rain", "🌧️ 비를 내리게 했습니다.", "world.weather")
+
+    @discord.ui.button(label="뇌우", emoji="⛈️", style=discord.ButtonStyle.secondary, row=1)
+    async def thunder(self, interaction, button):
+        await self._run(interaction, "weather thunder", "⛈️ 뇌우를 내리게 했습니다.", "world.weather")
+
+    @discord.ui.button(label="날씨 변화", emoji="🔒", style=discord.ButtonStyle.secondary, row=1)
+    async def weatherCycle(self, interaction, button):
+        await self._toggle(interaction, "doWeatherCycle")
+
+    # ── 3행: 난이도 드롭다운은 __init__에서 추가 ─────────────
+    def __init__(self, controller, ownerId: int, timeout: float = 600):
+        super().__init__(controller, ownerId, timeout)
+        self.add_item(DifficultySelect(controller))
+
+    # ── 4행: 게임룰 토글 ─────────────────────────────────────
+    @discord.ui.button(label="아이템 유지", emoji="🎒", style=discord.ButtonStyle.secondary, row=3)
+    async def keepInventory(self, interaction, button):
+        await self._toggle(interaction, "keepInventory")
+
+    @discord.ui.button(label="몹 그리핑", emoji="💥", style=discord.ButtonStyle.secondary, row=3)
+    async def mobGriefing(self, interaction, button):
+        await self._toggle(interaction, "mobGriefing")
+
+    @discord.ui.button(label="즉시 리스폰", emoji="⚡", style=discord.ButtonStyle.secondary, row=3)
+    async def immediateRespawn(self, interaction, button):
+        await self._toggle(interaction, "doImmediateRespawn")
+
+    # ── 5행: 게임룰 토글 + 스폰 지정 ─────────────────────────
+    @discord.ui.button(label="자연 재생", emoji="♻️", style=discord.ButtonStyle.secondary, row=4)
+    async def naturalRegeneration(self, interaction, button):
+        await self._toggle(interaction, "naturalRegeneration")
+
+    @discord.ui.button(label="플레이 일수", emoji="📅", style=discord.ButtonStyle.secondary, row=4)
+    async def showDaysPlayed(self, interaction, button):
+        await self._toggle(interaction, "showDaysPlayed")
+
+    @discord.ui.button(label="스폰 지정", emoji="📍", style=discord.ButtonStyle.success, row=4)
+    async def setSpawn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        players = await self.controller.panelOnlinePlayers()
+        await interaction.response.send_message(
+            "월드 스폰을 지정합니다. 죽었을 때 리스폰(침대 없을 때)과 "
+            "`/도구`의 스폰 귀환이 모두 이 지점으로 바뀝니다.",
+            view=SpawnSetView(self.controller, self.ownerId, players),
             ephemeral=True,
         )
 
@@ -294,17 +442,6 @@ class PlayerSelect(discord.ui.Select):
             content=f"선택됨: **{self.values[0]}** — 아래 조회·조작 버튼이 이 플레이어에게 적용됩니다.",
             view=self.parentView,
         )
-
-
-class QuickActionModal(discord.ui.Modal):
-    """Shared error handling for the few quick actions that need typed input."""
-
-    async def on_error(self, interaction: discord.Interaction, error: Exception):
-        message = f"❌ {describeError(error)}"
-        if interaction.response.is_done():
-            await interaction.followup.send(message, ephemeral=True)
-        else:
-            await interaction.response.send_message(message, ephemeral=True)
 
 
 class GiveItemModal(QuickActionModal):

@@ -39,21 +39,30 @@ from bot.places import PlaceStore
 from bot.public_panel import PublicServerView
 from bot.quick_commands import (
     COMMON_EFFECTS,
+    DEFAULT_ON_GAMERULES,
+    DIFFICULTIES,
     GAMEMODES,
+    GAMERULES,
+    SPAWN_RADIUS_ZERO_COMMAND,
+    buildDifficultyCommand,
     buildEffectClearCommand,
     buildEffectCommand,
     buildEnchantCommand,
     buildGamemodeCommand,
+    buildGameruleQueryCommand,
+    buildGameruleSetCommand,
     buildGiveCommand,
     buildHealCommands,
     buildKickCommand,
     buildTeleportToCoordsCommand,
     buildTeleportToPlayerCommand,
+    buildWorldSpawnCommand,
     buildXpCommand,
     ensureServerAccepted,
     parseDaysPlayed,
+    parseGameruleValue,
 )
-from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded
+from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.rcon import (
     Rcon,
     RconAuthError,
@@ -231,11 +240,42 @@ class Admin(commands.Cog):
         """Start the persistent in-bot scheduler after the cog is ready."""
         self.backupScheduler.start()
         self.performanceAlerts.start()
+        # 운영자 기본값: 즉시 리스폰·자연 재생·플레이 일수 표시를 켠 채로
+        # 시작합니다. 서버가 아직 안 떠 있을 수 있어 백그라운드에서 재시도.
+        self._defaultGamerulesTask = asyncio.create_task(self._applyDefaultGamerules())
 
     def cog_unload(self):
         """Stop scheduler polling when the extension unloads."""
         self.backupScheduler.cancel()
         self.performanceAlerts.cancel()
+        if getattr(self, "_defaultGamerulesTask", None):
+            self._defaultGamerulesTask.cancel()
+
+    async def _applyDefaultGamerules(self):
+        """Turn the requested default-ON gamerules on once RCON is reachable.
+
+        [유지보수 안내] 기본 ON 목록은 bot/quick_commands.py의
+        DEFAULT_ON_GAMERULES 입니다. showDaysPlayed처럼 구버전 마인크래프트에
+        없는 게임룰은 실패해도 봇을 막지 않고 경고 로그만 남깁니다.
+        이미 켜져 있으면 다시 켜도 부작용이 없어(멱등) 매 시작마다 실행합니다.
+        """
+        for attempt in range(30):  # 서버 기동을 기다리며 최대 30분 재시도
+            try:
+                await _rcon("list")
+                break
+            except RconError:
+                await asyncio.sleep(60)
+        else:
+            _log.warning("default gamerules skipped: RCON unreachable")
+            return
+        for gameruleKey in DEFAULT_ON_GAMERULES:
+            try:
+                ensureServerAccepted(
+                    await _rcon(buildGameruleSetCommand(gameruleKey, True))
+                )
+                _log.info("default gamerule applied: %s=true", gameruleKey)
+            except (ValueError, RconError) as error:
+                _log.warning("default gamerule %s failed: %s", gameruleKey, error)
 
     # A single guard applied to every command in this cog.
     async def cog_check(self, ctx):  # for prefix commands (unused)
@@ -1500,6 +1540,107 @@ class Admin(commands.Cog):
     async def panelSharedPlaces(self):
         """Return the shared coordinate book for the teleport dropdown."""
         return await asyncio.to_thread(self.placeStore.list)
+
+    # --- 빠른 명령: 월드(시간·날씨·난이도·게임룰·스폰) --------------------
+    async def panelWorldCommand(
+        self,
+        interaction: discord.Interaction,
+        command: str,
+        successMessage: str,
+        auditAction: str,
+    ) -> None:
+        """Run one world-level quick command (already deferred) with audit."""
+        try:
+            ensureServerAccepted(await _rcon(command))
+            await self._audit(interaction, auditAction, "success", command[:200])
+            await interaction.followup.send(f"✅ {successMessage}", ephemeral=True)
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, auditAction, "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelToggleGamerule(
+        self, interaction: discord.Interaction, gameruleKey: str
+    ) -> None:
+        """Query the current gamerule value and flip it in one button press."""
+        gameruleName, koreanLabel = GAMERULES[gameruleKey]
+        try:
+            current = parseGameruleValue(
+                ensureServerAccepted(await _rcon(buildGameruleQueryCommand(gameruleKey)))
+            )
+            ensureServerAccepted(
+                await _rcon(buildGameruleSetCommand(gameruleKey, not current))
+            )
+            await self._audit(
+                interaction, "world.gamerule", "success", f"{gameruleName}={not current}"
+            )
+            stateText = "켜짐 🟢" if not current else "꺼짐 🔴"
+            await interaction.followup.send(
+                f"✅ **{koreanLabel}**: {stateText}", ephemeral=True
+            )
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "world.gamerule", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelSetDifficulty(
+        self, interaction: discord.Interaction, difficulty: str
+    ) -> None:
+        await self.panelWorldCommand(
+            interaction,
+            buildDifficultyCommand(difficulty),
+            f"난이도를 **{DIFFICULTIES[difficulty]}** 로 바꿨습니다.",
+            "world.difficulty",
+        )
+
+    async def _applySpawn(
+        self, interaction: discord.Interaction, x: int, y: int, z: int
+    ) -> None:
+        """Set the overworld spawn and pin the respawn point exactly there."""
+        ensureServerAccepted(await _rcon(buildWorldSpawnCommand(x, y, z)))
+        # 분산 반경을 0으로 맞춰 정확히 그 지점에 리스폰되게 합니다.
+        ensureServerAccepted(await _rcon(SPAWN_RADIUS_ZERO_COMMAND))
+        await self._audit(interaction, "world.setspawn", "success", f"{x} {y} {z}")
+        await interaction.followup.send(
+            f"✅ 월드 스폰을 **({x}, {y}, {z})** 로 지정했습니다.\n"
+            "이제 죽었을 때 리스폰(침대가 없을 때)과 `/도구`의 스폰 귀환이 "
+            "모두 이 지점입니다. 침대에서 잔 플레이어는 여전히 침대에서 "
+            "리스폰합니다.",
+            ephemeral=True,
+        )
+
+    async def panelSetSpawnFromPlayer(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """선택한 접속자가 서 있는 자리를 월드 스폰으로 지정."""
+        try:
+            selector = buildPlayerSelector(playerName)
+            positionOutput, dimensionOutput = await asyncio.gather(
+                _rcon(f"data get entity {selector} Pos"),
+                _rcon(f"data get entity {selector} Dimension"),
+            )
+            dimension, x, y, z = parsePosition(positionOutput, dimensionOutput)
+            if dimension != "overworld":
+                raise ValueError(
+                    "오버월드에 있는 플레이어의 위치만 스폰으로 지정할 수 있습니다 "
+                    f"(현재: {dimension})."
+                )
+            await self._applySpawn(interaction, round(x), round(y), round(z))
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "world.setspawn", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelSetSpawnCoords(
+        self, interaction: discord.Interaction, rawX: str, rawY: str, rawZ: str
+    ) -> None:
+        """모달에 입력한 좌표를 검증해 월드 스폰으로 지정."""
+        try:
+            try:
+                x, y, z = (int(value.strip()) for value in (rawX, rawY, rawZ))
+            except ValueError:
+                raise ValueError("좌표는 정수로 입력하세요 (예: 120 64 -35).") from None
+            await self._applySpawn(interaction, x, y, z)
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "world.setspawn", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelOpenLinkAdmin(self, interaction: discord.Interaction) -> None:
         """Open direct multi-profile account management for one Discord user."""
