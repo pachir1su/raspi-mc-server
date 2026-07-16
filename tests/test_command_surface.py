@@ -8,7 +8,7 @@ from bot.main import syncCommandTree
 
 
 class CommandSurfaceTests(unittest.TestCase):
-    def testCogsDefineExactlyFourTopLevelCommands(self):
+    def testCogsDefineOnlyIntentionalTopLevelCommands(self):
         commandNames = {
             command.name
             for cog in (Admin, Friend)
@@ -16,7 +16,7 @@ class CommandSurfaceTests(unittest.TestCase):
         }
 
         self.assertEqual(
-            {"server", "admin", "my-tools", "upload"},
+            {"server", "admin", "my-tools", "help", "upload"},
             commandNames,
         )
 

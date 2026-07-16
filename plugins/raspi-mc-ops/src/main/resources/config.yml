@@ -1,0 +1,8 @@
+chat-log:
+  enabled: true
+  file: chat.log
+
+spawn-protection:
+  enabled: true
+  radius: 16
+  world: ""

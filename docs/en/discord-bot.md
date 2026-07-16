@@ -76,12 +76,12 @@ sudo journalctl -u mc-discord-bot.service -f
 
 ## Commands
 
-The bot publishes only four top-level commands. Legacy command callbacks remain
+The bot publishes only five top-level commands. Legacy command callbacks remain
 internal to the panels, so Discord's command picker stays short.
 
 The first-run language controls bot responses and status text. Discord slash
 command names follow each user's **Discord client language**. Korean clients see
-`/서버`, `/관리자`, `/내도구`, and `/업로드`; English clients see the canonical
+`/서버`, `/관리자`, `/내도구`, `/도움말`, and `/업로드`; English clients see the canonical
 names below.
 
 | Command | What it does |
@@ -89,6 +89,7 @@ names below.
 | `/server` | Friend-safe access information, online players, and refresh buttons. |
 | `/admin` | Private owner dashboard for service, players, backups, worlds, updates, logs, storage, performance, incidents, direct multi-account assignment, admin-only help, and advanced tools. |
 | `/my-tools` | Private self-service panel for selecting an assigned account, rescue, location, score, coordinates, and diary. |
+| `/help` | Friend-safe explanation of the public commands without exposing owner controls. |
 | `/upload world/update/place-photo/diary` | Attachment-only flows that Discord buttons cannot provide. World/update remain admin-only; friend media still checks link ownership. |
 
 Destructive backup/world/service actions require a second confirmation button.
@@ -112,7 +113,8 @@ Run `/admin` once, then use buttons without typing command arguments for:
 - Pi temperature, memory, TPS, undervoltage, throttle metrics, and tuning report
 - emergency buttons for day, weather, peaceful difficulty, and dropped-item cleanup. Dropped-item cleanup asks for confirmation because it can delete friends' items.
 - the live-player and account-link selectors
-- bot and Minecraft log controls
+- bot, Minecraft, and event-driven player-chat log controls
+- persistent Paper spawn-protection toggle
 
 The ephemeral panel is visible only to the administrator who opened it and
 expires after ten minutes. Callback failures produce a visible error instead of
@@ -128,15 +130,15 @@ current `list` output. After selecting a player, buttons show:
 - **Health/XP** — health, food, experience level, and game mode
 - **Effects** — current active-effect data
 
-Names are sourced from the live list and validated again as Java usernames, so
+Names are sourced from the live list and validated again as Java or dot-prefixed Floodgate usernames, so
 they cannot be turned into arbitrary RCON input.
 
 ## Log panel
 
 The dashboard **Logs** button opens controls instead of immediately attaching one file. It reads a
-bounded tail of the bot log or Paper `latest.log` and supports:
+bounded tail of the bot log, Paper `latest.log`, or `RaspiMcOps/chat.log` and supports:
 
-- bot or Minecraft previews
+- bot, Minecraft, or player-chat previews
 - warning/error-only filtering for each source
 - original attachments within the guild's actual Discord limit
 - an SSH/SFTP hint when a file is too large

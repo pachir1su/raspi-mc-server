@@ -22,7 +22,8 @@ PUBLIC_COMMANDS_ENABLED=true
 # Put runtime JSON and uploaded photos on the mounted HDD.
 MC_STATE_DIR=/mnt/minecraft/bot-state
 
-# Fixed destination used by the /my-tools rescue button. No default coordinates are used.
+# Optional fixed destination used by the /my-tools rescue button.
+# Leave all four blank to use Paper's live primary-world spawn.
 MC_SPAWN_DIMENSION=overworld
 MC_SPAWN_X=0.5
 MC_SPAWN_Y=80
@@ -77,7 +78,8 @@ characters are rejected in both cases.
 ## 3. Rescue only the linked account
 
 - Select an account in `/my-tools`, then press **Selected account: spawn**. It teleports only a Minecraft profile assigned to the caller. The
-  player must be online. The destination is the fixed `MC_SPAWN_*` configuration;
+  player must be online. A complete `MC_SPAWN_*` configuration overrides the
+  destination; otherwise the bundled plugin reads Paper's live primary-world spawn.
   the friend cannot enter a target, coordinates, or RCON command.
 - **My location** reads only that linked online player's dimension and XYZ.
 
@@ -135,7 +137,7 @@ your host-level HDD backup. They are ignored by Git.
 |---|---|
 | Friend sees the feature-disabled message | Set `PUBLIC_COMMANDS_ENABLED=true`, then restart the bot. |
 | No account appears in `/my-tools` | Owner opens `/admin` → **Friend accounts**, selects the Discord user, then adds a Java or Bedrock profile. |
-| Rescue says spawn is not configured | Set all four `MC_SPAWN_DIMENSION/X/Y/Z` values and restart. |
+| Rescue reports an unknown `raspiops` command | Install a Release build containing the bundled Paper operations plugin, then restart Paper and the bot. |
 | Bedrock registration says the whitelist command is unknown | Re-run `python -m bot.main --setup`, select Java+Bedrock, and check both plugin configs were generated. |
 | Rescue or whereami cannot find the player | The exact linked Java/Floodgate account must currently be online. |
 | Photo upload fails | Use a supported image type below 5 MiB and check `MC_STATE_DIR` permissions/free space. |

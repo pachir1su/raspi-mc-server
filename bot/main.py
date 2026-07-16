@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 from bot import log
 from bot import userTag
 from bot.app_settings import ensureFirstRunSetup
+from bot.bundled_plugins import BundledPluginManager
 from bot.crossplay import CrossplayManager
 from bot.command_i18n import CommandTranslator
 
@@ -27,7 +28,7 @@ t = None
 
 
 async def syncCommandTree(tree, guildIds: list[int]) -> None:
-    """Publish four commands and remove stale globals in guild-only mode."""
+    """Publish the bounded command surface and remove stale guild globals."""
     if guildIds:
         for guildId in guildIds:
             guild = discord.Object(id=guildId)
@@ -88,8 +89,13 @@ def main():
     serverDir = os.getenv("MC_SERVER_DIR", "/mnt/minecraft/live")
     serviceName = os.getenv("MC_SERVICE_NAME", "minecraft.service")
     try:
+        repoDir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        pluginManager = BundledPluginManager(repoDir, serverDir, serviceName)
+        pluginChanged = pluginManager.ensure()
         crossplayManager = CrossplayManager(serverDir, serviceName)
-        crossplayManager.ensure(settings)
+        crossplayChanged = crossplayManager.ensure(settings)
+        if pluginChanged and not crossplayChanged:
+            pluginManager.restartMinecraft()
         crossplayManager.ensureMinecraftRunning()
     except RuntimeError as error:
         raise SystemExit(f"Crossplay setup failed: {error}") from error

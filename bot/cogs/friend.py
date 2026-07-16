@@ -31,8 +31,9 @@ from bot.player_links import (
     buildWhitelistRemoveCommand,
     serverPlayerName,
 )
+from bot.player_names import buildPlayerSelector
 from bot.rcon import Rcon, RconError
-from bot.rescue import buildSpawnCommand, parsePosition
+from bot.rescue import buildAutomaticSpawnCommand, buildSpawnCommand, parsePosition
 from bot.system_metrics import readSystemMetrics, readThrottleFlags
 
 _log = log.get("cog.friend")
@@ -98,6 +99,37 @@ class Friend(commands.Cog):
             view=MyToolsView(self, interaction.user.id, links),
             ephemeral=True,
         )
+
+    @app_commands.command(
+        name="help", description="Show friend-safe Minecraft bot help."
+    )
+    async def helpCommand(self, interaction: discord.Interaction) -> None:
+        """Explain the public command surface without exposing owner controls."""
+        embed = discord.Embed(
+            title="📘 Minecraft 봇 도움말",
+            description="친구가 사용할 수 있는 명령은 아래 세 가지입니다.",
+            color=BRAND_BLUE,
+        )
+        embed.add_field(
+            name="`/서버` (`/server`)",
+            value="접속 주소, 서버 상태와 현재 접속자를 확인합니다.",
+            inline=False,
+        )
+        embed.add_field(
+            name="`/내도구` (`/my-tools`)",
+            value=(
+                "관리자가 등록한 내 캐릭터를 선택해 스폰 귀환, 위치 조회, "
+                "좌표북, 서버 일지와 건강 점수를 사용합니다."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="`/도움말` (`/help`)",
+            value="이 안내를 다시 표시합니다.",
+            inline=False,
+        )
+        embed.set_footer(text="관리 기능은 ADMIN_USER_IDS에 등록된 서버장에게만 표시됩니다.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Allow the friend surface only when its owner-controlled switch is enabled."""
@@ -242,15 +274,23 @@ class Friend(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            destination = cfg.rescueDestination()
             playerName = serverPlayerName(
                 link, self.appSettings.bedrockUsernamePrefix
             )
-            output = await _rcon(buildSpawnCommand(playerName, destination))
+            try:
+                destination = cfg.rescueDestination()
+            except ValueError:
+                # The plugin reads the authoritative live world spawn when the
+                # optional operator override is intentionally left unset.
+                output = await _rcon(buildAutomaticSpawnCommand(playerName))
+                destinationLabel = "world spawn"
+            else:
+                output = await _rcon(buildSpawnCommand(playerName, destination))
+                destinationLabel = "configured spawn"
             await asyncio.to_thread(
                 self.diaryStore.record,
                 "rescue",
-                f"{playerName} returned to configured spawn.",
+                f"{playerName} returned to {destinationLabel}.",
                 interaction.user.id,
             )
             await interaction.followup.send(
@@ -273,9 +313,10 @@ class Friend(commands.Cog):
             playerName = serverPlayerName(
                 link, self.appSettings.bedrockUsernamePrefix
             )
+            playerTarget = buildPlayerSelector(playerName)
             positionOutput, dimensionOutput = await asyncio.gather(
-                _rcon(f"data get entity {playerName} Pos"),
-                _rcon(f"data get entity {playerName} Dimension"),
+                _rcon(f"data get entity {playerTarget} Pos"),
+                _rcon(f"data get entity {playerTarget} Dimension"),
             )
             dimension, x, y, z = parsePosition(positionOutput, dimensionOutput)
             await interaction.followup.send(
@@ -706,9 +747,10 @@ class Friend(commands.Cog):
             playerName = serverPlayerName(
                 link, self.appSettings.bedrockUsernamePrefix
             )
+            playerTarget = buildPlayerSelector(playerName)
             positionOutput, dimensionOutput = await asyncio.gather(
-                _rcon(f"data get entity {playerName} Pos"),
-                _rcon(f"data get entity {playerName} Dimension"),
+                _rcon(f"data get entity {playerTarget} Pos"),
+                _rcon(f"data get entity {playerTarget} Dimension"),
             )
             dimension, x, y, z = parsePosition(positionOutput, dimensionOutput)
             place, previous = await asyncio.to_thread(

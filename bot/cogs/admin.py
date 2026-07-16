@@ -31,7 +31,8 @@ from bot.backup_settings import SettingsStore
 from bot.control_panel import AdminDashboardView, LogPanelView, PlayerPanelView
 from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
-from bot.player_info import parseOnlinePlayers, summarizeInventory, validatePlayerName
+from bot.player_info import parseOnlinePlayers, summarizeInventory
+from bot.player_names import buildPlayerSelector, validateServerPlayerName
 from bot.performance_report import parseTps, shouldAlert
 from bot.public_panel import PublicServerView
 from bot.rcon import (
@@ -1564,9 +1565,22 @@ class Admin(commands.Cog):
             f"{mark} 서버 {action}: `{(output or 'done')[:1400]}`", ephemeral=True
         )
 
+    async def panelToggleSpawnProtection(self, interaction: discord.Interaction) -> None:
+        """Toggle the bundled plugin's persistent safe-zone setting through RCON."""
+        try:
+            output = await _rcon("spawnprotection toggle")
+            await self._audit(interaction, "spawn-protection.toggle", "success", output)
+            await interaction.followup.send(
+                f"🛡️ `{output.strip() or 'spawn protection toggled'}`", ephemeral=True
+            )
+        except RconError as error:
+            await self._audit(interaction, "spawn-protection.toggle", "failed", str(error))
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
     async def panelPlayerEmbed(self, player: str, detailType: str) -> discord.Embed:
         """Query a selected player's allowed read-only entity fields through RCON."""
-        validatePlayerName(player)
+        safePlayer = validateServerPlayerName(player)
+        playerTarget = buildPlayerSelector(safePlayer)
         titleMap = {
             "inventory": "🎒 인벤토리",
             "position": "🧭 위치",
@@ -1575,20 +1589,20 @@ class Admin(commands.Cog):
         }
         try:
             if detailType == "inventory":
-                output = await _rcon(f"data get entity {player} Inventory")
+                output = await _rcon(f"data get entity {playerTarget} Inventory")
                 description = summarizeInventory(output)
             elif detailType == "position":
                 position, dimension = await asyncio.gather(
-                    _rcon(f"data get entity {player} Pos"),
-                    _rcon(f"data get entity {player} Dimension"),
+                    _rcon(f"data get entity {playerTarget} Pos"),
+                    _rcon(f"data get entity {playerTarget} Dimension"),
                 )
                 description = f"**좌표**\n`{position[:800]}`\n**차원**\n`{dimension[:500]}`"
             elif detailType == "stats":
                 health, food, level, mode = await asyncio.gather(
-                    _rcon(f"data get entity {player} Health"),
-                    _rcon(f"data get entity {player} foodLevel"),
-                    _rcon(f"data get entity {player} XpLevel"),
-                    _rcon(f"data get entity {player} playerGameType"),
+                    _rcon(f"data get entity {playerTarget} Health"),
+                    _rcon(f"data get entity {playerTarget} foodLevel"),
+                    _rcon(f"data get entity {playerTarget} XpLevel"),
+                    _rcon(f"data get entity {playerTarget} playerGameType"),
                 )
                 description = (
                     f"**체력** `{health[:300]}`\n**허기** `{food[:300]}`\n"
@@ -1596,7 +1610,7 @@ class Admin(commands.Cog):
                 )
             elif detailType == "effects":
                 description = discordPreview(
-                    await _rcon(f"data get entity {player} active_effects"), 1500
+                    await _rcon(f"data get entity {playerTarget} active_effects"), 1500
                 )
             else:
                 raise ValueError("Unknown player detail type")
@@ -1619,6 +1633,8 @@ class Admin(commands.Cog):
             return Path(currentPath)
         if source == "server":
             return Path(cfg.server_dir) / "logs" / "latest.log"
+        if source == "chat":
+            return Path(cfg.server_dir) / "plugins" / "RaspiMcOps" / "chat.log"
         raise ValueError("Unknown log source")
 
     async def panelLogEmbed(self, source: str, errorsOnly: bool = False) -> discord.Embed:
@@ -1629,9 +1645,11 @@ class Admin(commands.Cog):
             if errorsOnly:
                 text = filterImportant(text)
             preview = discordPreview(text)
-            title = "⚠️ 최근 경고·오류" if errorsOnly else (
-                "🤖 봇 로그" if source == "bot" else "⛏️ 마인크래프트 로그"
-            )
+            title = "⚠️ 최근 경고·오류" if errorsOnly else {
+                "bot": "🤖 봇 로그",
+                "server": "⛏️ 마인크래프트 로그",
+                "chat": "💬 게임 채팅 로그",
+            }[source]
             return discord.Embed(
                 title=title,
                 description=f"`{path}`\n```\n{preview}\n```",
