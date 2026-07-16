@@ -148,6 +148,13 @@ class AdminDashboardView(OwnerView):
             embed=self.controller.panelHelpEmbed(), ephemeral=True
         )
 
+    @discord.ui.button(label="스폰 보호", emoji="🛡️", style=discord.ButtonStyle.secondary, row=3)
+    async def spawnProtection(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelToggleSpawnProtection(interaction)
+
 
 class IncidentActionsView(OwnerView):
     """One-click emergency shortcuts for common small-server accidents."""
@@ -554,7 +561,7 @@ class TextActionModal(discord.ui.Modal):
         self.add_item(self.value)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await self.controller.panelTextAction(interaction, self.action, str(self.value))
+        await self.controller.panelTextAction(interaction, self.action, self.value.value)
 
 
 class AdvancedPanelView(OwnerView):
