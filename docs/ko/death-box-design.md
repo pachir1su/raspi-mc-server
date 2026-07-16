@@ -82,12 +82,31 @@ Release ZIP에는 플러그인이 `bundled-plugins/DeathBox.jar`로 포함되며
 
 ```yaml
 enabled: true
-container: double-chest   # double-chest | chest | barrel
-search-radius: 4          # 제한 범위, 1~8로 clamp
-expire-hours: 0           # 0이면 만료하지 않음
+container: double-chest          # double-chest | chest | barrel
+search-radius: 4                 # 제한 범위, 1~8로 clamp
+expire-hours: 72                 # 0이면 만료하지 않음(기본 72시간)
+max-physical-boxes-per-player: 3 # 1인당 물리 상자 상한(0이면 무제한)
 friends-can-open: false
 fallback-virtual-box: true
+messages:                        # 플레이어에게 보이는 문구(전부 한국어 기본값)
+  death.stored: "§6[데스박스] §f아이템을 §e{x}, {y}, {z} ..."
+  # 생략한 키는 플러그인 내장 한국어 기본값을 사용합니다.
 ```
+
+메시지는 전부 한국어가 기본값입니다(#60). `messages:` 아래 키를 덮어써서
+문구를 바꾸거나 번역할 수 있고, `{중괄호}` 자리표시자와 `§`색상 코드는
+그대로 두면 됩니다. 생략한 키는 내장 기본값을 씁니다.
+
+### 악용 방지(#65)
+
+한 사람이 남의 집 앞에서 반복해서 죽어 부술 수 없는 상자를 깔아버리는 것을
+막기 위해 두 가지를 둡니다.
+
+- `max-physical-boxes-per-player`: 1인당 활성 **물리(블록) 상자** 상한(기본 3).
+  상한에 도달한 뒤의 사망은 블록을 놓지 않고 **가상 상자**로 보관되어
+  관리자가 `/deathbox recover`로 돌려줍니다. 블록이 무한히 쌓이지 않습니다.
+- `expire-hours`: 기본 72시간으로 오래된 상자가 매시간 정리됩니다.
+- 빈 상자는 이전부터 열어서 비우면 즉시 자동 제거됩니다.
 
 ## 명령
 
