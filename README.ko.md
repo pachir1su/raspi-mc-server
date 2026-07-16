@@ -91,6 +91,12 @@ sudo systemctl enable minecraft.service mc-discord-bot.service
 
 ## 문서
 
+외부 이미지의 출처와 라이선스는 [이미지 출처 문서](docs/assets/ATTRIBUTION.md)에
+기록합니다.
+
+게임플레이 안내는 Geyser로 접속한 Bedrock 플레이어도 포함해 서버 측 Java/Paper 26.1
+규칙을 기준으로 합니다.
+
 | 주제 | 한국어 | English |
 |---|---|---|
 | 무화면 SD카드 → 서버 가동 | [헤드리스 전체 설치](docs/ko/headless-setup.md) | [headless setup](docs/en/headless-setup.md) |
@@ -100,6 +106,14 @@ sudo systemctl enable minecraft.service mc-discord-bot.service
 | 치트와 관리자 | [치트와 관리자](docs/ko/cheats-and-ops.md) | [cheats-and-ops](docs/en/cheats-and-ops.md) |
 | 디스코드 봇 | [디스코드 봇](docs/ko/discord-bot.md) | [discord-bot](docs/en/discord-bot.md) |
 | 친구 연동·구조·일지 | [친구 도구](docs/ko/friend-tools.md) | [friend-tools](docs/en/friend-tools.md) |
+| 인챈트 | [인챈트](docs/ko/enchantments.md) | [enchantments](docs/en/enchantments.md) |
+| 상태 효과 | [상태 효과](docs/ko/status-effects.md) | [status effects](docs/en/status-effects.md) |
+| 양조법 | [양조법](docs/ko/brewing.md) | [brewing](docs/en/brewing.md) |
+| 주민 거래 | [주민 거래](docs/ko/villager-trading.md) | [villager trading](docs/en/villager-trading.md) |
+| 광물과 자원 | [광물과 자원](docs/ko/ores-and-resources.md) | [ores and resources](docs/en/ores-and-resources.md) |
+| 농사와 사육 | [농사와 사육](docs/ko/farming-and-breeding.md) | [farming and breeding](docs/en/farming-and-breeding.md) |
+| 음식과 허기 | [음식과 허기](docs/ko/food.md) | [food](docs/en/food.md) |
+| 서버 전용 기능 | [서버 전용 기능](docs/ko/server-features.md) | [server features](docs/en/server-features.md) |
 | Death Box 플러그인 | [Death Box 설계](docs/ko/death-box-design.md) | [death-box-design](docs/en/death-box-design.md) |
 | Paper 운영 플러그인 | [Paper 운영 플러그인](docs/ko/paper-ops-plugin.md) | [paper-ops-plugin](docs/en/paper-ops-plugin.md) |
 | 원격 접속(RCON / Cloudflare) | [원격 접속](docs/ko/remote-access.md) | [remote-access](docs/en/remote-access.md) |

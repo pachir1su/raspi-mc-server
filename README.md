@@ -94,6 +94,12 @@ Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
 
 ## Documentation
 
+Third-party image sources and licenses are recorded in
+[image attribution](docs/assets/ATTRIBUTION.md).
+
+Gameplay guides use the server-side Java/Paper 26.1 rules, including for Bedrock
+players connected through Geyser.
+
 | Topic | English | 한국어 |
 |---|---|---|
 | Headless SD card → running server | [headless setup](docs/en/headless-setup.md) | [무화면 전체 설치](docs/ko/headless-setup.md) |
@@ -103,6 +109,14 @@ Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
 | Cheats & operators | [cheats-and-ops](docs/en/cheats-and-ops.md) | [치트와 관리자](docs/ko/cheats-and-ops.md) |
 | Discord bot | [discord-bot](docs/en/discord-bot.md) | [디스코드 봇](docs/ko/discord-bot.md) |
 | Friend links, rescue & journal | [friend-tools](docs/en/friend-tools.md) | [친구 도구](docs/ko/friend-tools.md) |
+| Enchantments | [enchantments](docs/en/enchantments.md) | [인챈트](docs/ko/enchantments.md) |
+| Status effects | [status effects](docs/en/status-effects.md) | [상태 효과](docs/ko/status-effects.md) |
+| Brewing | [brewing](docs/en/brewing.md) | [양조법](docs/ko/brewing.md) |
+| Villager trading | [villager trading](docs/en/villager-trading.md) | [주민 거래](docs/ko/villager-trading.md) |
+| Ores & resources | [ores and resources](docs/en/ores-and-resources.md) | [광물과 자원](docs/ko/ores-and-resources.md) |
+| Farming & breeding | [farming and breeding](docs/en/farming-and-breeding.md) | [농사와 사육](docs/ko/farming-and-breeding.md) |
+| Food & hunger | [food](docs/en/food.md) | [음식과 허기](docs/ko/food.md) |
+| Server-specific player features | [server features](docs/en/server-features.md) | [서버 전용 기능](docs/ko/server-features.md) |
 | Death Box plugin | [death-box-design](docs/en/death-box-design.md) | [Death Box 설계](docs/ko/death-box-design.md) |
 | Paper operations plugin | [paper-ops-plugin](docs/en/paper-ops-plugin.md) | [Paper 운영 플러그인](docs/ko/paper-ops-plugin.md) |
 | Remote access (RCON / Cloudflare) | [remote-access](docs/en/remote-access.md) | [원격 접속](docs/ko/remote-access.md) |
