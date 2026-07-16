@@ -18,20 +18,25 @@ public final class RaspiMcOpsPlugin extends JavaPlugin {
     );
 
     private SpawnProtectionService spawnProtection;
+    private ContainerLockService containerLock;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         spawnProtection = new SpawnProtectionService(this);
+        containerLock = new ContainerLockService(this);
         Bukkit.getPluginManager().registerEvents(new ChatLogService(this), this);
         Bukkit.getPluginManager().registerEvents(spawnProtection, this);
+        Bukkit.getPluginManager().registerEvents(containerLock, this);
 
         requireCommand("raspiops").setExecutor(this);
         requireCommand("spawnprotection").setExecutor(this);
+        requireCommand("chestlock").setExecutor(this);
         getLogger().info(
-            "RaspiMcOps enabled: chat log=%s, %s".formatted(
+            "RaspiMcOps enabled: chat log=%s, %s, %s".formatted(
                 getConfig().getBoolean("chat-log.enabled", true),
-                spawnProtection.status()
+                spawnProtection.status(),
+                containerLock.status()
             )
         );
     }
@@ -55,6 +60,7 @@ public final class RaspiMcOpsPlugin extends JavaPlugin {
             return switch (command.getName().toLowerCase(Locale.ROOT)) {
                 case "raspiops" -> handleRaspiOps(sender, args);
                 case "spawnprotection" -> spawnProtection.handleCommand(sender, args);
+                case "chestlock" -> containerLock.handleCommand(sender, args);
                 default -> false;
             };
         } catch (RuntimeException error) {

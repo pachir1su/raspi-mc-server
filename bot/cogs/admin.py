@@ -1359,6 +1359,14 @@ class Admin(commands.Cog):
             inline=False,
         )
         embed.add_field(
+            name="월드 보호 토글",
+            value=(
+                "**스폰 보호**: 스폰 주변 파괴·설치·공격 차단 켜기/끄기\n"
+                "**상자 잠금**: 설치한 사람만 자기 상자를 열 수 있게 켜기/끄기"
+            ),
+            inline=False,
+        )
+        embed.add_field(
             name="주의가 필요한 버튼",
             value=(
                 "**긴급 복구**는 긴급 작업, **고급 도구**는 공지·RCON·허용목록용입니다. "
@@ -1575,6 +1583,18 @@ class Admin(commands.Cog):
             )
         except RconError as error:
             await self._audit(interaction, "spawn-protection.toggle", "failed", str(error))
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    async def panelToggleChestLock(self, interaction: discord.Interaction) -> None:
+        """Toggle the bundled plugin's persistent container-lock setting through RCON."""
+        try:
+            output = await _rcon("chestlock toggle")
+            await self._audit(interaction, "chest-lock.toggle", "success", output)
+            await interaction.followup.send(
+                f"🔒 `{output.strip() or 'chest lock toggled'}`", ephemeral=True
+            )
+        except RconError as error:
+            await self._audit(interaction, "chest-lock.toggle", "failed", str(error))
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
     async def panelPlayerEmbed(self, player: str, detailType: str) -> discord.Embed:

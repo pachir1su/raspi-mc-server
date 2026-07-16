@@ -99,12 +99,15 @@ fallback-virtual-box: true
 |---|---|---|
 | `/deathbox locate` | box owner | Show the player's newest box coordinates. |
 | `/deathbox list` | box owner | List that player's active boxes. |
+| `/deathbox locate <player>` | admin / console | Look up another player's newest box. |
+| `/deathbox list <player>` | admin / console | List another player's active boxes. |
 | `/deathbox recover <id>` | admin | Recover a virtual fallback box into your inventory. |
 | `/deathbox purge <id> confirm` | admin | Delete a box after explicit confirmation. |
 
 Permissions: `deathbox.use` (default: all), `deathbox.friend` (default: none),
-`deathbox.admin` (default: op). Discord may later expose **read-only** box
-locations; creation, capture, recovery, and deletion stay inside the plugin.
+`deathbox.admin` (default: op). The Discord `/my-tools` panel exposes
+**Locate death box** and **List death boxes** buttons that call the console
+form (`deathbox locate/list <player>`) via RCON.
 
 ## Verification checklist (run on a real server)
 

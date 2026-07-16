@@ -90,12 +90,14 @@ fallback-virtual-box: true
 |---|---|---|
 | `/deathbox locate` | 상자 소유자 | 자신의 최신 상자 좌표 표시. |
 | `/deathbox list` | 상자 소유자 | 자신의 활성 상자 목록 표시. |
+| `/deathbox locate <플레이어>` | 관리자 / 콘솔 | 다른 플레이어의 최신 상자 조회. |
+| `/deathbox list <플레이어>` | 관리자 / 콘솔 | 다른 플레이어의 활성 상자 목록. |
 | `/deathbox recover <id>` | 관리자 | 가상 대체 상자를 인벤토리로 복구. |
 | `/deathbox purge <id> confirm` | 관리자 | 명시적 확인 후 상자 삭제. |
 
 권한: `deathbox.use`(기본: 전체), `deathbox.friend`(기본: 없음),
-`deathbox.admin`(기본: op). Discord에는 나중에 상자 좌표를 **읽기 전용**으로만 노출할
-수 있으며, 생성·캡처·복구·삭제는 플러그인 내부에 유지합니다.
+`deathbox.admin`(기본: op). Discord `/내도구` 패널의 **데스박스 찾기**·**데스박스
+목록** 버튼이 콘솔 형식(`deathbox locate/list <플레이어>`)을 RCON으로 호출합니다.
 
 ## 검증 체크리스트(실서버에서 확인)
 

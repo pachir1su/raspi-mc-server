@@ -1,5 +1,7 @@
 package io.github.pachir1su.deathbox;
 
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -9,6 +11,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /** /deathbox locate | list | recover &lt;id&gt; | purge &lt;id&gt; confirm */
@@ -24,8 +27,8 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "help" : args[0].toLowerCase();
         switch (sub) {
-            case "locate" -> locate(sender);
-            case "list" -> list(sender);
+            case "locate" -> locate(sender, args);
+            case "list" -> list(sender, args);
             case "recover" -> recover(sender, args);
             case "purge" -> purge(sender, args);
             default -> sender.sendMessage("§6[DeathBox] §f/deathbox <locate|list|recover|purge>");
@@ -33,32 +36,48 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void locate(CommandSender sender) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("§6[DeathBox] §cOnly players have death boxes.");
-            return;
+    private UUID resolveOwner(CommandSender sender, String[] args) {
+        if (args.length >= 2) {
+            if (!sender.hasPermission("deathbox.admin")) {
+                deny(sender);
+                return null;
+            }
+            OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+            if (!target.hasPlayedBefore() && !target.isOnline()) {
+                sender.sendMessage("§6[DeathBox] §cPlayer §e" + args[1] + "§c not found.");
+                return null;
+            }
+            return target.getUniqueId();
         }
-        List<BoxRecord> boxes = plugin.index().ownedBy(player.getUniqueId());
-        if (boxes.isEmpty()) {
-            player.sendMessage("§6[DeathBox] §fYou have no active death boxes.");
-            return;
+        if (sender instanceof Player player) {
+            return player.getUniqueId();
         }
-        player.sendMessage("§6[DeathBox] §fNewest box: " + describe(boxes.get(0)));
+        sender.sendMessage("§6[DeathBox] §fUsage from console: /deathbox locate <player>");
+        return null;
     }
 
-    private void list(CommandSender sender) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("§6[DeathBox] §cOnly players have death boxes.");
-            return;
-        }
-        List<BoxRecord> boxes = plugin.index().ownedBy(player.getUniqueId());
+    private void locate(CommandSender sender, String[] args) {
+        UUID owner = resolveOwner(sender, args);
+        if (owner == null) return;
+        List<BoxRecord> boxes = plugin.index().ownedBy(owner);
         if (boxes.isEmpty()) {
-            player.sendMessage("§6[DeathBox] §fYou have no active death boxes.");
+            sender.sendMessage("§6[DeathBox] §fNo active death boxes.");
             return;
         }
-        player.sendMessage("§6[DeathBox] §fYour boxes (" + boxes.size() + "):");
+        sender.sendMessage("§6[DeathBox] §fNewest box: " + describe(boxes.get(0)));
+    }
+
+    private void list(CommandSender sender, String[] args) {
+        UUID owner = resolveOwner(sender, args);
+        if (owner == null) return;
+        List<BoxRecord> boxes = plugin.index().ownedBy(owner);
+        if (boxes.isEmpty()) {
+            sender.sendMessage("§6[DeathBox] §fNo active death boxes.");
+            return;
+        }
+        sender.sendMessage("§6[DeathBox] §fBoxes (" + boxes.size() + "):");
         for (BoxRecord box : boxes) {
-            player.sendMessage("  §7- §e" + box.id + " §f" + describe(box));
+            sender.sendMessage("  §7- §e" + box.id + " §f" + describe(box));
         }
     }
 
@@ -147,6 +166,10 @@ final class DeathBoxCommand implements CommandExecutor, TabCompleter {
                 subs.add("purge");
             }
             return prefix(subs, args[0]);
+        }
+        if (args.length == 2 && sender.hasPermission("deathbox.admin")
+                && (args[0].equalsIgnoreCase("locate") || args[0].equalsIgnoreCase("list"))) {
+            return null; // default to online player names
         }
         if (args.length == 2 && sender.hasPermission("deathbox.admin")
                 && (args[0].equalsIgnoreCase("recover") || args[0].equalsIgnoreCase("purge"))) {
