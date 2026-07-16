@@ -110,7 +110,7 @@ fallback-virtual-box: true
 | `/deathbox purge <id> confirm` | admin | Delete a box after explicit confirmation. |
 
 Permissions: `deathbox.use` (default: all), `deathbox.friend` (default: none),
-`deathbox.admin` (default: op). The Discord `/my-tools` panel exposes
+`deathbox.admin` (default: op). The Discord `/tools` panel exposes
 **Locate death box** and **List death boxes** buttons that call the console
 form (`deathbox locate/list <player>`) via RCON.
 

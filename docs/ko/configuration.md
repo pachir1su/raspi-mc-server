@@ -11,7 +11,7 @@
 
 ```dotenv
 MC_PUBLIC_VERSION="Paper Java 26.1.x"
-MC_PUBLIC_RULES="Respect builds and items; ask the operator when something breaks."
+MC_PUBLIC_ADDRESS="play.example.com"
 ```
 
 Git에 추적되는 `.env`에는 플레이스홀더만 두세요. 실제 비밀값은 Pi의 운영용

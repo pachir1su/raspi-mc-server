@@ -298,7 +298,6 @@ MC_REQUIRE_STORAGE_MOUNT=true
 MC_STATE_DIR=/mnt/minecraft/bot-state
 MC_PUBLIC_ADDRESS=<public address or IP given to friends>
 MC_PUBLIC_VERSION="Paper Java 26.1.x + Bedrock"
-MC_PUBLIC_RULES="Respect builds and items; tell the operator when something breaks."
 ```
 
 Initially place only the owner in `ADMIN_USER_IDS`. See
@@ -415,7 +414,7 @@ the same friend uses multiple PC and mobile/console profiles. There is no friend
 request or approval queue.
 
 Registration also adds the correct Java/Floodgate whitelist entry. Friends
-select one assigned account in `/my-tools` before using **Selected account:
+select one assigned account in `/tools` before using **Selected account:
 spawn** or **Selected account: location**.
 
 Floodgate documents that `fwhitelist` can resolve a gamertag only after that Xbox

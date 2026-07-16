@@ -7,7 +7,7 @@ the service, back up the world, and pull logs — all from Discord.
 ## Why a bot?
 
 - Manage the server from your phone without SSH.
-- `/admin` → **Advanced tools** → **Advanced RCON** is your remote cheat console (op level 4).
+- `/admin` → **Advanced tools** → **In-game command** is your remote cheat console (op level 4).
 - Slow actions (backup, restart) show a **loading animation** so you get
   feedback instead of a frozen "thinking…".
 - `/admin` → **Logs** previews or attaches the current log for quick debugging.
@@ -44,14 +44,9 @@ RCON_PASSWORD=matches-server.properties
 MC_SERVICE_NAME=minecraft.service
 PUBLIC_COMMANDS_ENABLED=true
 MC_STATE_DIR=/mnt/minecraft/bot-state
-MC_SPAWN_DIMENSION=overworld
-MC_SPAWN_X=0.5
-MC_SPAWN_Y=80
-MC_SPAWN_Z=0.5
 MC_MAP_URL_TEMPLATE=https://map.example.com/?world={dimension}&x={x}&y={y}&z={z}
 MC_PUBLIC_ADDRESS=play.example.com
 MC_PUBLIC_VERSION="Paper Java 26.1.x"
-MC_PUBLIC_RULES="Respect builds and items; tell the operator when something breaks."
 STATUS_CHANNEL_ID=123456789012345678
 ALERT_TPS_THRESHOLD=18.0
 ALERT_MEMORY_PERCENT=85
@@ -81,20 +76,21 @@ internal to the panels, so Discord's command picker stays short.
 
 The first-run language controls bot responses and status text. Discord slash
 command names follow each user's **Discord client language**. Korean clients see
-`/서버`, `/관리자`, `/내도구`, `/도움말`, and `/업로드`; English clients see the canonical
+`/서버`, `/관리자`, `/도구`, `/도움말`, and `/업로드`; English clients see the canonical
 names below.
 
 | Command | What it does |
 |---|---|
 | `/server` | Friend-safe access information, online players, and refresh buttons. |
-| `/admin` | Private owner dashboard for service, players, backups, worlds, updates, logs, storage, performance, incidents, direct multi-account assignment, admin-only help, and advanced tools. |
-| `/my-tools` | Private self-service panel for selecting an assigned account, rescue, location, score, coordinates, and diary. |
+| `/admin` | Private owner dashboard for service, player management (inspection plus give/effects/enchant/gamemode/teleport/XP/heal/kick), backups, worlds, updates, logs, storage, performance, quick commands (time/weather/difficulty/gamerules/set spawn), direct multi-account assignment, admin-only help, and advanced tools. |
+| `/tools` | Private self-service panel for selecting an assigned account, rescue, location, score, coordinates, diary, and death boxes. |
 | `/help` | Friend-safe explanation of the public commands without exposing owner controls. |
 | `/upload world/update/place-photo/diary` | Attachment-only flows that Discord buttons cannot provide. World/update remain admin-only; friend media still checks link ownership. |
 
 Destructive backup/world/service actions require a second confirmation button.
 Text modals appear only where text is inherent: player name, coordinate name,
-diary text, announcements, raw RCON, and whitelist names.
+diary text, announcements, item names, the in-game command console, and
+whitelist names.
 
 See [backup.md](backup.md) for the complete retention and file-safety model.
 See [friend-tools.md](friend-tools.md) for exact Pi configuration, approval flow,
@@ -104,7 +100,7 @@ runtime files, command examples, and troubleshooting.
 
 Run `/admin` once, then use buttons without typing command arguments. The
 first screen keeps only the everyday buttons (refresh, players, server
-control, backups, emergency recovery, health, friend accounts, help); the
+control, backups, quick commands, health, friend accounts, help); the
 **More** button opens the second tier with performance, lag analysis, logs,
 storage, worlds, updates, advanced tools, and the protection toggles.
 Everything below stays reachable:
@@ -116,7 +112,14 @@ Everything below stays reachable:
 - toggling automatic backups
 - imported-world selection, update status, storage, and health diagnostics
 - Pi temperature, memory, TPS, undervoltage, throttle metrics, and tuning report
-- emergency buttons for day, weather, peaceful difficulty, and dropped-item cleanup. Dropped-item cleanup asks for confirmation because it can delete friends' items.
+- quick commands: time (day/night/freeze), weather (clear/rain/thunder/lock),
+  four difficulty levels, gamerule toggles (keep inventory, mob griefing,
+  immediate respawn, natural regeneration, days played), spawn placement
+  (from a player's position or typed coordinates), and dropped-item cleanup.
+  Dropped-item cleanup asks for confirmation because it can delete friends' items.
+- player quick actions: give items (Korean aliases supported), potion effects,
+  enchants, gamemode, teleport (player/place/spawn), XP, heal, and kick (with
+  confirmation). Effect and enchant dropdowns include a free-input option.
 - the live-player and account-link selectors
 - bot, Minecraft, and event-driven player-chat log controls
 - persistent Paper spawn-protection toggle
@@ -125,15 +128,20 @@ The ephemeral panel is visible only to the administrator who opened it and
 expires after ten minutes. Callback failures produce a visible error instead of
 leaving an apparently dead button.
 
-## Player inspection
+## Player management (inspection + actions)
 
 The `/admin` dashboard **Players** button builds a dropdown from Paper's
-current `list` output. After selecting a player, buttons show:
+current `list` output. After selecting a player, inspection buttons show:
 
 - **Inventory** — hotbar, normal slots, armour, offhand item, and counts
 - **Position** — coordinates and dimension
 - **Health/XP** — health, food, experience level, and game mode
 - **Effects** — current active-effect data
+
+Action buttons (all audited): give item (Korean alias or English ID with typo
+suggestions), potion effects and enchants (common presets plus free input),
+gamemode, teleport to another player / a saved place / spawn, XP +10/+30,
+heal, and kick (with confirmation).
 
 Names are sourced from the live list and validated again as Java or dot-prefixed Floodgate usernames, so
 they cannot be turned into arbitrary RCON input.

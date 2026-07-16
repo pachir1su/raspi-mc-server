@@ -19,10 +19,12 @@ The Discord `/admin` → **Logs** panel can preview or download this file.
 
 ## Automatic rescue spawn
 
-`MC_SPAWN_X/Y/Z` remain an optional operator override. When they are blank, the
-Discord rescue button calls the plugin's narrow `raspiops rescue` command. The
-plugin resolves one exact validated online player name and teleports only that
-player to Paper's live primary-world spawn.
+The Discord rescue button always calls the plugin's narrow `raspiops rescue`
+command. The plugin resolves one exact validated online player name and
+teleports only that player to Paper's live primary-world spawn. The spawn point
+itself is moved via `/admin` → **Quick commands** → **Set spawn**, and always
+matches the on-death respawn location. (The old `MC_SPAWN_X/Y/Z` coordinate
+override was removed because it let the two locations drift apart.)
 
 ## Spawn safe zone
 

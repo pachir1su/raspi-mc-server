@@ -11,7 +11,7 @@ spaces or shell-special characters such as `;` must be enclosed in double quotes
 
 ```dotenv
 MC_PUBLIC_VERSION="Paper Java 26.1.x"
-MC_PUBLIC_RULES="Respect builds and items; ask the operator when something breaks."
+MC_PUBLIC_ADDRESS="play.example.com"
 ```
 
 Keep the tracked `.env` limited to placeholders. Put real secrets only in the Pi's

@@ -25,6 +25,7 @@ from bot import log
 from bot import BRAND_BLUE, OK_GREEN, WARN_YELLOW, ERR_RED, userTag
 from bot.audit import AuditLog
 from bot.config import cfg
+from bot.error_text import describeError
 from bot.i18n import t
 from bot.internal_actions import InternalActionGroup, internalAction
 from bot.backup_settings import SettingsStore
@@ -34,7 +35,34 @@ from bot.loading import animate_while
 from bot.player_info import parseOnlinePlayers, summarizeInventory
 from bot.player_names import buildPlayerSelector, validateServerPlayerName
 from bot.performance_report import parseTps, shouldAlert
+from bot.places import PlaceStore
 from bot.public_panel import PublicServerView
+from bot.quick_commands import (
+    COMMON_EFFECTS,
+    DEFAULT_ON_GAMERULES,
+    DIFFICULTIES,
+    GAMEMODES,
+    GAMERULES,
+    SPAWN_RADIUS_ZERO_COMMAND,
+    buildDifficultyCommand,
+    buildEffectClearCommand,
+    buildEffectCommand,
+    buildEnchantCommand,
+    buildGamemodeCommand,
+    buildGameruleQueryCommand,
+    buildGameruleSetCommand,
+    buildGiveCommand,
+    buildHealCommands,
+    buildKickCommand,
+    buildTeleportToCoordsCommand,
+    buildTeleportToPlayerCommand,
+    buildWorldSpawnCommand,
+    buildXpCommand,
+    ensureServerAccepted,
+    parseDaysPlayed,
+    parseGameruleValue,
+)
+from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.rcon import (
     Rcon,
     RconAuthError,
@@ -138,6 +166,8 @@ class Admin(commands.Cog):
             cfg.storage_root, cfg.server_dir, cfg.require_storage_mount
         )
         self.updateStore = UpdateStore(cfg.state_dir, cfg.storage_root)
+        # 접속자 관리의 TP 버튼이 공유 좌표북을 읽습니다(쓰기는 친구 cog 담당).
+        self.placeStore = PlaceStore(cfg.state_dir)
         self.operationLock = asyncio.Lock()
         self.lastAlertAt: dict[str, datetime] = {}
 
@@ -210,11 +240,42 @@ class Admin(commands.Cog):
         """Start the persistent in-bot scheduler after the cog is ready."""
         self.backupScheduler.start()
         self.performanceAlerts.start()
+        # 운영자 기본값: 즉시 리스폰·자연 재생·플레이 일수 표시를 켠 채로
+        # 시작합니다. 서버가 아직 안 떠 있을 수 있어 백그라운드에서 재시도.
+        self._defaultGamerulesTask = asyncio.create_task(self._applyDefaultGamerules())
 
     def cog_unload(self):
         """Stop scheduler polling when the extension unloads."""
         self.backupScheduler.cancel()
         self.performanceAlerts.cancel()
+        if getattr(self, "_defaultGamerulesTask", None):
+            self._defaultGamerulesTask.cancel()
+
+    async def _applyDefaultGamerules(self):
+        """Turn the requested default-ON gamerules on once RCON is reachable.
+
+        [유지보수 안내] 기본 ON 목록은 bot/quick_commands.py의
+        DEFAULT_ON_GAMERULES 입니다. showDaysPlayed처럼 구버전 마인크래프트에
+        없는 게임룰은 실패해도 봇을 막지 않고 경고 로그만 남깁니다.
+        이미 켜져 있으면 다시 켜도 부작용이 없어(멱등) 매 시작마다 실행합니다.
+        """
+        for attempt in range(30):  # 서버 기동을 기다리며 최대 30분 재시도
+            try:
+                await _rcon("list")
+                break
+            except RconError:
+                await asyncio.sleep(60)
+        else:
+            _log.warning("default gamerules skipped: RCON unreachable")
+            return
+        for gameruleKey in DEFAULT_ON_GAMERULES:
+            try:
+                ensureServerAccepted(
+                    await _rcon(buildGameruleSetCommand(gameruleKey, True))
+                )
+                _log.info("default gamerule applied: %s=true", gameruleKey)
+            except (ValueError, RconError) as error:
+                _log.warning("default gamerule %s failed: %s", gameruleKey, error)
 
     # A single guard applied to every command in this cog.
     async def cog_check(self, ctx):  # for prefix commands (unused)
@@ -419,11 +480,6 @@ class Admin(commands.Cog):
             value=", ".join(players) if players else t("online_none"),
             inline=False,
         )
-        embed.add_field(
-            name=t("portal_rules"),
-            value=cfg.public_rules or t("portal_rules_default"),
-            inline=False,
-        )
         embed.set_footer(text=statusText[:200])
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -439,7 +495,7 @@ class Admin(commands.Cog):
                 ephemeral=True,
             )
         except RconError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     # --- read-only ------------------------------------------------------
     @internalAction(description="Show whether the server is up and who is online.")
@@ -488,7 +544,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "server.say", "success")
         except RconError as e:
             await self._audit(interaction, "server.say", "failed", str(e))
-            await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(e)}", ephemeral=True)
 
     @internalAction(name="mc", description="Run ANY server command via RCON (owner cheat channel).")
     @app_commands.describe(command="e.g. gamemode creative YourName, time set day, give ...")
@@ -508,7 +564,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "server.command", "success", commandName)
         except RconError as e:
             await self._audit(interaction, "server.command", "failed", str(e))
-            await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(e)}", ephemeral=True)
 
     # --- whitelist ------------------------------------------------------
     whitelist = InternalActionGroup()
@@ -529,7 +585,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, f"whitelist.{action}", "success", name)
         except RconError as e:
             await self._audit(interaction, f"whitelist.{action}", "failed", str(e))
-            await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(e)}", ephemeral=True)
 
     # --- lifecycle (systemd) -------------------------------------------
     @internalAction(description="Start the Minecraft service.")
@@ -622,7 +678,7 @@ class Admin(commands.Cog):
                 "\n".join(lines) or "아직 백업이 없습니다.", ephemeral=True
             )
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="timeline", description="Show a compact backup timeline with ages and sizes.")
     async def backupTimeline(self, interaction: discord.Interaction):
@@ -647,7 +703,7 @@ class Admin(commands.Cog):
                 ephemeral=True,
             )
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="restore-preview", description="Verify and preview a backup before restoring it.")
     @app_commands.autocomplete(name=backupNameAutocomplete)
@@ -672,7 +728,7 @@ class Admin(commands.Cog):
                 ephemeral=True,
             )
         except StorageError as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="download", description="Download a backup if it fits Discord's limit.")
     @app_commands.autocomplete(name=backupNameAutocomplete)
@@ -681,7 +737,7 @@ class Admin(commands.Cog):
             path = self.storage.resolveBackup(name)
             await self._sendFile(interaction, path, "월드 백업")
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="delete", description="Delete one selected backup archive.")
     @app_commands.describe(confirm="Type DELETE to confirm permanent deletion")
@@ -696,7 +752,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "backup.delete", "success", name)
             _log.warning("backup delete by %s: %s", userTag(interaction.user), name)
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="restore", description="Restore a backup after an emergency snapshot.")
     @app_commands.describe(confirm="Type RESTORE to confirm stopping and replacing the live world")
@@ -741,7 +797,7 @@ class Admin(commands.Cog):
                 f"✅ `{name}` 백업이 손상 없이 온전합니다.\nSHA-256: `{digest}`", ephemeral=True
             )
         except StorageError as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="prune", description="Apply the saved retention policy immediately.")
     async def backupPrune(self, interaction: discord.Interaction):
@@ -754,7 +810,7 @@ class Admin(commands.Cog):
             )
             await self._audit(interaction, "backup.prune", "success", str(deletedCount))
         except (StorageError, RuntimeError, OSError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="settings", description="Show automatic backup and HDD settings.")
     async def backupSettings(self, interaction: discord.Interaction):
@@ -783,7 +839,7 @@ class Admin(commands.Cog):
                 description += "\n다음 백업: **일시 중지됨**"
             await interaction.response.send_message(embed=discord.Embed(title="백업 설정", description=description, color=BRAND_BLUE), ephemeral=True)
         except (StorageError, RuntimeError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="configure", description="Change the persistent automatic backup policy.")
     async def backupConfigure(
@@ -810,7 +866,7 @@ class Admin(commands.Cog):
             _log.warning("backup settings changed by %s", userTag(interaction.user))
             await self._audit(interaction, "backup.configure", "success", str(changes))
         except (ValueError, RuntimeError, OSError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="enabled", description="Enable or pause automatic backups.")
     async def backupEnabled(self, interaction: discord.Interaction, enabled: bool):
@@ -820,7 +876,7 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"✅ 자동 백업: **{'켜짐' if enabled else '꺼짐'}**", ephemeral=True)
             await self._audit(interaction, "backup.enabled", "success", str(enabled))
         except (ValueError, RuntimeError, OSError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     # --- uploaded maps --------------------------------------------------
     worldGroup = InternalActionGroup()
@@ -839,7 +895,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "world.upload", "success", targetPath.name)
         except (StorageError, OSError) as error:
             await self._audit(interaction, "world.upload", "failed", str(error))
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
         finally:
             uploadPath.unlink(missing_ok=True)
 
@@ -850,7 +906,7 @@ class Admin(commands.Cog):
             lines = [f"`{item.name}` — {self._formatBytes(item.size)}" for item in worlds[:20]]
             await interaction.response.send_message("\n".join(lines) or "업로드된 맵이 없습니다.", ephemeral=True)
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @worldGroup.command(name="activate", description="Back up the live world and switch to an imported map.")
     @app_commands.describe(confirm="Type ACTIVATE to confirm stopping and replacing the live world")
@@ -891,7 +947,7 @@ class Admin(commands.Cog):
             outputPath = await self.storage.exportWorld(name)
             await self._sendFile(interaction, outputPath, "저장된 맵", deferred=True)
         except StorageError as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
         finally:
             if outputPath:
                 outputPath.unlink(missing_ok=True)
@@ -909,7 +965,7 @@ class Admin(commands.Cog):
             _log.warning("world delete by %s: %s", userTag(interaction.user), name)
             await self._audit(interaction, "world.delete", "success", name)
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @internalAction(name="storage", description="Show HDD mount and free-space status.")
     async def storageStatus(self, interaction: discord.Interaction):
@@ -922,7 +978,7 @@ class Admin(commands.Cog):
                 ephemeral=True,
             )
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @internalAction(name="health", description="Check RCON, HDD, scheduler, and backup freshness.")
     async def health(self, interaction: discord.Interaction):
@@ -1008,7 +1064,7 @@ class Admin(commands.Cog):
                 embed.add_field(name="경고", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
         except (OSError, RuntimeError, ValueError) as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     # --- application updates -------------------------------------------
     updateGroup = InternalActionGroup()
@@ -1159,9 +1215,9 @@ class Admin(commands.Cog):
                 interaction, f"incident.{command.split()[0]}", "failed", str(error)
             )
             if interaction.response.is_done():
-                await interaction.followup.send(f"❌ {error}", ephemeral=True)
+                await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
             else:
-                await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+                await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @incidentGroup.command(name="day", description="Set the overworld time to day.")
     async def incidentDay(self, interaction: discord.Interaction):
@@ -1191,12 +1247,19 @@ class Admin(commands.Cog):
         await self._incidentCommand(interaction, "kill @e[type=item]", "incident_kill_items")
 
     async def publicServerEmbed(self) -> discord.Embed:
-        """Build the friend-safe server card shared by `/서버` panel refreshes."""
+        """Build the friend-safe server card shared by `/서버` panel refreshes.
+
+        이슈 #44/#45 개편: 규칙 문구 대신 친구가 실제로 궁금해하는
+        접속 주소·상태·접속자 이름·버전·플레이 일수를 보여줍니다.
+        """
         players = []
+        daysPlayed = None
         statusText = t("portal_offline")
         try:
             statusText = await _rcon("list")
             players = parseOnlinePlayers(statusText)
+            # 월드가 시작된 뒤 지난 게임 일수 — 서버 자랑 겸 근황 표시용.
+            daysPlayed = parseDaysPlayed(await _rcon("time query day"))
         except RconError:
             pass
         online = statusText != t("portal_offline")
@@ -1219,8 +1282,10 @@ class Admin(commands.Cog):
             inline=False,
         )
         embed.add_field(name=t("portal_version"), value=cfg.public_version, inline=True)
-        if cfg.public_rules:
-            embed.add_field(name=t("portal_rules"), value=cfg.public_rules, inline=False)
+        if daysPlayed is not None:
+            embed.add_field(
+                name=t("portal_days"), value=f"{daysPlayed:,}일차", inline=True
+            )
         return embed
 
     async def panelLegacyCommand(
@@ -1295,6 +1360,288 @@ class Admin(commands.Cog):
             raise ValueError("unsupported text action")
         await self.panelLegacyCommand(commandName, interaction, value)
 
+    # --- 접속자 관리 조작 버튼 (빠른 명령) ------------------------------
+    # 버튼 → 명령 대응은 bot/quick_commands.py의 빌더가 담당하고, 여기서는
+    # 실행 + 응답 검증 + 감사 기록 + 한글 안내만 합니다.
+    async def _quickPlayerAction(
+        self,
+        interaction: discord.Interaction,
+        commands: list[str],
+        auditAction: str,
+        successMessage: str,
+    ) -> None:
+        """Run one quick action (already deferred), verify, audit, and reply."""
+        try:
+            for command in commands:
+                ensureServerAccepted(await _rcon(command))
+            await self._audit(interaction, auditAction, "success", commands[-1][:200])
+            await interaction.followup.send(f"✅ {successMessage}", ephemeral=True)
+            _log.info("%s by %s", auditAction, userTag(interaction.user))
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, auditAction, "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelGiveItem(
+        self, interaction: discord.Interaction, playerName: str, rawItem: str, rawCount: str
+    ) -> None:
+        try:
+            command = buildGiveCommand(playerName, rawItem, rawCount)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        itemId, count = command.split()[-2:]
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.give",
+            f"`{playerName}` 에게 `{itemId.removeprefix('minecraft:')}` {count}개를 지급했습니다.",
+        )
+
+    async def panelApplyEffect(
+        self,
+        interaction: discord.Interaction,
+        playerName: str,
+        effectId: str,
+        seconds: int,
+        amplifier: int,
+    ) -> None:
+        try:
+            command = buildEffectCommand(playerName, effectId, seconds, amplifier)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        label = next(
+            (label for eid, label, _s, _a in COMMON_EFFECTS if eid == effectId.strip().lower()),
+            effectId.strip().lower(),
+        )
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.effect",
+            f"`{playerName}` 에게 **{label}** 효과를 {seconds // 60}분 적용했습니다.",
+        )
+
+    async def panelClearEffects(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            [buildEffectClearCommand(playerName)],
+            "player.effect_clear",
+            f"`{playerName}` 의 모든 포션 효과를 해제했습니다.",
+        )
+
+    async def panelEnchant(
+        self, interaction: discord.Interaction, playerName: str, enchantId: str, level: int
+    ) -> None:
+        try:
+            command = buildEnchantCommand(playerName, enchantId, level)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.enchant",
+            f"`{playerName}` 가 들고 있는 아이템에 `{enchantId.strip().lower()}` {level}레벨을 부여했습니다.",
+        )
+
+    async def panelGamemode(
+        self, interaction: discord.Interaction, playerName: str, mode: str
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            [buildGamemodeCommand(playerName, mode)],
+            "player.gamemode",
+            f"`{playerName}` 의 게임모드를 **{GAMEMODES[mode]}** 로 바꿨습니다.",
+        )
+
+    async def panelTeleportToPlayer(
+        self, interaction: discord.Interaction, playerName: str, targetName: str
+    ) -> None:
+        try:
+            command = buildTeleportToPlayerCommand(playerName, targetName)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.tp",
+            f"`{playerName}` 를 `{targetName}` 에게 이동시켰습니다.",
+        )
+
+    async def panelTeleportToPlace(
+        self, interaction: discord.Interaction, playerName: str, placeName: str
+    ) -> None:
+        place = await asyncio.to_thread(self.placeStore.get, placeName)
+        if place is None:
+            await interaction.followup.send("❌ 저장된 좌표를 찾지 못했습니다.", ephemeral=True)
+            return
+        try:
+            command = buildTeleportToCoordsCommand(
+                playerName, place.dimension, place.x, place.y, place.z
+            )
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.tp_place",
+            f"`{playerName}` 를 좌표 **{place.name}** 으로 이동시켰습니다.",
+        )
+
+    async def panelTeleportToSpawn(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        # 스폰 귀환과 같은 플러그인 경로를 쓰므로 월드 스폰과 항상 일치합니다.
+        try:
+            output = await _rcon(buildAutomaticSpawnCommand(playerName))
+            ensureRescueSucceeded(output)
+            await self._audit(interaction, "player.tp_spawn", "success", playerName)
+            await interaction.followup.send(
+                f"✅ `{playerName}` 를 스폰으로 이동시켰습니다.", ephemeral=True
+            )
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "player.tp_spawn", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelXp(
+        self, interaction: discord.Interaction, playerName: str, levels: int
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            [buildXpCommand(playerName, levels)],
+            "player.xp",
+            f"`{playerName}` 에게 경험치 {levels}레벨을 지급했습니다.",
+        )
+
+    async def panelHeal(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            buildHealCommands(playerName),
+            "player.heal",
+            f"`{playerName}` 의 체력과 배고픔을 회복시켰습니다.",
+        )
+
+    async def panelKick(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        await self._quickPlayerAction(
+            interaction,
+            [buildKickCommand(playerName)],
+            "player.kick",
+            f"`{playerName}` 를 서버에서 추방했습니다.",
+        )
+
+    async def panelSharedPlaces(self):
+        """Return the shared coordinate book for the teleport dropdown."""
+        return await asyncio.to_thread(self.placeStore.list)
+
+    # --- 빠른 명령: 월드(시간·날씨·난이도·게임룰·스폰) --------------------
+    async def panelWorldCommand(
+        self,
+        interaction: discord.Interaction,
+        command: str,
+        successMessage: str,
+        auditAction: str,
+    ) -> None:
+        """Run one world-level quick command (already deferred) with audit."""
+        try:
+            ensureServerAccepted(await _rcon(command))
+            await self._audit(interaction, auditAction, "success", command[:200])
+            await interaction.followup.send(f"✅ {successMessage}", ephemeral=True)
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, auditAction, "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelToggleGamerule(
+        self, interaction: discord.Interaction, gameruleKey: str
+    ) -> None:
+        """Query the current gamerule value and flip it in one button press."""
+        gameruleName, koreanLabel = GAMERULES[gameruleKey]
+        try:
+            current = parseGameruleValue(
+                ensureServerAccepted(await _rcon(buildGameruleQueryCommand(gameruleKey)))
+            )
+            ensureServerAccepted(
+                await _rcon(buildGameruleSetCommand(gameruleKey, not current))
+            )
+            await self._audit(
+                interaction, "world.gamerule", "success", f"{gameruleName}={not current}"
+            )
+            stateText = "켜짐 🟢" if not current else "꺼짐 🔴"
+            await interaction.followup.send(
+                f"✅ **{koreanLabel}**: {stateText}", ephemeral=True
+            )
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "world.gamerule", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelSetDifficulty(
+        self, interaction: discord.Interaction, difficulty: str
+    ) -> None:
+        await self.panelWorldCommand(
+            interaction,
+            buildDifficultyCommand(difficulty),
+            f"난이도를 **{DIFFICULTIES[difficulty]}** 로 바꿨습니다.",
+            "world.difficulty",
+        )
+
+    async def _applySpawn(
+        self, interaction: discord.Interaction, x: int, y: int, z: int
+    ) -> None:
+        """Set the overworld spawn and pin the respawn point exactly there."""
+        ensureServerAccepted(await _rcon(buildWorldSpawnCommand(x, y, z)))
+        # 분산 반경을 0으로 맞춰 정확히 그 지점에 리스폰되게 합니다.
+        ensureServerAccepted(await _rcon(SPAWN_RADIUS_ZERO_COMMAND))
+        await self._audit(interaction, "world.setspawn", "success", f"{x} {y} {z}")
+        await interaction.followup.send(
+            f"✅ 월드 스폰을 **({x}, {y}, {z})** 로 지정했습니다.\n"
+            "이제 죽었을 때 리스폰(침대가 없을 때)과 `/도구`의 스폰 귀환이 "
+            "모두 이 지점입니다. 침대에서 잔 플레이어는 여전히 침대에서 "
+            "리스폰합니다.",
+            ephemeral=True,
+        )
+
+    async def panelSetSpawnFromPlayer(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """선택한 접속자가 서 있는 자리를 월드 스폰으로 지정."""
+        try:
+            selector = buildPlayerSelector(playerName)
+            positionOutput, dimensionOutput = await asyncio.gather(
+                _rcon(f"data get entity {selector} Pos"),
+                _rcon(f"data get entity {selector} Dimension"),
+            )
+            dimension, x, y, z = parsePosition(positionOutput, dimensionOutput)
+            if dimension != "overworld":
+                raise ValueError(
+                    "오버월드에 있는 플레이어의 위치만 스폰으로 지정할 수 있습니다 "
+                    f"(현재: {dimension})."
+                )
+            await self._applySpawn(interaction, round(x), round(y), round(z))
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "world.setspawn", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelSetSpawnCoords(
+        self, interaction: discord.Interaction, rawX: str, rawY: str, rawZ: str
+    ) -> None:
+        """모달에 입력한 좌표를 검증해 월드 스폰으로 지정."""
+        try:
+            try:
+                x, y, z = (int(value.strip()) for value in (rawX, rawY, rawZ))
+            except ValueError:
+                raise ValueError("좌표는 정수로 입력하세요 (예: 120 64 -35).") from None
+            await self._applySpawn(interaction, x, y, z)
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "world.setspawn", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
     async def panelOpenLinkAdmin(self, interaction: discord.Interaction) -> None:
         """Open direct multi-profile account management for one Discord user."""
         friend = self.bot.get_cog("Friend")
@@ -1324,11 +1671,21 @@ class Admin(commands.Cog):
         embed.add_field(
             name="매일 쓰는 버튼 (첫 화면)",
             value=(
-                "**접속자 관리**: 접속자 선택 후 상태 확인·이동·추방\n"
+                "**접속자 관리**: 접속자를 고른 뒤 조회(인벤토리·위치·체력·효과)와 "
+                "조작(아이템 주기·포션 효과·인챈트·게임모드·TP·경험치·회복·추방)\n"
                 "**서버 제어**: 서버 시작·정지·재시작\n"
                 "**백업**: 즉시 백업, 자동 백업 주기·보관 설정, 복구\n"
-                "**긴급 복구**: 낮·맑음·평화 난이도 등 사고 대응\n"
+                "**빠른 명령**: 시간·날씨·난이도·게임룰 토글·드롭템 정리·스폰 지정\n"
                 "**상태 진단**: 서버가 이상할 때 첫 확인"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="스폰 지정",
+            value=(
+                "**빠른 명령 → 스폰 지정**으로 월드 스폰을 옮기면 죽었을 때 "
+                "리스폰(침대 없을 때)과 `/도구`의 스폰 귀환이 모두 그 지점으로 "
+                "바뀝니다. 접속자가 서 있는 자리로 지정하는 것이 가장 쉽습니다."
             ),
             inline=False,
         )
@@ -1364,13 +1721,15 @@ class Admin(commands.Cog):
         embed.add_field(
             name="주의가 필요한 버튼",
             value=(
-                "**긴급 복구**는 긴급 작업, **고급 도구**는 공지·RCON·허용목록용입니다. "
+                "**빠른 명령**은 서버 상태를 즉시 바꿉니다. **고급 도구**의 "
+                "**인게임 명령어**는 마인크래프트 콘솔 명령을 입력한 그대로 "
+                "실행합니다(자주 쓰는 명령은 접속자 관리·빠른 명령 버튼 우선). "
                 "정지·재시작·삭제·복구 작업은 확인 화면을 읽고 실행하세요."
             ),
             inline=False,
         )
         embed.set_footer(
-            text="일반 친구에게는 /서버와 /내도구만 안내하면 됩니다."
+            text="일반 친구에게는 /서버와 /도구만 안내하면 됩니다."
         )
         return embed
 
@@ -1578,7 +1937,7 @@ class Admin(commands.Cog):
             )
         except RconError as error:
             await self._audit(interaction, "spawn-protection.toggle", "failed", str(error))
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelToggleChestLock(self, interaction: discord.Interaction) -> None:
         """Toggle the bundled plugin's persistent container-lock setting through RCON."""
@@ -1590,7 +1949,7 @@ class Admin(commands.Cog):
             )
         except RconError as error:
             await self._audit(interaction, "chest-lock.toggle", "failed", str(error))
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelPlayerEmbed(self, player: str, detailType: str) -> discord.Embed:
         """Query a selected player's allowed read-only entity fields through RCON."""
@@ -1678,7 +2037,7 @@ class Admin(commands.Cog):
         try:
             await self._sendFile(interaction, self.panelLogPath(source), "Operational log")
         except (FileNotFoundError, OSError, ValueError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @tasks.loop(seconds=60)
     async def backupScheduler(self):

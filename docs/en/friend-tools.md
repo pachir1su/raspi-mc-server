@@ -22,28 +22,22 @@ PUBLIC_COMMANDS_ENABLED=true
 # Put runtime JSON and uploaded photos on the mounted HDD.
 MC_STATE_DIR=/mnt/minecraft/bot-state
 
-# Optional fixed destination used by the /my-tools rescue button.
-# Leave all four blank to use Paper's live primary-world spawn.
-MC_SPAWN_DIMENSION=overworld
-MC_SPAWN_X=0.5
-MC_SPAWN_Y=80
-MC_SPAWN_Z=0.5
-
 # Optional external web-map URL. Leave empty until a web map is deployed.
 MC_MAP_URL_TEMPLATE=https://map.example.com/?world={dimension}&x={x}&y={y}&z={z}
 ```
 
-Valid spawn dimensions are `overworld`, `nether`, and `the_end`. Coordinates
-must be numbers. X and Z must stay within ±30,000,000 and Y within -2048…2048.
+> Note: the old `MC_SPAWN_X/Y/Z/DIMENSION` coordinate override has been
+> removed. Rescue always uses the **world spawn**, so it always matches the
+> on-death respawn location. If the operational `.env` still contains those
+> values, they can be deleted (they are ignored).
 
 To choose the spawn location:
 
-1. Join the server with the owner's Minecraft account.
-2. Stand on the exact safe block where rescued players should arrive.
-3. Press **F3** and note XYZ, or use `/admin` → **Players** → **Position**.
-4. Put those values in `MC_SPAWN_X/Y/Z`. Adding `.5` to block-centre X/Z avoids
-   spawning on an edge.
-5. Make sure the destination is lit, not obstructed, and inside the world border.
+1. Have any online player (ideally the owner) stand on the desired block.
+2. Open `/admin` → **Quick commands** → **Set spawn** and pick that player.
+   Coordinates can also be typed manually.
+3. Both the on-death respawn (without a bed) and the `/tools` rescue button now
+   use that point. The scatter radius (`spawnRadius`) is set to 0 as well.
 
 `MC_MAP_URL_TEMPLATE` must match the web map you actually deploy. It supports
 `{dimension}`, `{x}`, `{y}`, and `{z}` placeholders. The bot only builds a link;
@@ -67,7 +61,7 @@ Press **Add Java (PC)** or **Add Bedrock (mobile)** and type only the exact
 Minecraft name in the modal. There is no friend request or approval queue. The
 owner may add multiple Java and Bedrock profiles to the same Discord user and
 may remove one selected profile without affecting the others. The friend sees
-all assigned profiles under **My accounts** in `/my-tools`.
+all assigned profiles under **My accounts** in `/tools`.
 
 Adding a profile runs `whitelist add` for Java or Floodgate's `fwhitelist add`
 for Bedrock. Removing it runs the matching removal command. These server
@@ -77,19 +71,20 @@ characters are rejected in both cases.
 
 ## 3. Rescue only the linked account
 
-- Select an account in `/my-tools`, then press **Selected account: spawn**. It teleports only a Minecraft profile assigned to the caller. The
-  player must be online. A complete `MC_SPAWN_*` configuration overrides the
-  destination; otherwise the bundled plugin reads Paper's live primary-world spawn.
-  the friend cannot enter a target, coordinates, or RCON command.
-- **My location** reads only that linked online player's dimension and XYZ.
+- Select an account in `/tools`, then press **Selected account: spawn**. It teleports only a Minecraft profile assigned to the caller. The
+  player must be online — if not, the bot replies that the player is not in
+  the game and runs nothing. The destination is always the **world spawn**
+  (changed via the admin panel's Set spawn), so it matches the on-death
+  respawn location. The friend cannot enter a target, coordinates, or RCON command.
+- **Selected account: location** reads only that linked online player's dimension and XYZ.
 
 The administrator's account assignment is the delegated authorization for this one fixed
-teleport. All general server mutation, raw Advanced RCON, lifecycle, backup, whitelist,
-incident, and world-management commands remain behind `ADMIN_USER_IDS`.
+teleport. All general server mutation, the in-game command console, lifecycle, backup, whitelist,
+quick commands, and world-management commands remain behind `ADMIN_USER_IDS`.
 
 ## 4. Coordinate book and photos
 
-Approved friends and admins open **Coordinates** in `/my-tools`. Existing places
+Approved friends and admins open **Coordinates** in `/tools`. Existing places
 are selected from a dropdown. **Save current position** reads the linked online
 player's XYZ automatically and asks only for a short name and optional note.
 View and delete are buttons. To attach or replace an image, use
@@ -102,7 +97,7 @@ any place. The book is capped at 250 names to keep reads and Discord output smal
 
 ## 5. Server diary
 
-Approved friends and admins open **Server diary** in `/my-tools`, select a recent
+Approved friends and admins open **Server diary** in `/tools`, select a recent
 entry from the dropdown, or press **New entry**. Free-form writing uses one modal
 because text is the feature. Use `/upload diary` only when adding a photo.
 
@@ -112,7 +107,7 @@ it grows past 2 MiB. Optional photos use the same 5 MiB local image policy.
 
 ## 6. On-demand server score
 
-**Server score** in `/my-tools` samples Paper TPS, RCON reachability, CPU temperature, five-minute
+**Server score** in `/tools` samples Paper TPS, RCON reachability, CPU temperature, five-minute
 load, memory, HDD free space, and Raspberry Pi undervoltage/throttle flags. It
 returns 0–100, a grade, and every deduction. It runs only when requested: there
 is no new background loop, chunk scan, or extra server tick work.
@@ -136,7 +131,7 @@ your host-level HDD backup. They are ignored by Git.
 | Symptom | Check |
 |---|---|
 | Friend sees the feature-disabled message | Set `PUBLIC_COMMANDS_ENABLED=true`, then restart the bot. |
-| No account appears in `/my-tools` | Owner opens `/admin` → **Friend accounts**, selects the Discord user, then adds a Java or Bedrock profile. |
+| No account appears in `/tools` | Owner opens `/admin` → **Friend accounts**, selects the Discord user, then adds a Java or Bedrock profile. |
 | Rescue reports an unknown `raspiops` command | Install a Release build containing the bundled Paper operations plugin, then restart Paper and the bot. |
 | Bedrock registration says the whitelist command is unknown | Re-run `python -m bot.main --setup`, select Java+Bedrock, and check both plugin configs were generated. |
 | Rescue or whereami cannot find the player | The exact linked Java/Floodgate account must currently be online. |
@@ -162,7 +157,7 @@ whitelist on
 whitelist reload
 ```
 
-Run these through local RCON or `/admin` → **Advanced tools** → **Advanced RCON**; never delegate them to the
+Run these through local RCON or `/admin` → **Advanced tools** → **In-game command**; never delegate them to the
 friend. Re-enable the whitelist immediately even if another step fails, verify
 it with `whitelist list`, and then add the Bedrock profile again. Do not operate the
 server with the whitelist left off. See the official
@@ -170,7 +165,7 @@ server with the whitelist left off. See the official
 
 ## Death Box buttons
 
-The `/my-tools` panel includes **Locate death box** and **List death boxes**
+The `/tools` panel includes **Locate death box** and **List death boxes**
 buttons. These call the DeathBox plugin via RCON (`deathbox locate <player>`,
 `deathbox list <player>`), so friends never need to type in-game commands.
 

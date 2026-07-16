@@ -36,11 +36,30 @@ class PanelUxTests(unittest.TestCase):
             "서버 제어",
             "성능 상세",
             "렉 원인",
-            "긴급 복구",
+            "빠른 명령",
             "친구 계정",
             "관리 도움말",
         ):
             self.assertIn(f'label="{label}"', source)
+
+    def testQuickCommandPanelsKeepTypingMinimal(self):
+        """조작 버튼은 드롭다운·버튼 우선이고, 텍스트 입력은 꼭 필요한 곳뿐."""
+        source = (ROOT / "bot" / "control_panel.py").read_text(encoding="utf-8")
+
+        for label in (
+            "아이템 주기",
+            "포션 효과",
+            "인챈트",
+            "게임모드",
+            "스폰 지정",
+            "아이템 유지",
+            "즉시 리스폰",
+            "자연 재생",
+            "플레이 일수",
+        ):
+            self.assertIn(label, source)
+        # 정해진 목록 밖도 쓸 수 있어야 한다(운영자 요청): 직접 입력 경로 유지.
+        self.assertIn("직접 입력", source)
 
     def testAdminHelpExplainsAccountsAndUploads(self):
         """Private help covers the two workflows that otherwise require discovery."""

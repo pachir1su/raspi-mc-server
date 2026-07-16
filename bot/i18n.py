@@ -4,14 +4,13 @@ from bot.config import cfg
 
 _MESSAGES = {
     "ko": {
-        "not_authorized": "⛔ 관리자 전용 기능입니다. 친구용 기능은 `/서버`, `/내도구`, `/도움말`을 사용하세요.",
+        "not_authorized": "⛔ 관리자 전용 기능입니다. 친구용 기능은 `/서버`, `/도구`, `/도움말`을 사용하세요.",
         "portal_title": "🎮 친구용 서버 포털",
         "portal_description": "접속 정보와 현재 상태를 한 번에 확인하세요.",
         "portal_address": "서버 주소",
         "portal_address_missing": "관리자가 MC_PUBLIC_ADDRESS를 설정하지 않았습니다.",
         "portal_version": "버전",
-        "portal_rules": "규칙",
-        "portal_rules_default": "서로의 건축물과 아이템을 존중하고, 문제는 서버장에게 알려주세요.",
+        "portal_days": "플레이 일수",
         "portal_online": "접속자",
         "portal_offline": "서버 상태를 확인할 수 없습니다.",
         "online_none": "현재 접속 중인 플레이어가 없습니다.",
@@ -35,14 +34,13 @@ _MESSAGES = {
         "presence": "라즈베리파이 마크 서버",
     },
     "en": {
-        "not_authorized": "⛔ This is an admin-only feature. Friends can use `/server`, `/my-tools`, and `/help`.",
+        "not_authorized": "⛔ This is an admin-only feature. Friends can use `/server`, `/tools`, and `/help`.",
         "portal_title": "🎮 Friend server portal",
         "portal_description": "Quick access info and live status for players.",
         "portal_address": "Server address",
         "portal_address_missing": "The admin has not set MC_PUBLIC_ADDRESS yet.",
         "portal_version": "Version",
-        "portal_rules": "Rules",
-        "portal_rules_default": "Respect builds and items, and tell the operator when something breaks.",
+        "portal_days": "Days played",
         "portal_online": "Online players",
         "portal_offline": "Server status is unavailable.",
         "online_none": "No players are online right now.",
