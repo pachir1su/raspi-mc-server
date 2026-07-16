@@ -91,12 +91,32 @@ bot's `.env` and not `server.properties`):
 
 ```yaml
 enabled: true
-container: double-chest   # double-chest | chest | barrel
-search-radius: 4          # bounded; clamped to 1..8
-expire-hours: 0           # 0 means never expire
+container: double-chest          # double-chest | chest | barrel
+search-radius: 4                 # bounded; clamped to 1..8
+expire-hours: 72                 # 0 means never expire (default 72h)
+max-physical-boxes-per-player: 3 # anti-grief cap; 0 disables
 friends-can-open: false
 fallback-virtual-box: true
+messages:                        # player-facing text (Korean defaults)
+  death.stored: "§6[데스박스] §f아이템을 §e{x}, {y}, {z} ..."
+  # Omitted keys fall back to the built-in Korean default.
 ```
+
+All player-facing text defaults to Korean (#60). Override any key under
+`messages:` to reword or translate it; keep the `{brace}` placeholders and
+`§` colour codes. Omitted keys use the built-in default.
+
+### Anti-grief (#65)
+
+To stop one player from repeatedly dying at someone else's door and stacking
+unbreakable chests:
+
+- `max-physical-boxes-per-player` caps active **physical (block)** boxes per
+  player (default 3). Beyond the cap, deaths are stored in a **virtual** box
+  (no block placed) that an admin recovers with `/deathbox recover`, so blocks
+  never pile up without bound.
+- `expire-hours` defaults to 72h so old boxes are swept hourly.
+- Emptied boxes already auto-remove the moment they are opened and cleared.
 
 ## Commands
 
