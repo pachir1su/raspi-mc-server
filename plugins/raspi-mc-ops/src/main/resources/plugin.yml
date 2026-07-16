@@ -1,0 +1,22 @@
+name: RaspiMcOps
+version: '${version}'
+main: io.github.pachir1su.raspimcops.RaspiMcOpsPlugin
+description: Event-driven operations for the raspi-mc-server Paper server.
+author: pachir1su
+api-version: '26.1.2'
+commands:
+  raspiops:
+    description: Narrow console integration used by the Discord bot.
+    usage: /raspiops rescue <exact-player-name>
+    permission: raspimcops.rescue
+  spawnprotection:
+    description: Inspect or toggle the event-level spawn safe zone.
+    usage: /spawnprotection <status|on|off|toggle>
+    permission: raspimcops.spawn.manage
+permissions:
+  raspimcops.rescue:
+    default: op
+  raspimcops.spawn.manage:
+    default: op
+  raspimcops.spawn.bypass:
+    default: op
