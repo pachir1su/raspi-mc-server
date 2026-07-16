@@ -73,10 +73,10 @@ class Config:
         "1", "true", "yes", "on",
     }
     map_url_template = os.getenv("MC_MAP_URL_TEMPLATE", "").strip()
-    spawn_dimension = os.getenv("MC_SPAWN_DIMENSION", "overworld").strip().lower()
-    spawn_x = os.getenv("MC_SPAWN_X", "").strip()
-    spawn_y = os.getenv("MC_SPAWN_Y", "").strip()
-    spawn_z = os.getenv("MC_SPAWN_Z", "").strip()
+    # MC_SPAWN_X/Y/Z/DIMENSION 오버라이드는 제거했습니다. 스폰 귀환은 항상
+    # 월드 스폰(setworldspawn)을 사용하므로 죽었을 때 리스폰 위치와 항상
+    # 일치합니다. 운영 .env에 남은 MC_SPAWN_* 값은 무시되며 지워도 됩니다.
+    # 스폰 위치 변경: 관리 패널 → 빠른 명령 → 스폰 지정.
     alert_cooldown_minutes = int(os.getenv("ALERT_COOLDOWN_MINUTES", "30"))
     alert_tps_threshold = float(os.getenv("ALERT_TPS_THRESHOLD", "18.0"))
     alert_memory_percent = float(os.getenv("ALERT_MEMORY_PERCENT", "85"))
@@ -97,23 +97,6 @@ class Config:
     require_storage_mount = os.getenv("MC_REQUIRE_STORAGE_MOUNT", "true").lower() in {
         "1", "true", "yes", "on",
     }
-
-    def rescueDestination(self):
-        """Return the explicitly configured friend rescue destination."""
-        # Keep coordinates unset by default so a wrong hard-coded spawn is never used.
-        if not all((self.spawn_x, self.spawn_y, self.spawn_z)):
-            raise ValueError("Set MC_SPAWN_X, MC_SPAWN_Y, and MC_SPAWN_Z in .env")
-        from bot.rescue import validateDestination
-
-        try:
-            return validateDestination(
-                self.spawn_dimension,
-                float(self.spawn_x),
-                float(self.spawn_y),
-                float(self.spawn_z),
-            )
-        except ValueError as error:
-            raise ValueError(f"Invalid rescue spawn configuration: {error}") from error
 
     def validate(self):
         """Raise if a must-have value is missing — called at startup."""
