@@ -102,7 +102,12 @@ runtime files, command examples, and troubleshooting.
 
 ## Button-first dashboard
 
-Run `/admin` once, then use buttons without typing command arguments for:
+Run `/admin` once, then use buttons without typing command arguments. The
+first screen keeps only the everyday buttons (refresh, players, server
+control, backups, emergency recovery, health, friend accounts, help); the
+**More** button opens the second tier with performance, lag analysis, logs,
+storage, worlds, updates, advanced tools, and the protection toggles.
+Everything below stays reachable:
 
 - refreshing server, player, HDD, and latest-backup status
 - creating, selecting, checking, downloading, restoring, deleting, and pruning backups

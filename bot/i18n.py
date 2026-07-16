@@ -4,7 +4,7 @@ from bot.config import cfg
 
 _MESSAGES = {
     "ko": {
-        "not_authorized": "⛔ 이 봇을 사용할 권한이 없습니다.",
+        "not_authorized": "⛔ 관리자 전용 기능입니다. 친구용 기능은 `/서버`, `/내도구`, `/도움말`을 사용하세요.",
         "portal_title": "🎮 친구용 서버 포털",
         "portal_description": "접속 정보와 현재 상태를 한 번에 확인하세요.",
         "portal_address": "서버 주소",
@@ -35,7 +35,7 @@ _MESSAGES = {
         "presence": "라즈베리파이 마크 서버",
     },
     "en": {
-        "not_authorized": "⛔ You are not authorised to use this bot.",
+        "not_authorized": "⛔ This is an admin-only feature. Friends can use `/server`, `/my-tools`, and `/help`.",
         "portal_title": "🎮 Friend server portal",
         "portal_description": "Quick access info and live status for players.",
         "portal_address": "Server address",
