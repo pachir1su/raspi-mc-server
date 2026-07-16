@@ -277,6 +277,92 @@ def buildHealCommands(playerName: str) -> list[str]:
     ]
 
 
+# 무적(#75): 대미지 무효화(저항 5)에 재생·화염 저항·포화를 함께 걸어 체력이
+# 줄지 않게 합니다. 저항은 증폭 4단계(=저항 V)가 대부분의 피해를 100% 막습니다.
+# 모든 효과는 파티클을 숨겨(#57 원리) 게임 화면에 거품이 보이지 않습니다.
+_INVINCIBILITY_EFFECTS = (
+    ("resistance", 4),
+    ("regeneration", 1),
+    ("fire_resistance", 0),
+    ("saturation", 0),
+)
+
+# 무적 지속 시간(초)의 안전 범위: 최소 1초, 최대 1시간.
+MIN_INVINCIBLE_SECONDS = 1
+MAX_INVINCIBLE_SECONDS = 3600
+
+
+def parseInvincibleSeconds(rawSeconds: str | int) -> int:
+    """Validate the invincibility duration (기본 5초, 1~3600초)."""
+    if isinstance(rawSeconds, int):
+        cleaned = str(rawSeconds)
+    else:
+        cleaned = (rawSeconds or "").strip()
+    if not cleaned:
+        return 5
+    if not cleaned.isdigit():
+        raise ValueError("무적 시간은 초 단위 숫자여야 합니다 (예: 5, 30, 300).")
+    seconds = int(cleaned)
+    if not MIN_INVINCIBLE_SECONDS <= seconds <= MAX_INVINCIBLE_SECONDS:
+        raise ValueError("무적 시간은 1초에서 3600초(1시간) 사이여야 합니다.")
+    return seconds
+
+
+def buildInvincibilityCommands(playerName: str, seconds: int = 5) -> list[str]:
+    """무적 세트를 한 번에 거는 effect 명령들(파티클 숨김)."""
+    safeSeconds = max(MIN_INVINCIBLE_SECONDS, min(int(seconds), MAX_INVINCIBLE_SECONDS))
+    return [
+        buildEffectCommand(playerName, effectId, safeSeconds, amplifier, hideParticles=True)
+        for effectId, amplifier in _INVINCIBILITY_EFFECTS
+    ]
+
+
+def buildInvincibilityClearCommands(playerName: str) -> list[str]:
+    """무적을 즉시 해제 — 걸어 둔 효과만 골라 지웁니다."""
+    selector = buildPlayerSelector(playerName)
+    return [
+        f"effect clear {selector} minecraft:{effectId}"
+        for effectId, _ in _INVINCIBILITY_EFFECTS
+    ]
+
+
+# 내 통계(#68): 스코어보드 목표로 사망·처치 수를 집계합니다. 목표를 만든
+# '시점부터' 집계되며 과거 기록은 소급되지 않습니다. (키, 목표명, 기준, 한글 라벨)
+SCOREBOARD_STATS = (
+    ("deaths", "mc_deaths", "deathCount", "사망 횟수"),
+    ("kills", "mc_kills", "totalKillCount", "몹·플레이어 처치 수"),
+    ("playerKills", "mc_pk", "playerKillCount", "플레이어 처치 수"),
+)
+
+
+def buildScoreboardSetupCommands() -> list[str]:
+    """봇 시작 시 통계용 스코어보드 목표를 만드는 명령(이미 있으면 서버가 무시)."""
+    return [
+        f"scoreboard objectives add {objective} {criterion}"
+        for _, objective, criterion, _ in SCOREBOARD_STATS
+    ]
+
+
+def buildScoreboardGetCommand(playerName: str, objective: str) -> str:
+    """한 플레이어의 스코어보드 값을 조회하는 명령."""
+    safeName = validateServerPlayerName(playerName)
+    if objective not in {obj for _, obj, _, _ in SCOREBOARD_STATS}:
+        raise ValueError("지원하지 않는 통계 목표입니다.")
+    return f"scoreboard players get {safeName} {objective}"
+
+
+def parseScoreboardValue(output: str) -> int:
+    """'... has N [obj]' 형태의 응답에서 값을 읽습니다. 기록 없으면 0."""
+    lowered = (output or "").casefold()
+    if "has no score" in lowered or "no score" in lowered:
+        return 0
+    match = re.search(r"\bhas\s+(-?\d+)\b", output or "")
+    if match:
+        return int(match.group(1))
+    match = re.search(r"(-?\d+)", output or "")
+    return int(match.group(1)) if match else 0
+
+
 def buildKickCommand(playerName: str, reason: str = "서버장이 퇴장시켰습니다.") -> str:
     safeName = validateServerPlayerName(playerName)
     safeReason = re.sub(r"[\r\n]", " ", reason).strip()[:100]
