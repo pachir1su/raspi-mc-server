@@ -6,3 +6,6 @@ spawn-protection:
   enabled: true
   radius: 16
   world: ""
+
+chest-lock:
+  enabled: true

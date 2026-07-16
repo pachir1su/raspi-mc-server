@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "io.github.pachir1su"
-version = "0.1.15"
+version = "0.1.16"
 
 repositories {
     mavenCentral()
