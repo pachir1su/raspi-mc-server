@@ -217,6 +217,19 @@ def buildEnchantCommand(playerName: str, enchantId: str, level: int = 1) -> str:
     )
 
 
+def buildForceEnchantCommand(playerName: str, enchantId: str, level: int = 1) -> str:
+    """든 아이템에 호환·최대레벨 무시하고 인챈트 (RaspiMcOps 플러그인, #62).
+
+    바닐라 `enchant`는 곡괭이에 날카로움을 못 걸고 레벨 상한도 강제하지만,
+    이 명령은 플러그인의 `/enchantheld`를 호출해 제한 없이 부여합니다.
+    플러그인이 정확한 이름(선택자 아님)을 받으므로 검증된 이름을 그대로 씁니다.
+    """
+    safeName = validateServerPlayerName(playerName)
+    safeEnchant = _validateResourceId(enchantId, "인챈트")
+    safeLevel = max(1, min(int(level), 255))
+    return f"enchantheld {safeName} {safeEnchant} {safeLevel}"
+
+
 def buildGamemodeCommand(playerName: str, mode: str) -> str:
     if mode not in GAMEMODES:
         raise ValueError("지원하지 않는 게임모드입니다.")

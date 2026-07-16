@@ -84,6 +84,23 @@ class CommandBuilderTests(unittest.TestCase):
             qc.buildEnchantCommand("Friend_1", "sharpness", 5),
         )
 
+    def testForceEnchant(self):
+        # 플러그인은 선택자가 아니라 정확한 이름을 받습니다.
+        self.assertEqual(
+            "enchantheld Friend_1 sharpness 20",
+            qc.buildForceEnchantCommand("Friend_1", "sharpness", 20),
+        )
+        self.assertEqual(
+            "enchantheld .Pocket efficiency 5",
+            qc.buildForceEnchantCommand(".Pocket", "minecraft:efficiency", 5),
+        )
+        self.assertEqual(  # 255 상한으로 clamp
+            "enchantheld Friend_1 sharpness 255",
+            qc.buildForceEnchantCommand("Friend_1", "sharpness", 9999),
+        )
+        with self.assertRaises(ValueError):
+            qc.buildForceEnchantCommand("@a", "sharpness", 5)
+
     def testGamemode(self):
         self.assertEqual(
             'gamemode creative @a[name="Friend_1",limit=1]',

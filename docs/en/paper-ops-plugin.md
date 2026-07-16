@@ -72,6 +72,21 @@ chestlock toggle
 The toggle is persisted in the plugin configuration. Turning the feature off
 keeps recorded owners, so locks resume when it is turned back on.
 
+## Force enchant (#62)
+
+Vanilla `/enchant` refuses e.g. Sharpness on a pickaxe and caps levels, but
+`enchantheld` applies an enchantment to the held item **ignoring compatibility
+and the max level** (`ItemStack.addUnsafeEnchantment`). It is an owner cheat, so
+it needs the `raspimcops.enchant` permission (default op).
+
+```text
+enchantheld <exact-player-name> <enchant-id> <level>
+e.g. enchantheld QUI203 sharpness 20
+```
+
+Levels are clamped to 1..255. In Discord the `/admin` → **Players** →
+**Enchant** dropdown's **강제 인챈트 (제한 없음)…** entry calls this command.
+
 Death Box remains the separate [`plugin/deathbox`](../../plugin/deathbox)
 implementation documented in [death-box-design.md](death-box-design.md). Do not
 install a second death-container implementation alongside it.

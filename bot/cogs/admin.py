@@ -55,6 +55,7 @@ from bot.quick_commands import (
     buildEffectClearCommand,
     buildEffectCommand,
     buildEnchantCommand,
+    buildForceEnchantCommand,
     buildGamemodeCommand,
     buildGameruleQueryCommand,
     buildGameruleSetCommand,
@@ -1487,6 +1488,23 @@ class Admin(commands.Cog):
             [command],
             "player.enchant",
             f"`{playerName}` 가 들고 있는 아이템에 `{enchantId.strip().lower()}` {level}레벨을 부여했습니다.",
+        )
+
+    async def panelForceEnchant(
+        self, interaction: discord.Interaction, playerName: str, enchantId: str, level: int
+    ) -> None:
+        """RaspiMcOps 플러그인으로 제한 없이 인챈트 (곡괭이에 날카로움 등, #62)."""
+        try:
+            command = buildForceEnchantCommand(playerName, enchantId, level)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [command],
+            "player.enchant_force",
+            f"`{playerName}` 가 들고 있는 아이템에 `{enchantId.strip().lower()}` "
+            f"{level}레벨을 **제한 없이** 부여했습니다.",
         )
 
     async def panelGamemode(
