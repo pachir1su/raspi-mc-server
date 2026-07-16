@@ -5,6 +5,7 @@ import discord
 from bot.config import cfg
 from bot.error_text import describeError
 from bot.i18n import t
+from bot.quick_commands import COMMON_EFFECTS, COMMON_ENCHANTS, DIFFICULTIES, GAMERULES
 
 
 class OwnerView(discord.ui.View):
@@ -290,16 +291,305 @@ class PlayerSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         self.parentView.selectedPlayer = self.values[0]
         await interaction.response.edit_message(
-            content=f"선택됨: **{self.values[0]}** — 아래 버튼으로 조회하세요.",
+            content=f"선택됨: **{self.values[0]}** — 아래 조회·조작 버튼이 이 플레이어에게 적용됩니다.",
             view=self.parentView,
         )
 
 
+class QuickActionModal(discord.ui.Modal):
+    """Shared error handling for the few quick actions that need typed input."""
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception):
+        message = f"❌ {describeError(error)}"
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+
+
+class GiveItemModal(QuickActionModal):
+    """아이템 주기 — 텍스트 입력은 아이템 이름(과 선택적 수량)뿐입니다."""
+
+    def __init__(self, controller, playerName: str):
+        super().__init__(title=f"아이템 주기 — {playerName}"[:45])
+        self.controller = controller
+        self.playerName = playerName
+        self.itemName = discord.ui.TextInput(
+            label="아이템 이름 (한글 별칭 또는 영어 ID)",
+            placeholder="예: 다이아, 철검, iron_sword",
+            max_length=64,
+        )
+        self.count = discord.ui.TextInput(
+            label="수량 (비우면 1)", required=False, max_length=5
+        )
+        self.add_item(self.itemName)
+        self.add_item(self.count)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelGiveItem(
+            interaction, self.playerName, self.itemName.value, self.count.value
+        )
+
+
+class CustomEffectModal(QuickActionModal):
+    """드롭다운에 없는 포션 효과를 ID로 직접 지정할 때만 씁니다."""
+
+    def __init__(self, controller, playerName: str):
+        super().__init__(title=f"포션 효과 직접 입력 — {playerName}"[:45])
+        self.controller = controller
+        self.playerName = playerName
+        self.effectId = discord.ui.TextInput(
+            label="효과 ID (영어)", placeholder="예: speed, luck, absorption", max_length=64
+        )
+        self.seconds = discord.ui.TextInput(
+            label="지속 시간(초, 비우면 300)", required=False, max_length=7
+        )
+        self.add_item(self.effectId)
+        self.add_item(self.seconds)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        secondsText = (self.seconds.value or "").strip()
+        if secondsText and not secondsText.isdigit():
+            raise ValueError("지속 시간은 숫자(초)로 입력하세요.")
+        await self.controller.panelApplyEffect(
+            interaction,
+            self.playerName,
+            self.effectId.value,
+            int(secondsText) if secondsText else 300,
+            0,
+        )
+
+
+class CustomEnchantModal(QuickActionModal):
+    """드롭다운에 없는 인챈트를 ID와 레벨로 직접 지정할 때만 씁니다."""
+
+    def __init__(self, controller, playerName: str):
+        super().__init__(title=f"인챈트 직접 입력 — {playerName}"[:45])
+        self.controller = controller
+        self.playerName = playerName
+        self.enchantId = discord.ui.TextInput(
+            label="인챈트 ID (영어)", placeholder="예: knockback, thorns", max_length=64
+        )
+        self.level = discord.ui.TextInput(
+            label="레벨 (비우면 1)", required=False, max_length=3
+        )
+        self.add_item(self.enchantId)
+        self.add_item(self.level)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        levelText = (self.level.value or "").strip()
+        if levelText and not levelText.isdigit():
+            raise ValueError("레벨은 숫자로 입력하세요.")
+        await self.controller.panelEnchant(
+            interaction,
+            self.playerName,
+            self.enchantId.value,
+            int(levelText) if levelText else 1,
+        )
+
+
+class EffectSelect(discord.ui.Select):
+    """자주 쓰는 포션 효과 + 효과 해제 + 직접 입력."""
+
+    def __init__(self, controller, playerName: str):
+        self.controller = controller
+        self.playerName = playerName
+        options = [
+            discord.SelectOption(
+                label=f"{label} ({seconds // 60}분)", value=effectId, emoji="✨"
+            )
+            for effectId, label, seconds, _amplifier in COMMON_EFFECTS
+        ]
+        options.append(
+            discord.SelectOption(label="효과 전부 해제", value="__clear__", emoji="🚿")
+        )
+        options.append(
+            discord.SelectOption(label="직접 입력…", value="__custom__", emoji="⌨️")
+        )
+        super().__init__(placeholder="적용할 포션 효과 선택", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        choice = self.values[0]
+        if choice == "__custom__":
+            await interaction.response.send_modal(
+                CustomEffectModal(self.controller, self.playerName)
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        if choice == "__clear__":
+            await self.controller.panelClearEffects(interaction, self.playerName)
+            return
+        seconds, amplifier = next(
+            (seconds, amplifier)
+            for effectId, _label, seconds, amplifier in COMMON_EFFECTS
+            if effectId == choice
+        )
+        await self.controller.panelApplyEffect(
+            interaction, self.playerName, choice, seconds, amplifier
+        )
+
+
+class EffectPanelView(OwnerView):
+    def __init__(self, controller, ownerId: int, playerName: str):
+        super().__init__(controller, ownerId, timeout=300)
+        self.add_item(EffectSelect(controller, playerName))
+
+
+class EnchantSelect(discord.ui.Select):
+    """자주 쓰는 인챈트 + 직접 입력. 들고 있는 아이템에 적용됩니다."""
+
+    def __init__(self, controller, playerName: str):
+        self.controller = controller
+        self.playerName = playerName
+        options = [
+            discord.SelectOption(label=label, value=f"{enchantId}:{level}", emoji="🗡️")
+            for enchantId, label, level in COMMON_ENCHANTS
+        ]
+        options.append(
+            discord.SelectOption(label="직접 입력…", value="__custom__", emoji="⌨️")
+        )
+        super().__init__(placeholder="부여할 인챈트 선택", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        choice = self.values[0]
+        if choice == "__custom__":
+            await interaction.response.send_modal(
+                CustomEnchantModal(self.controller, self.playerName)
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        enchantId, level = choice.rsplit(":", 1)
+        await self.controller.panelEnchant(
+            interaction, self.playerName, enchantId, int(level)
+        )
+
+
+class EnchantPanelView(OwnerView):
+    def __init__(self, controller, ownerId: int, playerName: str):
+        super().__init__(controller, ownerId, timeout=300)
+        self.add_item(EnchantSelect(controller, playerName))
+
+
+class GamemodePanelView(OwnerView):
+    """선택한 접속자의 게임모드를 버튼 한 번으로 변경."""
+
+    def __init__(self, controller, ownerId: int, playerName: str):
+        super().__init__(controller, ownerId, timeout=300)
+        self.playerName = playerName
+
+    async def _apply(self, interaction: discord.Interaction, mode: str):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelGamemode(interaction, self.playerName, mode)
+
+    @discord.ui.button(label="서바이벌", emoji="⛏️", style=discord.ButtonStyle.primary)
+    async def survival(self, interaction, button):
+        await self._apply(interaction, "survival")
+
+    @discord.ui.button(label="크리에이티브", emoji="🪄", style=discord.ButtonStyle.success)
+    async def creative(self, interaction, button):
+        await self._apply(interaction, "creative")
+
+    @discord.ui.button(label="관전", emoji="👻", style=discord.ButtonStyle.secondary)
+    async def spectator(self, interaction, button):
+        await self._apply(interaction, "spectator")
+
+
+class TeleportTargetSelect(discord.ui.Select):
+    """다른 접속자에게 순간이동 — 고르는 즉시 실행됩니다."""
+
+    def __init__(self, controller, playerName: str, otherPlayers: list[str]):
+        self.controller = controller
+        self.playerName = playerName
+        options = [
+            discord.SelectOption(label=name, value=name, emoji="🎮")
+            for name in otherPlayers[:25]
+        ]
+        super().__init__(
+            placeholder="이 접속자에게 이동", min_values=1, max_values=1, options=options, row=0
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelTeleportToPlayer(
+            interaction, self.playerName, self.values[0]
+        )
+
+
+class TeleportPlaceSelect(discord.ui.Select):
+    """공유 좌표북의 저장 좌표로 순간이동 — 고르는 즉시 실행됩니다."""
+
+    def __init__(self, controller, playerName: str, places):
+        self.controller = controller
+        self.playerName = playerName
+        options = [
+            discord.SelectOption(
+                label=place.name[:100],
+                value=place.name,
+                description=f"{place.dimension} · {place.x} {place.y} {place.z}"[:100],
+                emoji="📍",
+            )
+            for place in places[:25]
+        ]
+        super().__init__(
+            placeholder="저장된 좌표로 이동", min_values=1, max_values=1, options=options, row=1
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelTeleportToPlace(
+            interaction, self.playerName, self.values[0]
+        )
+
+
+class TeleportPanelView(OwnerView):
+    """접속자·좌표북·스폰 세 종류의 순간이동 목적지를 한 화면에."""
+
+    def __init__(self, controller, ownerId: int, playerName: str, otherPlayers, places):
+        super().__init__(controller, ownerId, timeout=300)
+        self.playerName = playerName
+        if otherPlayers:
+            self.add_item(TeleportTargetSelect(controller, playerName, otherPlayers))
+        if places:
+            self.add_item(TeleportPlaceSelect(controller, playerName, places))
+
+    @discord.ui.button(label="스폰으로", emoji="🏠", style=discord.ButtonStyle.primary, row=2)
+    async def toSpawn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelTeleportToSpawn(interaction, self.playerName)
+
+
+class ConfirmKickView(OwnerView):
+    """추방 전에 한 번 더 확인합니다."""
+
+    def __init__(self, controller, ownerId: int, playerName: str):
+        super().__init__(controller, ownerId, timeout=60)
+        self.playerName = playerName
+
+    @discord.ui.button(label="추방 확인", emoji="🥾", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelKick(interaction, self.playerName)
+        self.stop()
+
+    @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="추방을 취소했습니다.", view=None)
+        self.stop()
+
+
 class PlayerPanelView(OwnerView):
-    """Player selection plus inventory, position, stats, and effects shortcuts."""
+    """접속자 선택 + 조회(인벤토리·위치·체력·효과) + 조작(지급·효과·인챈트 등).
+
+    조회 버튼은 서버 상태를 바꾸지 않고, 조작 버튼은 전부 감사 기록을 남깁니다.
+    버튼 → 명령 대응은 bot/quick_commands.py에 있습니다.
+    """
 
     def __init__(self, controller, ownerId: int, players: list[str]):
         super().__init__(controller, ownerId)
+        self.players = players
         self.selectedPlayer = players[0]
         self.add_item(PlayerSelect(self, players))
 
@@ -319,9 +609,74 @@ class PlayerPanelView(OwnerView):
     async def stats(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._show(interaction, "stats")
 
-    @discord.ui.button(label="효과", emoji="✨", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="효과 보기", emoji="🔍", style=discord.ButtonStyle.secondary, row=1)
     async def effects(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._show(interaction, "effects")
+
+    @discord.ui.button(label="아이템 주기", emoji="🎁", style=discord.ButtonStyle.success, row=2)
+    async def giveItem(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(
+            GiveItemModal(self.controller, self.selectedPlayer)
+        )
+
+    @discord.ui.button(label="포션 효과", emoji="✨", style=discord.ButtonStyle.primary, row=2)
+    async def applyEffect(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            f"**{self.selectedPlayer}** 에게 적용할 효과를 선택하세요.",
+            view=EffectPanelView(self.controller, self.ownerId, self.selectedPlayer),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="인챈트", emoji="🗡️", style=discord.ButtonStyle.primary, row=2)
+    async def enchant(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            f"**{self.selectedPlayer}** 가 들고 있는 아이템에 부여할 인챈트를 선택하세요.",
+            view=EnchantPanelView(self.controller, self.ownerId, self.selectedPlayer),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="게임모드", emoji="🎮", style=discord.ButtonStyle.secondary, row=2)
+    async def gamemode(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            f"**{self.selectedPlayer}** 의 게임모드를 선택하세요.",
+            view=GamemodePanelView(self.controller, self.ownerId, self.selectedPlayer),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="TP", emoji="🚀", style=discord.ButtonStyle.secondary, row=2)
+    async def teleport(self, interaction: discord.Interaction, button: discord.ui.Button):
+        otherPlayers = [name for name in self.players if name != self.selectedPlayer]
+        places = await self.controller.panelSharedPlaces()
+        await interaction.response.send_message(
+            f"**{self.selectedPlayer}** 를 어디로 이동시킬까요?",
+            view=TeleportPanelView(
+                self.controller, self.ownerId, self.selectedPlayer, otherPlayers, places
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="경험치 +10", emoji="⭐", style=discord.ButtonStyle.secondary, row=3)
+    async def xpSmall(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelXp(interaction, self.selectedPlayer, 10)
+
+    @discord.ui.button(label="경험치 +30", emoji="🌟", style=discord.ButtonStyle.secondary, row=3)
+    async def xpLarge(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelXp(interaction, self.selectedPlayer, 30)
+
+    @discord.ui.button(label="회복", emoji="💖", style=discord.ButtonStyle.success, row=3)
+    async def heal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelHeal(interaction, self.selectedPlayer)
+
+    @discord.ui.button(label="추방", emoji="🥾", style=discord.ButtonStyle.danger, row=3)
+    async def kick(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            f"**{self.selectedPlayer}** 를 서버에서 추방할까요?",
+            view=ConfirmKickView(self.controller, self.ownerId, self.selectedPlayer),
+            ephemeral=True,
+        )
 
 
 class StoredFileSelect(discord.ui.Select):
