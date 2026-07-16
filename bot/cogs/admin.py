@@ -49,6 +49,7 @@ from bot.quick_commands import (
     DIFFICULTIES,
     GAMEMODES,
     GAMERULES,
+    GAMERULE_UNSUPPORTED_MESSAGE,
     SPAWN_RADIUS_ZERO_COMMAND,
     buildDifficultyCommand,
     buildEffectClearCommand,
@@ -64,6 +65,7 @@ from bot.quick_commands import (
     buildTeleportToPlayerCommand,
     buildWorldSpawnCommand,
     buildXpCommand,
+    ensureGameruleAccepted,
     ensureServerAccepted,
     parseDaysPlayed,
     parseGameruleValue,
@@ -176,6 +178,9 @@ class Admin(commands.Cog):
         self.placeStore = PlaceStore(cfg.state_dir)
         self.operationLock = asyncio.Lock()
         self.lastAlertAt: dict[str, datetime] = {}
+        # 게임룰 키 → 이 서버 버전 지원 여부. 빠른 명령 패널을 처음 열 때
+        # 한 번 조회해 캐시하고, 미지원 버튼을 비활성화합니다(#59).
+        self.supportedGamerules: dict[str, bool] = {}
 
     @app_commands.command(
         name="server", description="Check server status and online players with buttons."
@@ -276,12 +281,40 @@ class Admin(commands.Cog):
             return
         for gameruleKey in DEFAULT_ON_GAMERULES:
             try:
-                ensureServerAccepted(
+                ensureGameruleAccepted(
                     await _rcon(buildGameruleSetCommand(gameruleKey, True))
                 )
+                self.supportedGamerules[gameruleKey] = True
                 _log.info("default gamerule applied: %s=true", gameruleKey)
-            except (ValueError, RconError) as error:
+            except ValueError as error:
+                if str(error) == GAMERULE_UNSUPPORTED_MESSAGE:
+                    self.supportedGamerules[gameruleKey] = False
                 _log.warning("default gamerule %s failed: %s", gameruleKey, error)
+            except RconError as error:
+                _log.warning("default gamerule %s failed: %s", gameruleKey, error)
+
+    async def probeSupportedGamerules(self) -> dict[str, bool]:
+        """Ask the server once which panel gamerules exist in this version.
+
+        결과는 캐시되어 이후 패널 열기에서는 RCON을 다시 조회하지 않습니다.
+        조회 자체가 실패(RCON 불통)하면 알 수 없는 키는 True로 두어 버튼을
+        막지 않습니다 — 실제 토글 시점에 정확한 에러가 다시 안내됩니다.
+        """
+        for gameruleKey in GAMERULES:
+            if gameruleKey in self.supportedGamerules:
+                continue
+            try:
+                ensureGameruleAccepted(
+                    await _rcon(buildGameruleQueryCommand(gameruleKey))
+                )
+                self.supportedGamerules[gameruleKey] = True
+            except ValueError as error:
+                self.supportedGamerules[gameruleKey] = (
+                    str(error) != GAMERULE_UNSUPPORTED_MESSAGE
+                )
+            except RconError:
+                break  # 서버가 꺼져 있으면 나머지 프로브도 의미 없음
+        return dict(self.supportedGamerules)
 
     # A single guard applied to every command in this cog.
     async def cog_check(self, ctx):  # for prefix commands (unused)
@@ -1575,11 +1608,12 @@ class Admin(commands.Cog):
         gameruleName, koreanLabel = GAMERULES[gameruleKey]
         try:
             current = parseGameruleValue(
-                ensureServerAccepted(await _rcon(buildGameruleQueryCommand(gameruleKey)))
+                ensureGameruleAccepted(await _rcon(buildGameruleQueryCommand(gameruleKey)))
             )
-            ensureServerAccepted(
+            ensureGameruleAccepted(
                 await _rcon(buildGameruleSetCommand(gameruleKey, not current))
             )
+            self.supportedGamerules[gameruleKey] = True
             await self._audit(
                 interaction, "world.gamerule", "success", f"{gameruleName}={not current}"
             )
@@ -1588,6 +1622,8 @@ class Admin(commands.Cog):
                 f"✅ **{koreanLabel}**: {stateText}", ephemeral=True
             )
         except (ValueError, RconError) as error:
+            if str(error) == GAMERULE_UNSUPPORTED_MESSAGE:
+                self.supportedGamerules[gameruleKey] = False
             await self._audit(interaction, "world.gamerule", "failed", str(error)[:200])
             await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 

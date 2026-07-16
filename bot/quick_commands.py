@@ -102,6 +102,22 @@ _SERVER_FAILURE_MESSAGES = {
 }
 
 
+# 게임룰 이름이 그 서버 버전에 없으면 Brigadier가 'Incorrect argument'를
+# 돌려줍니다(#59). 일반 매핑은 '명령 형식 오류'라고만 말해 원인을 숨기므로
+# 게임룰 명령에는 이 함수를 대신 사용하세요.
+GAMERULE_UNSUPPORTED_MESSAGE = (
+    "이 서버 버전에는 없는 게임룰입니다. 서버를 업데이트하면 쓸 수 있어요."
+)
+
+
+def ensureGameruleAccepted(output: str) -> str:
+    """Validate a gamerule command reply with version-aware Korean errors."""
+    lowered = (output or "").casefold()
+    if "incorrect argument" in lowered or "unknown game rule" in lowered:
+        raise ValueError(GAMERULE_UNSUPPORTED_MESSAGE)
+    return ensureServerAccepted(output)
+
+
 def ensureServerAccepted(output: str) -> str:
     """Raise a Korean error when the server's reply is a known rejection.
 

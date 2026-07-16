@@ -64,6 +64,20 @@ class CommandBuilderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             qc.buildEffectCommand("Friend_1", "speed; op me")
 
+    def testGameruleUnsupportedMessage(self):
+        """An unknown gamerule maps to the version guidance, not a format error."""
+        with self.assertRaises(ValueError) as caught:
+            qc.ensureGameruleAccepted(
+                "Incorrect argument for command at position 9: gamerule <--[HERE]"
+            )
+        self.assertEqual(qc.GAMERULE_UNSUPPORTED_MESSAGE, str(caught.exception))
+        self.assertEqual(
+            "Gamerule keepInventory is currently set to: false",
+            qc.ensureGameruleAccepted(
+                "Gamerule keepInventory is currently set to: false"
+            ),
+        )
+
     def testEnchant(self):
         self.assertEqual(
             'enchant @a[name="Friend_1",limit=1] minecraft:sharpness 5',
