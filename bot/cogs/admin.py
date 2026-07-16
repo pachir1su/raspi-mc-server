@@ -36,6 +36,7 @@ from bot.player_info import parseOnlinePlayers, summarizeInventory
 from bot.player_names import buildPlayerSelector, validateServerPlayerName
 from bot.performance_report import parseTps, shouldAlert
 from bot.public_panel import PublicServerView
+from bot.quick_commands import parseDaysPlayed
 from bot.rcon import (
     Rcon,
     RconAuthError,
@@ -418,11 +419,6 @@ class Admin(commands.Cog):
         embed.add_field(
             name=t("portal_online"),
             value=", ".join(players) if players else t("online_none"),
-            inline=False,
-        )
-        embed.add_field(
-            name=t("portal_rules"),
-            value=cfg.public_rules or t("portal_rules_default"),
             inline=False,
         )
         embed.set_footer(text=statusText[:200])
@@ -1192,12 +1188,19 @@ class Admin(commands.Cog):
         await self._incidentCommand(interaction, "kill @e[type=item]", "incident_kill_items")
 
     async def publicServerEmbed(self) -> discord.Embed:
-        """Build the friend-safe server card shared by `/서버` panel refreshes."""
+        """Build the friend-safe server card shared by `/서버` panel refreshes.
+
+        이슈 #44/#45 개편: 규칙 문구 대신 친구가 실제로 궁금해하는
+        접속 주소·상태·접속자 이름·버전·플레이 일수를 보여줍니다.
+        """
         players = []
+        daysPlayed = None
         statusText = t("portal_offline")
         try:
             statusText = await _rcon("list")
             players = parseOnlinePlayers(statusText)
+            # 월드가 시작된 뒤 지난 게임 일수 — 서버 자랑 겸 근황 표시용.
+            daysPlayed = parseDaysPlayed(await _rcon("time query day"))
         except RconError:
             pass
         online = statusText != t("portal_offline")
@@ -1220,8 +1223,10 @@ class Admin(commands.Cog):
             inline=False,
         )
         embed.add_field(name=t("portal_version"), value=cfg.public_version, inline=True)
-        if cfg.public_rules:
-            embed.add_field(name=t("portal_rules"), value=cfg.public_rules, inline=False)
+        if daysPlayed is not None:
+            embed.add_field(
+                name=t("portal_days"), value=f"{daysPlayed:,}일차", inline=True
+            )
         return embed
 
     async def panelLegacyCommand(
