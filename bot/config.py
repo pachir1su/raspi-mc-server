@@ -68,7 +68,8 @@ class Config:
     language = _storedLanguage(state_dir)
     public_address = os.getenv("MC_PUBLIC_ADDRESS", "").strip()
     public_version = os.getenv("MC_PUBLIC_VERSION", "Paper / Java").strip()
-    public_rules = os.getenv("MC_PUBLIC_RULES", "").strip()
+    # MC_PUBLIC_RULES(서버 규칙 문구)는 운영자 요청으로 제거했습니다.
+    # /서버 안내에는 접속 정보·상태·플레이 일수만 표시합니다.
     public_commands_enabled = os.getenv("PUBLIC_COMMANDS_ENABLED", "true").lower() in {
         "1", "true", "yes", "on",
     }
