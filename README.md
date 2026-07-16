@@ -101,6 +101,7 @@ Details: **[docs/en/cheats-and-ops.md](docs/en/cheats-and-ops.md)**.
 | Discord bot | [discord-bot](docs/en/discord-bot.md) | [디스코드 봇](docs/ko/discord-bot.md) |
 | Friend links, rescue & journal | [friend-tools](docs/en/friend-tools.md) | [친구 도구](docs/ko/friend-tools.md) |
 | Death Box plugin | [death-box-design](docs/en/death-box-design.md) | [Death Box 설계](docs/ko/death-box-design.md) |
+| Paper operations plugin | [paper-ops-plugin](docs/en/paper-ops-plugin.md) | [Paper 운영 플러그인](docs/ko/paper-ops-plugin.md) |
 | Remote access (RCON / Cloudflare) | [remote-access](docs/en/remote-access.md) | [원격 접속](docs/ko/remote-access.md) |
 | Backups | [backup](docs/en/backup.md) | [백업](docs/ko/backup.md) |
 | Performance tuning | [performance](docs/en/performance.md) | [성능 튜닝](docs/ko/performance.md) |
