@@ -75,6 +75,11 @@ you run on the Pi. CI also builds the plugin on every change under
 
 ## Install
 
+Release ZIPs bundle the plugin as `bundled-plugins/DeathBox.jar`, and the bot
+validates and installs it into the server's `plugins/` directory on startup,
+exactly like `RaspiMcOps`. Manual installation is only needed for source
+checkouts without a release build:
+
 1. Copy `target/DeathBox-1.0.0.jar` into the server's `plugins/` directory.
 2. Start (or restart) the server once to generate `plugins/DeathBox/config.yml`.
 3. Edit the config if needed, then restart.

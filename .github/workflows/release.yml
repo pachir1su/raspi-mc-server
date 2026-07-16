@@ -50,6 +50,13 @@ jobs:
         shell: bash
         run: gradle -p plugins/raspi-mc-ops clean test jar --no-daemon
 
+      - name: Build the DeathBox plugin
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -ntp -f plugin/deathbox package
+          cp plugin/deathbox/target/DeathBox-*.jar plugin/deathbox/target/DeathBox.jar
+
       - name: Build manifest-verified ZIP
         shell: bash
         env:
@@ -63,7 +70,9 @@ jobs:
             --tag "$TAG" \
             --commit "$GITHUB_SHA" \
             --extra-file \
-              "plugins/raspi-mc-ops/build/libs/raspi-mc-ops.jar=bundled-plugins/raspi-mc-ops.jar"
+              "plugins/raspi-mc-ops/build/libs/raspi-mc-ops.jar=bundled-plugins/raspi-mc-ops.jar" \
+            --extra-file \
+              "plugin/deathbox/target/DeathBox.jar=bundled-plugins/DeathBox.jar"
           cd dist
           sha256sum "raspi-mc-server-${TAG}.zip" > SHA256SUMS
 
