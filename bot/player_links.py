@@ -2,7 +2,6 @@
 
 import json
 import os
-import re
 import tempfile
 import threading
 import uuid
@@ -10,35 +9,18 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bot.player_info import validatePlayerName
-
-
-BEDROCK_NAME_PATTERN = re.compile(r"[A-Za-z0-9_ ]{1,16}")
-
-
-def validateBedrockName(minecraftName: str) -> str:
-    """Accept a command-safe Floodgate gamertag, including ordinary spaces."""
-    cleanedName = (minecraftName or "").strip()
-    if not BEDROCK_NAME_PATTERN.fullmatch(cleanedName):
-        raise ValueError(
-            "Bedrock name must be 1-16 characters using letters, numbers, spaces, or _"
-        )
-    return cleanedName
+from bot.player_names import toServerPlayerName, validateBedrockName, validateJavaName
 
 
 def serverPlayerName(link: "PlayerLink", usernamePrefix: str = ".") -> str:
     """Return the exact Paper entity name used by Java or Floodgate."""
-    if link.edition == "java":
-        return validatePlayerName(link.minecraftName)
-    if link.edition == "bedrock" and usernamePrefix == ".":
-        return "." + validateBedrockName(link.minecraftName).replace(" ", "_")
-    raise ValueError("Unsupported Minecraft edition or Bedrock username prefix")
+    return toServerPlayerName(link.minecraftName, link.edition, usernamePrefix)
 
 
 def buildWhitelistCommand(link: "PlayerLink") -> str:
     """Build the narrow allowlist command used during admin approval."""
     if link.edition == "java":
-        return f"whitelist add {validatePlayerName(link.minecraftName)}"
+        return f"whitelist add {validateJavaName(link.minecraftName)}"
     if link.edition == "bedrock":
         return f"fwhitelist add {validateBedrockName(link.minecraftName)}"
     raise ValueError("Unsupported Minecraft edition")
@@ -47,7 +29,7 @@ def buildWhitelistCommand(link: "PlayerLink") -> str:
 def buildWhitelistRemoveCommand(link: "PlayerLink") -> str:
     """Build the matching safe whitelist removal command for one profile."""
     if link.edition == "java":
-        return f"whitelist remove {validatePlayerName(link.minecraftName)}"
+        return f"whitelist remove {validateJavaName(link.minecraftName)}"
     if link.edition == "bedrock":
         return f"fwhitelist remove {validateBedrockName(link.minecraftName)}"
     raise ValueError("Unsupported Minecraft edition")
@@ -144,7 +126,7 @@ class PlayerLinkStore:
         """Validate one edition/name pair before it reaches RCON or disk."""
         cleanedEdition = (edition or "").strip().lower()
         if cleanedEdition == "java":
-            return validatePlayerName(minecraftName), cleanedEdition
+            return validateJavaName(minecraftName), cleanedEdition
         if cleanedEdition == "bedrock":
             return validateBedrockName(minecraftName), cleanedEdition
         raise ValueError("edition must be java or bedrock")
