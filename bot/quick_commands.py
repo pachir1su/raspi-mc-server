@@ -75,6 +75,8 @@ GAMERULES = {
     "doImmediateRespawn": ("doImmediateRespawn", "즉시 리스폰"),
     "naturalRegeneration": ("naturalRegeneration", "자연 체력 재생"),
     "showDaysPlayed": ("showDaysPlayed", "플레이 일수 표시"),
+    "doDaylightCycle": ("doDaylightCycle", "낮밤 시간 흐름"),
+    "doWeatherCycle": ("doWeatherCycle", "날씨 변화"),
 }
 
 # 봇이 서버에 연결될 때 한 번 기본 ON으로 적용하는 게임룰(운영자 요청).
