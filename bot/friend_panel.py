@@ -34,6 +34,38 @@ class UserView(discord.ui.View):
             await interaction.response.send_message(message, ephemeral=True)
 
 
+class TeleportTargetSelect(discord.ui.Select):
+    """Pick an online player to teleport the friend's own account to."""
+
+    def __init__(self, controller, ownerId: int, linkId: str, targets: list[str]):
+        self.controller = controller
+        self.ownerId = ownerId
+        self.linkId = linkId
+        options = [
+            discord.SelectOption(label=name[:100], value=name, emoji="🧍")
+            for name in targets[:25]
+        ]
+        super().__init__(
+            placeholder="이동할 플레이어 선택",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await self.controller.panelPlayerTeleport(
+            interaction, self.linkId, self.values[0]
+        )
+
+
+class FriendTeleportView(UserView):
+    """Online-player picker for the friend teleport action."""
+
+    def __init__(self, controller, ownerId: int, linkId: str, targets: list[str]):
+        super().__init__(controller, ownerId, timeout=120)
+        self.add_item(TeleportTargetSelect(controller, ownerId, linkId, targets))
+
+
 class PlayerAccountSelect(discord.ui.Select):
     """Choose which administrator-managed Minecraft profile an action targets."""
 
@@ -307,6 +339,39 @@ class MyToolsView(UserView):
     ) -> None:
         if await self._requireSelection(interaction):
             await self.controller.panelDeathboxList(interaction, self.selectedLinkId)
+
+    @discord.ui.button(label="내 상태", emoji="❤️", style=discord.ButtonStyle.secondary, row=3)
+    async def myStatus(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        if await self._requireSelection(interaction):
+            await self.controller.panelMyStatus(interaction, self.selectedLinkId)
+
+    @discord.ui.button(label="플레이어에게 이동", emoji="🚀", style=discord.ButtonStyle.primary, row=4)
+    async def teleport(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        if not await self._requireSelection(interaction):
+            return
+        targets = await self.controller.panelTeleportTargets(interaction)
+        if not targets:
+            await interaction.response.send_message(
+                "이동할 수 있는 다른 접속자가 없습니다.", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            "이동할 접속 중인 플레이어를 선택하세요. (30분에 한 번)",
+            view=FriendTeleportView(
+                self.controller, self.ownerId, self.selectedLinkId, targets
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="서버 시간", emoji="🕰️", style=discord.ButtonStyle.secondary, row=4)
+    async def serverTime(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        await self.controller.panelServerTime(interaction)
 
 
 class ManagedAccountModal(discord.ui.Modal):

@@ -79,6 +79,11 @@ class Config:
     # 일치합니다. 운영 .env에 남은 MC_SPAWN_* 값은 무시되며 지워도 됩니다.
     # 스폰 위치 변경: 관리 패널 → 빠른 명령 → 스폰 지정.
     alert_cooldown_minutes = int(os.getenv("ALERT_COOLDOWN_MINUTES", "30"))
+    # 일반 플레이어 셀프 서비스 쿨타임(초). 디스코드 계정 단위로 적용되며,
+    # 여러 마인크래프트 계정을 연동해도 공유합니다. 파일에 저장되어 봇을
+    # 재시작해도 유지됩니다. 0이면 해당 쿨타임 비활성화.
+    tp_cooldown_seconds = int(os.getenv("TP_COOLDOWN_SECONDS", "1800"))
+    rescue_cooldown_seconds = int(os.getenv("RESCUE_COOLDOWN_SECONDS", "300"))
     alert_tps_threshold = float(os.getenv("ALERT_TPS_THRESHOLD", "18.0"))
     alert_memory_percent = float(os.getenv("ALERT_MEMORY_PERCENT", "85"))
     alert_temperature_celsius = float(os.getenv("ALERT_TEMPERATURE_CELSIUS", "80"))

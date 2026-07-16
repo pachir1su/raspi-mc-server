@@ -77,9 +77,25 @@ characters are rejected in both cases.
   (changed via the admin panel's Set spawn), so it matches the on-death
   respawn location. The friend cannot enter a target, coordinates, or RCON command.
 - **Selected account: location** reads only that linked online player's dimension and XYZ.
+- **My status** shows the caller's own health, food, XP level, and potion
+  effects in a readable form (read-only).
+- **Server time** shows the current in-game day count and day/night (read-only).
 
-The administrator's account assignment is the delegated authorization for this one fixed
-teleport. All general server mutation, the in-game command console, lifecycle, backup, whitelist,
+### Teleport to a player (cooldown)
+
+- **Teleport to a player** picks another online player and warps the caller's
+  own account to them. There is no consent step (friends-only trust), but a
+  **cooldown** prevents repeated ambush teleports.
+- The cooldown is scoped to the **Discord account**: linking several Minecraft
+  accounts shares one timer, so a player cannot dodge it by switching accounts,
+  and it is persisted to a file so a bot restart does not reset it.
+- Defaults: player teleport **30 min** (`TP_COOLDOWN_SECONDS`), spawn rescue
+  **5 min** (`RESCUE_COOLDOWN_SECONDS`). Tune them in the Pi's operational
+  `.env` (seconds; 0 disables). The rescue cooldown starts only on a successful
+  teleport (an offline-player failure is not counted).
+
+The administrator's account assignment is the delegated authorization for these
+bounded teleports. All general server mutation, the in-game command console, lifecycle, backup, whitelist,
 quick commands, and world-management commands remain behind `ADMIN_USER_IDS`.
 
 ## 4. Coordinate book and photos
