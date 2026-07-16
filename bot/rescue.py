@@ -4,7 +4,7 @@ import math
 import re
 from dataclasses import dataclass
 
-from bot.player_info import validatePlayerName
+from bot.player_names import buildPlayerSelector, validateServerPlayerName
 
 
 DIMENSION_IDS = {
@@ -18,17 +18,6 @@ POSITION_PATTERN = re.compile(
     r"(-?\d+(?:\.\d+)?)[dDfF]?\s*\]"
 )
 DIMENSION_PATTERN = re.compile(r"minecraft:(overworld|the_nether|the_end)")
-FLOODGATE_PLAYER_PATTERN = re.compile(r"\.[A-Za-z0-9_]{1,32}")
-
-
-def validateServerPlayerName(playerName: str) -> str:
-    """Accept either a Java name or a dot-prefixed Floodgate entity name."""
-    cleanedName = (playerName or "").strip()
-    if FLOODGATE_PLAYER_PATTERN.fullmatch(cleanedName):
-        return cleanedName
-    return validatePlayerName(cleanedName)
-
-
 @dataclass(frozen=True)
 class RescueDestination:
     """One configured, admin-controlled teleport destination."""
@@ -58,10 +47,16 @@ def validateDestination(
 
 def buildSpawnCommand(playerName: str, destination: RescueDestination) -> str:
     """Build only the fixed self-teleport command accepted by the friend cog."""
-    safeName = validateServerPlayerName(playerName)
+    playerTarget = buildPlayerSelector(validateServerPlayerName(playerName))
     dimensionId = DIMENSION_IDS[destination.dimension]
     coordinates = " ".join(f"{value:g}" for value in (destination.x, destination.y, destination.z))
-    return f"execute in {dimensionId} run tp {safeName} {coordinates}"
+    return f"execute in {dimensionId} run tp {playerTarget} {coordinates}"
+
+
+def buildAutomaticSpawnCommand(playerName: str) -> str:
+    """Ask the bundled Paper plugin to use the live world's configured spawn."""
+    safeName = validateServerPlayerName(playerName)
+    return f"raspiops rescue {safeName}"
 
 
 def parsePosition(positionOutput: str, dimensionOutput: str) -> tuple[str, float, float, float]:
