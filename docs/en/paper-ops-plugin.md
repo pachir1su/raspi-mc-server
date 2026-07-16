@@ -1,10 +1,10 @@
 # RaspiMcOps Paper plugin
 
-Release archives include the Java 25 `RaspiMcOps` plugin. On bot startup, the
+Release archives include the Java 25 `RaspiMcOps` plugin (and the `DeathBox`
+plugin — see [death-box-design.md](death-box-design.md)). On bot startup, each
 bundled JAR is validated, copied atomically to
-`/mnt/minecraft/live/plugins/raspi-mc-ops.jar`, and Paper is restarted only when
-the JAR changed. Source checkouts without a release-built JAR simply skip this
-step.
+`/mnt/minecraft/live/plugins/`, and Paper is restarted only when a JAR
+changed. Source checkouts without release-built JARs simply skip this step.
 
 The plugin configuration is generated at
 `/mnt/minecraft/live/plugins/RaspiMcOps/config.yml`. These settings do not belong

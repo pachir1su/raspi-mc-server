@@ -66,6 +66,11 @@ Pi에서 돌리는 Paper 버전에 맞춰 `plugin/deathbox/pom.xml`의 `<paper.a
 
 ## 설치
 
+Release ZIP에는 플러그인이 `bundled-plugins/DeathBox.jar`로 포함되며, 봇이
+시작할 때 `RaspiMcOps`와 똑같이 검증 후 서버의 `plugins/` 폴더에 자동
+설치합니다. 아래 수동 설치는 Release 빌드가 없는 소스 체크아웃에서만
+필요합니다.
+
 1. `target/DeathBox-1.0.0.jar`를 서버의 `plugins/` 폴더에 복사합니다.
 2. 서버를 한 번 시작(또는 재시작)해 `plugins/DeathBox/config.yml`을 생성합니다.
 3. 필요하면 설정을 수정한 뒤 재시작합니다.

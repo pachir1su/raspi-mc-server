@@ -1,7 +1,8 @@
 # RaspiMcOps Paper 플러그인
 
-Release ZIP에는 Java 25용 `RaspiMcOps` 플러그인이 포함됩니다. 봇 시작 시
-번들 JAR을 검증하고 `/mnt/minecraft/live/plugins/raspi-mc-ops.jar`에 원자적으로
+Release ZIP에는 Java 25용 `RaspiMcOps` 플러그인과 `DeathBox` 플러그인
+([death-box-design.md](death-box-design.md) 참고)이 포함됩니다. 봇 시작 시
+각 번들 JAR을 검증하고 `/mnt/minecraft/live/plugins/`에 원자적으로
 복사합니다. JAR이 바뀐 경우에만 Paper를 재시작합니다. Release 빌드 JAR이 없는
 일반 소스 체크아웃에서는 이 단계를 건너뜁니다.
 
