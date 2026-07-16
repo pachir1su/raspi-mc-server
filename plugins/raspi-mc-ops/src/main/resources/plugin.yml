@@ -17,6 +17,10 @@ commands:
     description: Inspect or toggle per-placer container locks.
     usage: /chestlock <status|on|off|toggle>
     permission: raspimcops.chestlock.manage
+  enchantheld:
+    description: Owner cheat — enchant a player's held item without vanilla limits.
+    usage: /enchantheld <exact-player-name> <enchant> <level>
+    permission: raspimcops.enchant
 permissions:
   raspimcops.rescue:
     default: op
@@ -27,4 +31,6 @@ permissions:
   raspimcops.chestlock.manage:
     default: op
   raspimcops.chestlock.bypass:
+    default: op
+  raspimcops.enchant:
     default: op
