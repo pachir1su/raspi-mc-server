@@ -69,6 +69,21 @@ chestlock toggle
 토글 상태는 플러그인 설정에 저장됩니다. 기능을 꺼도 기록된 소유자는 유지되어
 다시 켜면 잠금이 그대로 살아납니다.
 
+## 강제 인챈트(#62)
+
+바닐라 `/enchant`는 곡괭이에 날카로움을 못 걸고 최대 레벨도 강제하지만,
+`enchantheld`는 든 아이템에 **호환·최대 레벨을 무시하고** 인챈트를 부여합니다
+(`ItemStack.addUnsafeEnchantment`). 서버장 치트 용도라 `raspimcops.enchant`
+권한(기본 op)이 필요합니다.
+
+```text
+enchantheld <정확한-플레이어-이름> <인챈트ID> <레벨>
+예: enchantheld QUI203 sharpness 20
+```
+
+레벨은 1~255로 clamp합니다. Discord에서는 `/관리자` → **접속자 관리** →
+**인챈트** 드롭다운의 **강제 인챈트 (제한 없음)…** 항목이 이 명령을 호출합니다.
+
 Death Box는 [death-box-design.md](death-box-design.md)에 설명된 별도
 [`plugin/deathbox`](../../plugin/deathbox) 구현을 그대로 사용합니다. 다른 사망
 보관 구현을 중복 설치하지 마세요.
