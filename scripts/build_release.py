@@ -55,16 +55,43 @@ def _trackedFiles(repoDir: Path) -> list[Path]:
     return sorted(paths, key=lambda path: path.relative_to(repoDir).as_posix())
 
 
-def buildRelease(repoDir: Path, outputPath: Path, tag: str, commit: str) -> dict:
+def _safeExtraTarget(rawPath: str) -> str:
+    """Validate one generated artifact destination inside the release archive."""
+    path = PurePosixPath(rawPath)
+    normalizedPath = path.as_posix()
+    if not normalizedPath or path.is_absolute() or ".." in path.parts or "\\" in rawPath:
+        raise ValueError(f"unsafe generated release path: {rawPath}")
+    if normalizedPath in EXCLUDED_PATHS or normalizedPath.startswith(EXCLUDED_PREFIXES):
+        raise ValueError(f"protected generated release path: {normalizedPath}")
+    return normalizedPath
+
+
+def buildRelease(
+    repoDir: Path,
+    outputPath: Path,
+    tag: str,
+    commit: str,
+    extraFiles: dict[str, Path] | None = None,
+) -> dict:
     """Create a ZIP whose manifest authenticates every deployable file."""
     if not tag.startswith("v") or len(tag) > 64:
         raise ValueError("release tag must start with v and be at most 64 characters")
     repoDir = repoDir.resolve()
     outputPath.parent.mkdir(parents=True, exist_ok=True)
+    archiveFiles = {
+        filePath.relative_to(repoDir).as_posix(): filePath
+        for filePath in _trackedFiles(repoDir)
+    }
+    for rawTarget, rawSource in (extraFiles or {}).items():
+        target = _safeExtraTarget(rawTarget)
+        source = Path(rawSource).resolve()
+        if target in archiveFiles:
+            raise ValueError(f"generated release path duplicates a tracked file: {target}")
+        if not source.is_file():
+            raise ValueError(f"generated release file is missing: {source}")
+        archiveFiles[target] = source
     manifestFiles = []
-    trackedFiles = _trackedFiles(repoDir)
-    for filePath in trackedFiles:
-        relativePath = filePath.relative_to(repoDir).as_posix()
+    for relativePath, filePath in sorted(archiveFiles.items()):
         manifestFiles.append(
             {
                 "path": relativePath,
@@ -84,8 +111,8 @@ def buildRelease(repoDir: Path, outputPath: Path, tag: str, commit: str) -> dict
             outputPath, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
         ) as archive:
             archive.writestr("release-manifest.json", manifestBytes)
-            for filePath in trackedFiles:
-                archive.write(filePath, filePath.relative_to(repoDir).as_posix())
+            for relativePath, filePath in sorted(archiveFiles.items()):
+                archive.write(filePath, relativePath)
     except (OSError, zipfile.BadZipFile) as error:
         raise RuntimeError(f"cannot build release ZIP: {error}") from error
     return manifest
@@ -98,8 +125,25 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tag", required=True)
     parser.add_argument("--commit", required=True)
+    parser.add_argument(
+        "--extra-file",
+        action="append",
+        default=[],
+        metavar="SOURCE=ARCHIVE_PATH",
+        help="include one generated artifact at a safe archive path",
+    )
     args = parser.parse_args()
-    manifest = buildRelease(args.repo, args.output, args.tag, args.commit)
+    extraFiles = {}
+    for value in args.extra_file:
+        if "=" not in value:
+            parser.error("--extra-file must use SOURCE=ARCHIVE_PATH")
+        source, target = value.split("=", 1)
+        if target in extraFiles:
+            parser.error(f"duplicate --extra-file target: {target}")
+        extraFiles[target] = Path(source)
+    manifest = buildRelease(
+        args.repo, args.output, args.tag, args.commit, extraFiles=extraFiles
+    )
     print(f"built {args.output} with {len(manifest['files'])} files")
     print(f"sha256:{_sha256(args.output)}")
 
