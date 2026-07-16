@@ -50,6 +50,69 @@ class QuickActionModal(discord.ui.Modal):
             await interaction.response.send_message(message, ephemeral=True)
 
 
+# ── 한 메시지 안 페이지 이동 (#58) ─────────────────────────────────
+# 예전에는 버튼을 누를 때마다 새 ephemeral 메시지를 보내 채팅이 계속 쌓였습니다.
+# 이제 하위 패널은 같은 메시지를 edit로 교체하고, 각 패널에 '🏠 홈' 버튼을 두어
+# 되돌아갑니다. 느린 조회는 먼저 로딩 문구로 교체한 뒤 결과로 다시 편집합니다.
+
+
+async def replaceScreen(
+    interaction: discord.Interaction,
+    *,
+    content=None,
+    embed=None,
+    view: discord.ui.View | None = None,
+):
+    """현재 메시지를 새 화면으로 교체합니다(첫 응답이면 edit_message)."""
+    if interaction.response.is_done():
+        await interaction.edit_original_response(content=content, embed=embed, view=view)
+    else:
+        await interaction.response.edit_message(content=content, embed=embed, view=view)
+
+
+async def replaceWithLoadingEmbed(interaction, controller, ownerId, builder):
+    """느린 조회: 먼저 로딩 문구로 교체(3초 응답 한도 회피)한 뒤 결과로 재편집.
+
+    builder는 embed를 반환하는 코루틴입니다. 결과 화면에는 '🏠 홈' 버튼만 둡니다.
+    """
+    await interaction.response.edit_message(content="⏳ 불러오는 중…", embed=None, view=None)
+    embed = await builder()
+    await interaction.edit_original_response(
+        content=None, embed=embed, view=InfoScreenView(controller, ownerId)
+    )
+
+
+async def renderAdminHome(interaction: discord.Interaction, controller, ownerId: int):
+    """대시보드 홈으로 같은 메시지에서 되돌아갑니다."""
+    embed = await controller.panelOverviewEmbed()
+    await replaceScreen(
+        interaction,
+        content=None,
+        embed=embed,
+        view=AdminDashboardView(controller, ownerId),
+    )
+
+
+class HomeButton(discord.ui.Button):
+    """어느 하위 패널에서든 관리 대시보드 홈으로 돌아갑니다(#58)."""
+
+    def __init__(self, controller, ownerId: int, *, row: int = 4, label: str = "🏠 홈"):
+        super().__init__(label=label, style=discord.ButtonStyle.secondary, row=row)
+        self.controller = controller
+        self.ownerId = ownerId
+
+    async def callback(self, interaction: discord.Interaction):
+        await renderAdminHome(interaction, self.controller, self.ownerId)
+
+
+class InfoScreenView(OwnerView):
+    """읽기 전용 결과 화면 — '🏠 홈' 버튼만 둡니다."""
+
+    def __init__(self, controller, ownerId: int):
+        super().__init__(controller, ownerId)
+        self.add_item(HomeButton(controller, ownerId, row=0))
+
+
 class AdminDashboardView(OwnerView):
     """Main dashboard with the most common tasks reachable in one click.
 
@@ -66,19 +129,25 @@ class AdminDashboardView(OwnerView):
     async def players(self, interaction: discord.Interaction, button: discord.ui.Button):
         players = await self.controller.panelOnlinePlayers()
         if not players:
-            await interaction.response.send_message("현재 접속 중인 플레이어가 없습니다.", ephemeral=True)
+            await replaceScreen(
+                interaction,
+                content="현재 접속 중인 플레이어가 없습니다.",
+                embed=None,
+                view=InfoScreenView(self.controller, self.ownerId),
+            )
             return
         view = PlayerPanelView(self.controller, self.ownerId, players)
-        await interaction.response.send_message(
-            "조회할 플레이어를 선택하세요.", view=view, ephemeral=True
+        await replaceScreen(
+            interaction, content="조회할 플레이어를 선택하세요.", embed=None, view=view
         )
 
     @discord.ui.button(label="서버 제어", emoji="🎛️", style=discord.ButtonStyle.primary, row=0)
     async def service(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "실행할 서버 작업을 선택하세요. 정지와 재시작은 한 번 더 확인합니다.",
+        await replaceScreen(
+            interaction,
+            content="실행할 서버 작업을 선택하세요. 정지와 재시작은 한 번 더 확인합니다.",
+            embed=None,
             view=ServerActionsView(self.controller, self.ownerId),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="백업", emoji="💾", style=discord.ButtonStyle.success, row=0)
@@ -86,10 +155,11 @@ class AdminDashboardView(OwnerView):
         backups = await self.controller.panelBackups()
         settings = await self.controller.panelBackupSettings()
         embed = await self.controller.panelBackupEmbed()
-        await interaction.response.send_message(
+        await replaceScreen(
+            interaction,
+            content=None,
             embed=embed,
             view=BackupPanelView(self.controller, self.ownerId, backups, settings),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="빠른 명령", emoji="⚡", style=discord.ButtonStyle.danger, row=0)
@@ -98,18 +168,23 @@ class AdminDashboardView(OwnerView):
         # (아이템·효과·TP 등)은 '접속자 관리'에서 접속자를 고른 뒤 사용합니다.
         # 첫 열기에서 서버 버전이 지원하는 게임룰을 조회해(#59) 미지원
         # 버튼을 비활성화합니다. 조회 결과는 캐시됩니다.
-        await interaction.response.defer(ephemeral=True)
         supported = await self.controller.probeSupportedGamerules()
-        await interaction.followup.send(
-            "시간·날씨·난이도·게임룰·스폰을 버튼으로 바꿉니다. 서버 상태가 즉시 바뀝니다.",
+        await replaceScreen(
+            interaction,
+            content="시간·날씨·난이도·게임룰·스폰을 버튼으로 바꿉니다. 서버 상태가 즉시 바뀝니다.",
+            embed=None,
             view=WorldCommandsView(self.controller, self.ownerId, supported),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="상태 진단", emoji="🩺", style=discord.ButtonStyle.secondary, row=1)
     async def health(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = await self.controller.panelHealthEmbed()
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await replaceScreen(
+            interaction,
+            content=None,
+            embed=embed,
+            view=InfoScreenView(self.controller, self.ownerId),
+        )
 
     @discord.ui.button(label="친구 계정", emoji="👤", style=discord.ButtonStyle.secondary, row=1)
     async def links(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -117,71 +192,100 @@ class AdminDashboardView(OwnerView):
 
     @discord.ui.button(label="관리 도움말", emoji="❓", style=discord.ButtonStyle.primary, row=1)
     async def help(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            embed=self.controller.panelHelpEmbed(), ephemeral=True
+        await replaceScreen(
+            interaction,
+            content=None,
+            embed=self.controller.panelHelpEmbed(),
+            view=InfoScreenView(self.controller, self.ownerId),
         )
 
     @discord.ui.button(label="더보기", emoji="🧰", style=discord.ButtonStyle.secondary, row=1)
     async def more(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "자주 쓰지 않는 도구와 설정입니다.",
+        await replaceScreen(
+            interaction,
+            content="자주 쓰지 않는 도구와 설정입니다.",
+            embed=None,
             view=MoreToolsView(self.controller, self.ownerId),
-            ephemeral=True,
         )
 
 
 class MoreToolsView(OwnerView):
     """Second-tier dashboard tools that are useful but not everyday actions."""
 
+    def __init__(self, controller, ownerId: int, timeout: float = 600):
+        super().__init__(controller, ownerId, timeout)
+        self.add_item(HomeButton(controller, ownerId, row=2))
+
+    async def _tuningEmbed(self):
+        warnings, embed = await self.controller._collectPerformanceWarnings()
+        if warnings:
+            embed.add_field(
+                name="경고",
+                value="\n".join(f"• {item}" for item in warnings)[:1000],
+                inline=False,
+            )
+        return embed
+
     @discord.ui.button(label="성능 상세", emoji="📊", style=discord.ButtonStyle.secondary, row=0)
     async def performance(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        embed = await self.controller.panelMetricsEmbed()
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await replaceWithLoadingEmbed(
+            interaction, self.controller, self.ownerId, self.controller.panelMetricsEmbed
+        )
 
     @discord.ui.button(label="렉 원인", emoji="🧰", style=discord.ButtonStyle.secondary, row=0)
     async def tuning(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        warnings, embed = await self.controller._collectPerformanceWarnings()
-        if warnings:
-            embed.add_field(name="경고", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await replaceWithLoadingEmbed(
+            interaction, self.controller, self.ownerId, self._tuningEmbed
+        )
 
     @discord.ui.button(label="로그", emoji="📄", style=discord.ButtonStyle.secondary, row=0)
     async def logs(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "확인할 로그를 선택하세요.", view=LogPanelView(self.controller, self.ownerId), ephemeral=True
+        await replaceScreen(
+            interaction,
+            content="확인할 로그를 선택하세요.",
+            embed=None,
+            view=LogPanelView(self.controller, self.ownerId),
         )
 
     @discord.ui.button(label="저장공간", emoji="💽", style=discord.ButtonStyle.secondary, row=0)
     async def storage(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = await self.controller.panelStorageEmbed()
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await replaceScreen(
+            interaction,
+            content=None,
+            embed=embed,
+            view=InfoScreenView(self.controller, self.ownerId),
+        )
 
     @discord.ui.button(label="월드", emoji="🌍", style=discord.ButtonStyle.secondary, row=1)
     async def worlds(self, interaction: discord.Interaction, button: discord.ui.Button):
         worlds = await self.controller.panelWorlds()
-        await interaction.response.send_message(
-            "가져온 월드를 선택하세요. 새 파일은 `/업로드 월드`로 추가합니다.",
+        await replaceScreen(
+            interaction,
+            content="가져온 월드를 선택하세요. 새 파일은 `/업로드 월드`로 추가합니다.",
+            embed=None,
             view=WorldPanelView(self.controller, self.ownerId, worlds),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="업데이트", emoji="⬆️", style=discord.ButtonStyle.secondary, row=1)
     async def updates(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "Release 확인과 최근 설치 결과를 조회합니다. ZIP은 `/업로드 업데이트`를 사용하세요.",
+        await replaceScreen(
+            interaction,
+            content="Release 확인과 최근 설치 결과를 조회합니다. ZIP은 `/업로드 업데이트`를 사용하세요.",
+            embed=None,
             view=UpdatePanelView(self.controller, self.ownerId),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="고급 도구", emoji="⚙️", style=discord.ButtonStyle.secondary, row=1)
     async def advanced(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "게임 공지, 인게임 명령어(마인크래프트 콘솔 명령 직접 실행), "
-            "접속 허용목록과 감사 기록입니다.",
+        await replaceScreen(
+            interaction,
+            content=(
+                "게임 공지, 인게임 명령어(마인크래프트 콘솔 명령 직접 실행), "
+                "접속 허용목록과 감사 기록입니다."
+            ),
+            embed=None,
             view=AdvancedPanelView(self.controller, self.ownerId),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="스폰 보호", emoji="🛡️", style=discord.ButtonStyle.secondary, row=2)
@@ -350,6 +454,7 @@ class WorldCommandsView(OwnerView):
     ):
         super().__init__(controller, ownerId, timeout)
         self.add_item(DifficultySelect(controller))
+        self.add_item(HomeButton(controller, ownerId, row=3))
         # 이 서버 버전에 없는 게임룰 버튼은 눌러도 실패하므로 회색 처리.
         # 프로브가 판단하지 못한 키(True/미기록)는 그대로 살려 둡니다.
         for attrName, gameruleKey in self._GAMERULE_BUTTONS.items():
@@ -436,6 +541,10 @@ class ConfirmServiceView(OwnerView):
 
 class ServerActionsView(OwnerView):
     """Server lifecycle shortcuts; disruptive actions open confirmation views."""
+
+    def __init__(self, controller, ownerId: int, timeout: float = 600):
+        super().__init__(controller, ownerId, timeout)
+        self.add_item(HomeButton(controller, ownerId, row=1))
 
     async def _confirm(self, interaction: discord.Interaction, action: str, koreanName: str):
         await interaction.response.send_message(
@@ -816,6 +925,7 @@ class PlayerPanelView(OwnerView):
         self.players = players
         self.selectedPlayer = players[0]
         self.add_item(PlayerSelect(self, players))
+        self.add_item(HomeButton(controller, ownerId, row=4))
 
     async def _show(self, interaction: discord.Interaction, detailType: str):
         embed = await self.controller.panelPlayerEmbed(self.selectedPlayer, detailType)
@@ -970,6 +1080,7 @@ class BackupPanelView(OwnerView):
         )
         if backups:
             self.add_item(StoredFileSelect(self, backups, "백업 선택", "💾"))
+        self.add_item(HomeButton(controller, ownerId, row=3))
 
     async def _selected(self, interaction, action: str, *args):
         if not self.selectedName:
@@ -1096,6 +1207,7 @@ class WorldPanelView(OwnerView):
         self.selectedName = worlds[0].name if worlds else None
         if worlds:
             self.add_item(StoredFileSelect(self, worlds, "가져온 월드 선택", "🌍"))
+        self.add_item(HomeButton(controller, ownerId, row=2))
 
     async def _selected(self, interaction, action: str, *args):
         if not self.selectedName:
@@ -1145,6 +1257,10 @@ class WorldPanelView(OwnerView):
 class UpdatePanelView(OwnerView):
     """Release check and recent updater result without typed subcommands."""
 
+    def __init__(self, controller, ownerId: int, timeout: float = 600):
+        super().__init__(controller, ownerId, timeout)
+        self.add_item(HomeButton(controller, ownerId, row=1))
+
     @discord.ui.button(label="새 버전 확인", emoji="🔍", style=discord.ButtonStyle.primary)
     async def check(self, interaction, button):
         await self.controller.panelLegacyCommand("updateCheck", interaction)
@@ -1170,6 +1286,10 @@ class TextActionModal(discord.ui.Modal):
 
 class AdvancedPanelView(OwnerView):
     """Keep unavoidable text entry and audit lookup out of the routine dashboard."""
+
+    def __init__(self, controller, ownerId: int, timeout: float = 600):
+        super().__init__(controller, ownerId, timeout)
+        self.add_item(HomeButton(controller, ownerId, row=3))
 
     @discord.ui.button(label="게임 공지", emoji="📣", style=discord.ButtonStyle.primary)
     async def announce(self, interaction, button):
@@ -1210,6 +1330,10 @@ class AdvancedPanelView(OwnerView):
 
 class LogPanelView(OwnerView):
     """Choose bot/Paper logs, filtered failures, or direct attachments."""
+
+    def __init__(self, controller, ownerId: int, timeout: float = 600):
+        super().__init__(controller, ownerId, timeout)
+        self.add_item(HomeButton(controller, ownerId, row=3))
 
     async def _show(self, interaction: discord.Interaction, source: str, errorsOnly: bool = False):
         embed = await self.controller.panelLogEmbed(source, errorsOnly)

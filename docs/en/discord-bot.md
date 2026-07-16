@@ -130,6 +130,12 @@ The ephemeral panel is visible only to the administrator who opened it and
 expires after ten minutes. Callback failures produce a visible error instead of
 leaving an apparently dead button.
 
+Sub-panels (players, service, backups, quick commands, More, health, …) **swap
+the screen in place inside the same message instead of posting a new one**
+(#58), so pressing buttons no longer piles up chat, and every sub-screen has a
+**🏠 홈** button that returns to the dashboard in one tap. Slow lookups
+(performance, tuning) show a loading frame first, then edit to the result.
+
 ## Player management (inspection + actions)
 
 The `/admin` dashboard **Players** button builds a dropdown from Paper's
