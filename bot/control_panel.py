@@ -573,6 +573,35 @@ class CustomEnchantModal(QuickActionModal):
         )
 
 
+class ForceEnchantModal(QuickActionModal):
+    """제한 없는 강제 인챈트(예: 곡괭이에 날카로움, 날카로움 20). #62."""
+
+    def __init__(self, controller, playerName: str):
+        super().__init__(title=f"강제 인챈트 — {playerName}"[:45])
+        self.controller = controller
+        self.playerName = playerName
+        self.enchantId = discord.ui.TextInput(
+            label="인챈트 ID (영어)", placeholder="예: sharpness, efficiency", max_length=64
+        )
+        self.level = discord.ui.TextInput(
+            label="레벨 (1~255, 비우면 1)", required=False, max_length=3
+        )
+        self.add_item(self.enchantId)
+        self.add_item(self.level)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        levelText = (self.level.value or "").strip()
+        if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 255):
+            raise ValueError("레벨은 1~255 사이의 숫자로 입력하세요.")
+        await self.controller.panelForceEnchant(
+            interaction,
+            self.playerName,
+            self.enchantId.value,
+            int(levelText) if levelText else 1,
+        )
+
+
 class EffectSelect(discord.ui.Select):
     """자주 쓰는 포션 효과 + 효과 해제 + 직접 입력."""
 
@@ -633,6 +662,14 @@ class EnchantSelect(discord.ui.Select):
         options.append(
             discord.SelectOption(label="직접 입력…", value="__custom__", emoji="⌨️")
         )
+        options.append(
+            discord.SelectOption(
+                label="강제 인챈트 (제한 없음)…",
+                value="__force__",
+                emoji="⚡",
+                description="곡괭이에 날카로움, 날카로움 20 등 바닐라 제한 무시",
+            )
+        )
         super().__init__(placeholder="부여할 인챈트 선택", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
@@ -640,6 +677,11 @@ class EnchantSelect(discord.ui.Select):
         if choice == "__custom__":
             await interaction.response.send_modal(
                 CustomEnchantModal(self.controller, self.playerName)
+            )
+            return
+        if choice == "__force__":
+            await interaction.response.send_modal(
+                ForceEnchantModal(self.controller, self.playerName)
             )
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
