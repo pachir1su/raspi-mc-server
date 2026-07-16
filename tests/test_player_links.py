@@ -11,6 +11,7 @@ from bot.player_links import (
     buildWhitelistCommand,
     buildWhitelistRemoveCommand,
     serverPlayerName,
+    validateBedrockName,
 )
 
 
@@ -62,6 +63,19 @@ class PlayerLinkStoreTests(unittest.TestCase):
         self.assertEqual(".Alex", serverPlayerName(bedrockLink))
         self.assertEqual(".Pocket_Friend", serverPlayerName(spacedLink))
         self.assertEqual("fwhitelist add Pocket Friend", buildWhitelistCommand(spacedLink))
+
+    def testBedrockInputIsNormalizedWithoutStoringFloodgatePrefix(self):
+        """Discord variants resolve to one prefix-free Xbox identity."""
+        self.assertEqual("QUI203", validateBedrockName("QUI203"))
+        self.assertEqual("QUI203", validateBedrockName(".QUI203"))
+        self.assertEqual("QUI203", validateBedrockName("QUI203\u200b"))
+        self.assertEqual("Pocket Friend", validateBedrockName(" Pocket Friend "))
+
+    def testBedrockInputRejectsInvalidCharactersAndLength(self):
+        """Normalization never weakens the bounded gamertag alphabet."""
+        for value in ("bad;op", 'bad"name', "A" * 17, ".", ""):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                validateBedrockName(value)
 
     def testOldJavaRecordLoadsWithoutEdition(self):
         """Links created before crossplay continue to represent Java accounts."""
