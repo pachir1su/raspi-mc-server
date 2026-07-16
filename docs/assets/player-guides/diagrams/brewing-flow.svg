@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">Potion brewing flow / 포션 양조 흐름</title>
+  <desc id="desc">Water bottles become awkward potions with nether wart, gain an effect ingredient, and can then be extended, strengthened, or converted to splash and lingering forms.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#4b5563"/></marker>
+    <style>
+      text{font-family:Arial,"Noto Sans KR",sans-serif;fill:#172033} .h{font-size:27px;font-weight:700}.t{font-size:20px;font-weight:700}.s{font-size:16px}.box{stroke:#374151;stroke-width:2}.line{stroke:#4b5563;stroke-width:3;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="360" rx="24" fill="#f8fafc"/>
+  <text x="48" y="48" class="h">Potion brewing flow · 포션 양조 흐름</text>
+  <rect x="48" y="105" width="190" height="110" rx="18" fill="#dbeafe" class="box"/>
+  <text x="143" y="150" text-anchor="middle" class="t">Water Bottle</text><text x="143" y="180" text-anchor="middle" class="s">물병</text>
+  <path d="M238 160 H325" class="line"/><text x="281" y="136" text-anchor="middle" class="s">Nether Wart</text><text x="281" y="196" text-anchor="middle" class="s">네더 사마귀</text>
+  <rect x="330" y="105" width="190" height="110" rx="18" fill="#ede9fe" class="box"/>
+  <text x="425" y="150" text-anchor="middle" class="t">Awkward</text><text x="425" y="180" text-anchor="middle" class="s">어색한 물약</text>
+  <path d="M520 160 H607" class="line"/><text x="563" y="136" text-anchor="middle" class="s">Effect item</text><text x="563" y="196" text-anchor="middle" class="s">효과 재료</text>
+  <rect x="612" y="105" width="190" height="110" rx="18" fill="#dcfce7" class="box"/>
+  <text x="707" y="150" text-anchor="middle" class="t">Effect Potion</text><text x="707" y="180" text-anchor="middle" class="s">효과 포션</text>
+  <path d="M802 160 H889" class="line"/><text x="846" y="136" text-anchor="middle" class="s">Choose · 선택</text>
+  <rect x="894" y="78" width="258" height="164" rx="18" fill="#fff7ed" class="box"/>
+  <text x="1023" y="116" text-anchor="middle" class="t">Modifiers · 변형</text>
+  <text x="918" y="150" class="s">Redstone · 연장</text><text x="918" y="178" class="s">Glowstone · 강화</text>
+  <text x="918" y="206" class="s">Gunpowder → Splash · 투척용</text>
+  <path d="M1023 242 V286" class="line"/>
+  <rect x="894" y="288" width="258" height="48" rx="14" fill="#fee2e2" class="box"/>
+  <text x="1023" y="319" text-anchor="middle" class="s">Dragon's Breath → Lingering · 잔류형</text>
+  <text x="48" y="320" class="s">Weakness exception / 나약함 예외: Water Bottle + Fermented Spider Eye · 물병 + 발효된 거미 눈</text>
+</svg>

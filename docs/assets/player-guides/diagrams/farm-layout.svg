@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">Nine by nine hydrated farm / 9×9 수분 공급 농장</title>
+  <desc id="desc">A central water source hydrates farmland up to four blocks away in every horizontal direction.</desc>
+  <defs><pattern id="soil" width="54" height="54" patternUnits="userSpaceOnUse"><rect width="54" height="54" fill="#a16207" stroke="#fef3c7" stroke-width="2"/><path d="M8 16h38M8 30h38M8 44h38" stroke="#78350f" stroke-width="3"/></pattern><style>text{font-family:Arial,"Noto Sans KR",sans-serif;fill:#172033}.h{font-size:27px;font-weight:700}.t{font-size:18px}.s{font-size:15px}</style></defs>
+  <rect width="1200" height="620" rx="24" fill="#f8fafc"/>
+  <text x="48" y="48" class="h">Efficient 9×9 field · 효율적인 9×9 밭</text>
+  <text x="48" y="78" class="s">One center source hydrates farmland within four horizontal blocks. · 중앙 물 한 칸이 수평 4칸 안의 경작지를 적십니다.</text>
+  <rect x="180" y="105" width="486" height="486" fill="url(#soil)" stroke="#713f12" stroke-width="4"/>
+  <rect x="396" y="321" width="54" height="54" fill="#38bdf8" stroke="#075985" stroke-width="4"/>
+  <text x="423" y="353" text-anchor="middle" class="s" fill="#082f49">W</text>
+  <path d="M180 95H666M170 105V591" stroke="#334155" stroke-width="2"/>
+  <text x="423" y="99" text-anchor="middle" class="t">9 blocks · 9칸</text>
+  <text x="146" y="350" text-anchor="middle" class="t" transform="rotate(-90 146 350)">9 blocks · 9칸</text>
+  <g class="t"><rect x="710" y="150" width="44" height="44" fill="#38bdf8" stroke="#075985" stroke-width="3"/><text x="772" y="180">Water · 물</text><rect x="710" y="225" width="44" height="44" fill="#a16207" stroke="#713f12" stroke-width="3"/><text x="772" y="255">Hydrated farmland · 젖은 경작지</text></g>
+  <text x="710" y="335" class="t">Build notes · 건설 메모</text>
+  <text x="710" y="370" class="s">• Add slab paths outside</text><text x="710" y="394" class="s">  바깥에 반블록 길 설치</text>
+  <text x="710" y="434" class="s">• Fence animals out</text><text x="710" y="458" class="s">  동물 진입 방지</text>
+  <text x="710" y="498" class="s">• Cover water with a slab</text><text x="710" y="522" class="s">  물 위에 반블록 설치 가능</text>
+</svg>

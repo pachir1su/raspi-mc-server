@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="590" viewBox="0 0 1200 590" role="img" aria-labelledby="title desc">
+  <title id="title">Food saturation comparison / 음식 포화도 비교</title>
+  <desc id="desc">Horizontal bars compare saturation restored by common foods in Java 26.1.</desc>
+  <defs><style>text{font-family:Arial,"Noto Sans KR",sans-serif;fill:#172033}.h{font-size:27px;font-weight:700}.t{font-size:17px}.s{font-size:14px}.grid{stroke:#cbd5e1;stroke-width:1}.bar{fill:#f59e0b}</style></defs>
+  <rect width="1200" height="590" rx="24" fill="#f8fafc"/>
+  <text x="48" y="48" class="h">Saturation per serving · 1회 섭취 포화도</text>
+  <text x="48" y="78" class="s">Higher saturation delays the next visible hunger loss. · 포화도가 높을수록 다음 허기 감소가 늦어집니다.</text>
+  <g class="grid"><line x1="340" y1="110" x2="340" y2="530"/><line x1="536" y1="110" x2="536" y2="530"/><line x1="732" y1="110" x2="732" y2="530"/><line x1="928" y1="110" x2="928" y2="530"/><line x1="1124" y1="110" x2="1124" y2="530"/></g>
+  <g class="s" text-anchor="middle"><text x="340" y="552">0</text><text x="536" y="552">4</text><text x="732" y="552">8</text><text x="928" y="552">12</text><text x="1124" y="552">16</text></g>
+  <g class="t">
+    <text x="320" y="141" text-anchor="end">Golden Carrot · 황금 당근</text><rect x="340" y="118" width="706" height="32" rx="8" class="bar"/><text x="1058" y="141">14.4</text>
+    <text x="320" y="194" text-anchor="end">Steak / Pork · 스테이크 / 돼지고기</text><rect x="340" y="171" width="627" height="32" rx="8" fill="#b45309"/><text x="979" y="194">12.8</text>
+    <text x="320" y="247" text-anchor="end">Rabbit Stew · 토끼 스튜</text><rect x="340" y="224" width="588" height="32" rx="8" fill="#92400e"/><text x="940" y="247">12.0</text>
+    <text x="320" y="300" text-anchor="end">Mutton / Salmon · 양고기 / 연어</text><rect x="340" y="277" width="470" height="32" rx="8" fill="#ef4444"/><text x="822" y="300">9.6</text>
+    <text x="320" y="353" text-anchor="end">Cooked Chicken · 익힌 닭고기</text><rect x="340" y="330" width="353" height="32" rx="8" fill="#f97316"/><text x="705" y="353">7.2</text>
+    <text x="320" y="406" text-anchor="end">Bread / Potato / Cod · 빵 / 감자 / 대구</text><rect x="340" y="383" width="294" height="32" rx="8" fill="#eab308"/><text x="646" y="406">6.0</text>
+    <text x="320" y="459" text-anchor="end">Pumpkin Pie · 호박 파이</text><rect x="340" y="436" width="235" height="32" rx="8" fill="#fb923c"/><text x="587" y="459">4.8</text>
+    <text x="320" y="512" text-anchor="end">Apple / Chorus · 사과 / 후렴과</text><rect x="340" y="489" width="118" height="32" rx="8" fill="#84cc16"/><text x="470" y="512">2.4</text>
+  </g>
+</svg>

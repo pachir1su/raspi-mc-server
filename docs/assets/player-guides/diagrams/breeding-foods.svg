@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="540" viewBox="0 0 1200 540" role="img" aria-labelledby="title desc">
+  <title id="title">Common animal breeding foods / 주요 동물 번식 먹이</title>
+  <desc id="desc">A quick visual mapping common farm animals to their breeding foods, with special cases noted.</desc>
+  <defs><style>text{font-family:Arial,"Noto Sans KR",sans-serif;fill:#172033}.h{font-size:27px;font-weight:700}.t{font-size:19px;font-weight:700}.s{font-size:15px}.card{stroke:#64748b;stroke-width:2}</style></defs>
+  <rect width="1200" height="540" rx="24" fill="#f8fafc"/>
+  <text x="48" y="48" class="h">Breeding food quick map · 번식 먹이 빠른 표</text>
+  <g>
+    <rect x="48" y="92" width="344" height="105" rx="18" fill="#fef3c7" class="card"/><text x="72" y="128" class="t">Wheat · 밀</text><text x="72" y="160" class="s">Cow, Sheep, Goat, Mooshroom</text><text x="72" y="184" class="s">소, 양, 염소, 무시룸</text>
+    <rect x="428" y="92" width="344" height="105" rx="18" fill="#ffedd5" class="card"/><text x="452" y="128" class="t">Carrot / Potato / Beetroot</text><text x="452" y="160" class="s">Pig · 돼지</text><text x="452" y="184" class="s">당근 / 감자 / 비트</text>
+    <rect x="808" y="92" width="344" height="105" rx="18" fill="#dcfce7" class="card"/><text x="832" y="128" class="t">Seeds · 씨앗</text><text x="832" y="160" class="s">Chicken · 닭</text><text x="832" y="184" class="s">Wheat, melon, pumpkin, beetroot…</text>
+    <rect x="48" y="225" width="344" height="105" rx="18" fill="#dbeafe" class="card"/><text x="72" y="261" class="t">Raw cod / salmon · 생선</text><text x="72" y="293" class="s">Cat, Ocelot · 고양이, 오실롯</text><text x="72" y="317" class="s">Axolotl needs a tropical-fish bucket</text>
+    <rect x="428" y="225" width="344" height="105" rx="18" fill="#fce7f3" class="card"/><text x="452" y="261" class="t">Berries · 열매</text><text x="452" y="293" class="s">Fox: sweet or glow berries</text><text x="452" y="317" class="s">여우: 달콤한 / 발광 열매</text>
+    <rect x="808" y="225" width="344" height="105" rx="18" fill="#ede9fe" class="card"/><text x="832" y="261" class="t">Flowers · 꽃</text><text x="832" y="293" class="s">Bee · 벌</text><text x="832" y="317" class="s">Nearby hive space recommended</text>
+    <rect x="48" y="358" width="344" height="105" rx="18" fill="#fef9c3" class="card"/><text x="72" y="394" class="t">Golden food · 황금 먹이</text><text x="72" y="426" class="s">Horse / Donkey: carrot or apple</text><text x="72" y="450" class="s">말 / 당나귀: 당근 또는 사과</text>
+    <rect x="428" y="358" width="344" height="105" rx="18" fill="#ecfccb" class="card"/><text x="452" y="394" class="t">Special plants · 특수 식물</text><text x="452" y="426" class="s">Panda: bamboo · 판다: 대나무</text><text x="452" y="450" class="s">Camel: cactus · 낙타: 선인장</text>
+    <rect x="808" y="358" width="344" height="105" rx="18" fill="#fee2e2" class="card"/><text x="832" y="394" class="t">Special cases · 특수 사례</text><text x="832" y="426" class="s">Turtle: seagrass · 거북: 해초</text><text x="832" y="450" class="s">Nautilus: pufferfish · 앵무조개: 복어</text>
+  </g>
+  <text x="48" y="510" class="s">Use the full table below for taming, nearby-block, and home-location requirements. · 길들이기·주변 블록·귀소 조건은 아래 전체 표를 확인하세요.</text>
+</svg>
