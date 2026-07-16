@@ -25,6 +25,7 @@ from bot import log
 from bot import BRAND_BLUE, OK_GREEN, WARN_YELLOW, ERR_RED, userTag
 from bot.audit import AuditLog
 from bot.config import cfg
+from bot.error_text import describeError
 from bot.i18n import t
 from bot.internal_actions import InternalActionGroup, internalAction
 from bot.backup_settings import SettingsStore
@@ -439,7 +440,7 @@ class Admin(commands.Cog):
                 ephemeral=True,
             )
         except RconError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     # --- read-only ------------------------------------------------------
     @internalAction(description="Show whether the server is up and who is online.")
@@ -488,7 +489,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "server.say", "success")
         except RconError as e:
             await self._audit(interaction, "server.say", "failed", str(e))
-            await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(e)}", ephemeral=True)
 
     @internalAction(name="mc", description="Run ANY server command via RCON (owner cheat channel).")
     @app_commands.describe(command="e.g. gamemode creative YourName, time set day, give ...")
@@ -508,7 +509,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "server.command", "success", commandName)
         except RconError as e:
             await self._audit(interaction, "server.command", "failed", str(e))
-            await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(e)}", ephemeral=True)
 
     # --- whitelist ------------------------------------------------------
     whitelist = InternalActionGroup()
@@ -529,7 +530,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, f"whitelist.{action}", "success", name)
         except RconError as e:
             await self._audit(interaction, f"whitelist.{action}", "failed", str(e))
-            await interaction.response.send_message(f"❌ {e}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(e)}", ephemeral=True)
 
     # --- lifecycle (systemd) -------------------------------------------
     @internalAction(description="Start the Minecraft service.")
@@ -622,7 +623,7 @@ class Admin(commands.Cog):
                 "\n".join(lines) or "아직 백업이 없습니다.", ephemeral=True
             )
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="timeline", description="Show a compact backup timeline with ages and sizes.")
     async def backupTimeline(self, interaction: discord.Interaction):
@@ -647,7 +648,7 @@ class Admin(commands.Cog):
                 ephemeral=True,
             )
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="restore-preview", description="Verify and preview a backup before restoring it.")
     @app_commands.autocomplete(name=backupNameAutocomplete)
@@ -672,7 +673,7 @@ class Admin(commands.Cog):
                 ephemeral=True,
             )
         except StorageError as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="download", description="Download a backup if it fits Discord's limit.")
     @app_commands.autocomplete(name=backupNameAutocomplete)
@@ -681,7 +682,7 @@ class Admin(commands.Cog):
             path = self.storage.resolveBackup(name)
             await self._sendFile(interaction, path, "월드 백업")
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="delete", description="Delete one selected backup archive.")
     @app_commands.describe(confirm="Type DELETE to confirm permanent deletion")
@@ -696,7 +697,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "backup.delete", "success", name)
             _log.warning("backup delete by %s: %s", userTag(interaction.user), name)
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="restore", description="Restore a backup after an emergency snapshot.")
     @app_commands.describe(confirm="Type RESTORE to confirm stopping and replacing the live world")
@@ -741,7 +742,7 @@ class Admin(commands.Cog):
                 f"✅ `{name}` 백업이 손상 없이 온전합니다.\nSHA-256: `{digest}`", ephemeral=True
             )
         except StorageError as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="prune", description="Apply the saved retention policy immediately.")
     async def backupPrune(self, interaction: discord.Interaction):
@@ -754,7 +755,7 @@ class Admin(commands.Cog):
             )
             await self._audit(interaction, "backup.prune", "success", str(deletedCount))
         except (StorageError, RuntimeError, OSError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="settings", description="Show automatic backup and HDD settings.")
     async def backupSettings(self, interaction: discord.Interaction):
@@ -783,7 +784,7 @@ class Admin(commands.Cog):
                 description += "\n다음 백업: **일시 중지됨**"
             await interaction.response.send_message(embed=discord.Embed(title="백업 설정", description=description, color=BRAND_BLUE), ephemeral=True)
         except (StorageError, RuntimeError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="configure", description="Change the persistent automatic backup policy.")
     async def backupConfigure(
@@ -810,7 +811,7 @@ class Admin(commands.Cog):
             _log.warning("backup settings changed by %s", userTag(interaction.user))
             await self._audit(interaction, "backup.configure", "success", str(changes))
         except (ValueError, RuntimeError, OSError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @backupGroup.command(name="enabled", description="Enable or pause automatic backups.")
     async def backupEnabled(self, interaction: discord.Interaction, enabled: bool):
@@ -820,7 +821,7 @@ class Admin(commands.Cog):
             await interaction.response.send_message(f"✅ 자동 백업: **{'켜짐' if enabled else '꺼짐'}**", ephemeral=True)
             await self._audit(interaction, "backup.enabled", "success", str(enabled))
         except (ValueError, RuntimeError, OSError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     # --- uploaded maps --------------------------------------------------
     worldGroup = InternalActionGroup()
@@ -839,7 +840,7 @@ class Admin(commands.Cog):
             await self._audit(interaction, "world.upload", "success", targetPath.name)
         except (StorageError, OSError) as error:
             await self._audit(interaction, "world.upload", "failed", str(error))
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
         finally:
             uploadPath.unlink(missing_ok=True)
 
@@ -850,7 +851,7 @@ class Admin(commands.Cog):
             lines = [f"`{item.name}` — {self._formatBytes(item.size)}" for item in worlds[:20]]
             await interaction.response.send_message("\n".join(lines) or "업로드된 맵이 없습니다.", ephemeral=True)
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @worldGroup.command(name="activate", description="Back up the live world and switch to an imported map.")
     @app_commands.describe(confirm="Type ACTIVATE to confirm stopping and replacing the live world")
@@ -891,7 +892,7 @@ class Admin(commands.Cog):
             outputPath = await self.storage.exportWorld(name)
             await self._sendFile(interaction, outputPath, "저장된 맵", deferred=True)
         except StorageError as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
         finally:
             if outputPath:
                 outputPath.unlink(missing_ok=True)
@@ -909,7 +910,7 @@ class Admin(commands.Cog):
             _log.warning("world delete by %s: %s", userTag(interaction.user), name)
             await self._audit(interaction, "world.delete", "success", name)
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @internalAction(name="storage", description="Show HDD mount and free-space status.")
     async def storageStatus(self, interaction: discord.Interaction):
@@ -922,7 +923,7 @@ class Admin(commands.Cog):
                 ephemeral=True,
             )
         except StorageError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @internalAction(name="health", description="Check RCON, HDD, scheduler, and backup freshness.")
     async def health(self, interaction: discord.Interaction):
@@ -1008,7 +1009,7 @@ class Admin(commands.Cog):
                 embed.add_field(name="경고", value="\n".join(f"• {item}" for item in warnings)[:1000], inline=False)
             await interaction.followup.send(embed=embed, ephemeral=True)
         except (OSError, RuntimeError, ValueError) as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     # --- application updates -------------------------------------------
     updateGroup = InternalActionGroup()
@@ -1159,9 +1160,9 @@ class Admin(commands.Cog):
                 interaction, f"incident.{command.split()[0]}", "failed", str(error)
             )
             if interaction.response.is_done():
-                await interaction.followup.send(f"❌ {error}", ephemeral=True)
+                await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
             else:
-                await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+                await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @incidentGroup.command(name="day", description="Set the overworld time to day.")
     async def incidentDay(self, interaction: discord.Interaction):
@@ -1578,7 +1579,7 @@ class Admin(commands.Cog):
             )
         except RconError as error:
             await self._audit(interaction, "spawn-protection.toggle", "failed", str(error))
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelToggleChestLock(self, interaction: discord.Interaction) -> None:
         """Toggle the bundled plugin's persistent container-lock setting through RCON."""
@@ -1590,7 +1591,7 @@ class Admin(commands.Cog):
             )
         except RconError as error:
             await self._audit(interaction, "chest-lock.toggle", "failed", str(error))
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelPlayerEmbed(self, player: str, detailType: str) -> discord.Embed:
         """Query a selected player's allowed read-only entity fields through RCON."""
@@ -1678,7 +1679,7 @@ class Admin(commands.Cog):
         try:
             await self._sendFile(interaction, self.panelLogPath(source), "Operational log")
         except (FileNotFoundError, OSError, ValueError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     @tasks.loop(seconds=60)
     async def backupScheduler(self):

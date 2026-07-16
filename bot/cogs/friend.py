@@ -13,6 +13,7 @@ from bot import BRAND_BLUE, ERR_RED, OK_GREEN, WARN_YELLOW, log, userTag
 from bot.app_settings import AppSettingsStore
 from bot.config import cfg
 from bot.diary import DiaryEntry, DiaryStore
+from bot.error_text import describeError
 from bot.health_score import HealthInputs, calculateHealthScore
 from bot.friend_panel import ManagedAccountView, MyToolsView
 from bot.internal_actions import InternalActionGroup, internalAction
@@ -310,7 +311,7 @@ class Friend(commands.Cog):
             )
             _log.info("self rescue by %s -> %s", userTag(interaction.user), link.minecraftName)
         except (ValueError, RconError, OSError, RuntimeError) as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     @rescueGroup.command(name="whereami", description="Show your linked player's current location.")
     async def rescueWhereAmI(
@@ -336,7 +337,7 @@ class Friend(commands.Cog):
                 ephemeral=True,
             )
         except (ValueError, RconError) as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     # --- coordinate book ----------------------------------------------
     @placeGroup.command(name="add", description="Save or replace a shared coordinate.")
@@ -389,7 +390,7 @@ class Friend(commands.Cog):
         except (ValueError, OSError, RuntimeError, discord.HTTPException) as error:
             if not stored:
                 await asyncio.to_thread(self.imageStore.remove, imagePath)
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     @placeGroup.command(name="list", description="List shared coordinate names.")
     async def placeList(self, interaction: discord.Interaction) -> None:
@@ -413,7 +414,7 @@ class Friend(commands.Cog):
         try:
             place = await asyncio.to_thread(self.placeStore.get, name)
         except ValueError as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
             return
         if not place:
             await interaction.response.send_message("좌표를 찾지 못했습니다.", ephemeral=True)
@@ -438,7 +439,7 @@ class Friend(commands.Cog):
             await asyncio.to_thread(self.imageStore.remove, deleted.imagePath if deleted else None)
             await interaction.response.send_message("✅ 좌표를 삭제했습니다.", ephemeral=True)
         except (ValueError, OSError, RuntimeError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     # --- server diary --------------------------------------------------
     @diaryGroup.command(name="add", description="Write a server-life journal entry.")
@@ -467,7 +468,7 @@ class Friend(commands.Cog):
         except (ValueError, OSError, RuntimeError, discord.HTTPException) as error:
             if not stored:
                 await asyncio.to_thread(self.imageStore.remove, imagePath)
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     @diaryGroup.command(name="recent", description="Show recent server-life entries.")
     async def diaryRecent(
@@ -741,7 +742,7 @@ class Friend(commands.Cog):
             )
             await interaction.response.send_message("✅ 좌표를 삭제했습니다.", ephemeral=True)
         except (ValueError, OSError, RuntimeError) as error:
-            await interaction.response.send_message(f"❌ {error}", ephemeral=True)
+            await interaction.response.send_message(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelSaveCurrentPlace(
         self,
@@ -785,7 +786,7 @@ class Friend(commands.Cog):
             )
             await self._sendPlace(interaction, place)
         except (ValueError, OSError, RuntimeError, RconError) as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelDiaryEntries(self) -> list[DiaryEntry]:
         """Return recent diary entries for the panel dropdown."""
@@ -816,7 +817,7 @@ class Friend(commands.Cog):
             )
             await self._sendDiaryEntry(interaction, entry)
         except (ValueError, OSError, RuntimeError) as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelUploadPlacePhoto(
         self,
@@ -855,7 +856,7 @@ class Friend(commands.Cog):
         except (ValueError, OSError, RuntimeError, discord.HTTPException) as error:
             if not stored:
                 await asyncio.to_thread(self.imageStore.remove, imagePath)
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelUploadDiaryPhoto(
         self,
@@ -883,7 +884,7 @@ class Friend(commands.Cog):
         except (ValueError, OSError, RuntimeError, discord.HTTPException) as error:
             if not stored:
                 await asyncio.to_thread(self.imageStore.remove, imagePath)
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
 
     async def panelDeathboxLocate(
@@ -902,7 +903,7 @@ class Friend(commands.Cog):
             cleaned = _stripMinecraftColors(reply)
             await interaction.followup.send(f"📦 {cleaned}", ephemeral=True)
         except RconError as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelDeathboxList(
         self, interaction: discord.Interaction, linkId: str
@@ -920,7 +921,7 @@ class Friend(commands.Cog):
             cleaned = _stripMinecraftColors(reply)
             await interaction.followup.send(f"📦 {cleaned}", ephemeral=True)
         except RconError as error:
-            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
 
 def _stripMinecraftColors(text: str) -> str:
