@@ -105,44 +105,67 @@ class Friend(commands.Cog):
         name="help", description="Show friend-safe Minecraft bot help."
     )
     async def helpCommand(self, interaction: discord.Interaction) -> None:
-        """Explain the public command surface without exposing owner controls."""
+        """Explain the public command surface without exposing owner controls.
+
+        이슈 #44: 명령 이름만 나열하던 도움말을 버튼 단위 안내로 개편했습니다.
+        새 버튼을 추가하면 이 도움말의 해당 섹션도 함께 갱신하세요.
+        """
         embed = discord.Embed(
             title="📘 Minecraft 봇 도움말",
-            description="친구가 사용할 수 있는 명령은 아래 세 가지입니다.",
+            description=(
+                "친구 전용 명령은 아래 세 가지이며, 모든 응답은 명령을 입력한 "
+                "본인에게만 보입니다."
+            ),
             color=BRAND_BLUE,
         )
         embed.add_field(
-            name="`/서버` (`/server`)",
-            value="접속 주소, 서버 상태와 현재 접속자를 확인합니다.",
-            inline=False,
-        )
-        embed.add_field(
-            name="`/내도구` (`/my-tools`)",
+            name="기본 명령어",
             value=(
-                "관리자가 등록한 내 캐릭터를 선택해 스폰 귀환, 위치 조회, "
-                "좌표북, 서버 일지와 건강 점수를 사용합니다."
+                "`/서버` — 접속 주소, 서버 온라인 여부, 현재 접속자를 확인합니다.\n"
+                "`/도구` — 내 캐릭터로 쓸 수 있는 도구 패널을 엽니다 "
+                "(버튼 설명은 아래 참고).\n"
+                "`/도움말` — 이 안내를 다시 표시합니다."
             ),
             inline=False,
         )
         embed.add_field(
-            name="`/도움말` (`/help`)",
-            value="이 안내를 다시 표시합니다.",
+            name="`/도구` 버튼 안내 — 먼저 위 드롭다운에서 계정을 선택하세요",
+            value=(
+                "🏠 **선택 계정 스폰 귀환** — 길을 잃거나 끼었을 때 스폰으로 "
+                "이동합니다 (게임에 접속 중일 때만 가능).\n"
+                "📍 **선택 계정 위치** — 내 캐릭터의 현재 차원과 좌표를 확인합니다.\n"
+                "🗺️ **공유 좌표북** — 좋은 장소를 이름 붙여 저장하고 모두와 "
+                "공유합니다. 사진도 붙일 수 있습니다.\n"
+                "📦 **데스박스 찾기 / 목록** — 죽어도 아이템은 상자에 보관됩니다. "
+                "그 상자의 위치를 알려줍니다.\n"
+                "📖 **서버 일지** — 서버에서 있었던 일을 기록하고 읽습니다.\n"
+                "🩺 **서버 상태 점수** — 서버가 느린 것 같을 때 0~100점 "
+                "건강 점수를 확인합니다.\n"
+                "👤 **내 계정 목록** — 나에게 등록된 Java/Bedrock 계정을 "
+                "확인합니다."
+            ),
             inline=False,
         )
         embed.add_field(
             name="🧭 이럴 땐 이렇게",
             value=(
                 "• **서버 주소를 알고 싶다** → `/서버`\n"
-                "• **죽어서 아이템을 잃었다** → `/내도구` → **데스박스 찾기** "
-                "(아이템은 상자에 안전하게 보관됩니다)\n"
-                "• **길을 잃었다/끼었다** → `/내도구` → **선택 계정 스폰 귀환**\n"
-                "• **좋은 장소를 공유하고 싶다** → `/내도구` → **공유 좌표북** → "
+                "• **죽어서 아이템을 잃었다** → `/도구` → **데스박스 찾기**\n"
+                "• **길을 잃었다/끼었다** → `/도구` → **선택 계정 스폰 귀환**\n"
+                "• **좋은 장소를 공유하고 싶다** → `/도구` → **공유 좌표북** → "
                 "**현재 위치 저장**\n"
-                "• **서버가 느린 것 같다** → `/내도구` → **서버 상태 점수**"
+                "• **서버가 느린 것 같다** → `/도구` → **서버 상태 점수**"
             ),
             inline=False,
         )
-        embed.set_footer(text="관리 기능은 ADMIN_USER_IDS에 등록된 서버장에게만 표시됩니다.")
+        embed.add_field(
+            name="참고",
+            value=(
+                "Minecraft 계정 등록과 삭제는 서버장이 합니다. `/도구`에 계정이 "
+                "안 보이면 서버장에게 등록을 요청하세요."
+            ),
+            inline=False,
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
