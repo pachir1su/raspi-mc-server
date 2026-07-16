@@ -875,6 +875,49 @@ class Friend(commands.Cog):
             await interaction.followup.send(f"❌ {error}", ephemeral=True)
 
 
+    async def panelDeathboxLocate(
+        self, interaction: discord.Interaction, linkId: str
+    ) -> None:
+        """Show the newest death box for the selected account via RCON."""
+        link = await self._approvedLink(interaction, linkId)
+        if not link:
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            playerName = serverPlayerName(
+                link, self.appSettings.bedrockUsernamePrefix
+            )
+            reply = await _rcon(f"deathbox locate {playerName}")
+            cleaned = _stripMinecraftColors(reply)
+            await interaction.followup.send(f"📦 {cleaned}", ephemeral=True)
+        except RconError as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+    async def panelDeathboxList(
+        self, interaction: discord.Interaction, linkId: str
+    ) -> None:
+        """List all active death boxes for the selected account via RCON."""
+        link = await self._approvedLink(interaction, linkId)
+        if not link:
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            playerName = serverPlayerName(
+                link, self.appSettings.bedrockUsernamePrefix
+            )
+            reply = await _rcon(f"deathbox list {playerName}")
+            cleaned = _stripMinecraftColors(reply)
+            await interaction.followup.send(f"📦 {cleaned}", ephemeral=True)
+        except RconError as error:
+            await interaction.followup.send(f"❌ {error}", ephemeral=True)
+
+
+def _stripMinecraftColors(text: str) -> str:
+    """Remove Minecraft section-sign colour codes from RCON output."""
+    import re
+    return re.sub(r"§[0-9a-fk-or]", "", text)
+
+
 async def setup(bot: commands.Bot) -> None:
     """Register the isolated friend-facing command surface."""
     await bot.add_cog(Friend(bot))

@@ -292,6 +292,20 @@ class MyToolsView(UserView):
             ephemeral=True,
         )
 
+    @discord.ui.button(label="데스박스 찾기", emoji="📦", style=discord.ButtonStyle.secondary, row=3)
+    async def deathboxLocate(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        if await self._requireSelection(interaction):
+            await self.controller.panelDeathboxLocate(interaction, self.selectedLinkId)
+
+    @discord.ui.button(label="데스박스 목록", emoji="🗃️", style=discord.ButtonStyle.secondary, row=3)
+    async def deathboxList(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        if await self._requireSelection(interaction):
+            await self.controller.panelDeathboxList(interaction, self.selectedLinkId)
+
 
 class ManagedAccountModal(discord.ui.Modal):
     """Ask an administrator only for the Minecraft name being assigned."""
