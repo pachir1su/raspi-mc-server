@@ -32,7 +32,13 @@ from bot.backup_settings import SettingsStore
 from bot.control_panel import AdminDashboardView, LogPanelView, PlayerPanelView
 from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
-from bot.player_info import parseOnlinePlayers, summarizeInventory
+from bot.player_info import (
+    parseOnlinePlayers,
+    summarizeEffects,
+    summarizeEnderChest,
+    summarizeInventorySections,
+    summarizePlayerStats,
+)
 from bot.player_names import buildPlayerSelector, validateServerPlayerName
 from bot.performance_report import parseTps, shouldAlert
 from bot.places import PlaceStore
@@ -43,6 +49,7 @@ from bot.quick_commands import (
     DIFFICULTIES,
     GAMEMODES,
     GAMERULES,
+    GAMERULE_UNSUPPORTED_MESSAGE,
     SPAWN_RADIUS_ZERO_COMMAND,
     buildDifficultyCommand,
     buildEffectClearCommand,
@@ -58,6 +65,7 @@ from bot.quick_commands import (
     buildTeleportToPlayerCommand,
     buildWorldSpawnCommand,
     buildXpCommand,
+    ensureGameruleAccepted,
     ensureServerAccepted,
     parseDaysPlayed,
     parseGameruleValue,
@@ -170,6 +178,9 @@ class Admin(commands.Cog):
         self.placeStore = PlaceStore(cfg.state_dir)
         self.operationLock = asyncio.Lock()
         self.lastAlertAt: dict[str, datetime] = {}
+        # 게임룰 키 → 이 서버 버전 지원 여부. 빠른 명령 패널을 처음 열 때
+        # 한 번 조회해 캐시하고, 미지원 버튼을 비활성화합니다(#59).
+        self.supportedGamerules: dict[str, bool] = {}
 
     @app_commands.command(
         name="server", description="Check server status and online players with buttons."
@@ -270,12 +281,40 @@ class Admin(commands.Cog):
             return
         for gameruleKey in DEFAULT_ON_GAMERULES:
             try:
-                ensureServerAccepted(
+                ensureGameruleAccepted(
                     await _rcon(buildGameruleSetCommand(gameruleKey, True))
                 )
+                self.supportedGamerules[gameruleKey] = True
                 _log.info("default gamerule applied: %s=true", gameruleKey)
-            except (ValueError, RconError) as error:
+            except ValueError as error:
+                if str(error) == GAMERULE_UNSUPPORTED_MESSAGE:
+                    self.supportedGamerules[gameruleKey] = False
                 _log.warning("default gamerule %s failed: %s", gameruleKey, error)
+            except RconError as error:
+                _log.warning("default gamerule %s failed: %s", gameruleKey, error)
+
+    async def probeSupportedGamerules(self) -> dict[str, bool]:
+        """Ask the server once which panel gamerules exist in this version.
+
+        결과는 캐시되어 이후 패널 열기에서는 RCON을 다시 조회하지 않습니다.
+        조회 자체가 실패(RCON 불통)하면 알 수 없는 키는 True로 두어 버튼을
+        막지 않습니다 — 실제 토글 시점에 정확한 에러가 다시 안내됩니다.
+        """
+        for gameruleKey in GAMERULES:
+            if gameruleKey in self.supportedGamerules:
+                continue
+            try:
+                ensureGameruleAccepted(
+                    await _rcon(buildGameruleQueryCommand(gameruleKey))
+                )
+                self.supportedGamerules[gameruleKey] = True
+            except ValueError as error:
+                self.supportedGamerules[gameruleKey] = (
+                    str(error) != GAMERULE_UNSUPPORTED_MESSAGE
+                )
+            except RconError:
+                break  # 서버가 꺼져 있으면 나머지 프로브도 의미 없음
+        return dict(self.supportedGamerules)
 
     # A single guard applied to every command in this cog.
     async def cog_check(self, ctx):  # for prefix commands (unused)
@@ -1404,9 +1443,12 @@ class Admin(commands.Cog):
         effectId: str,
         seconds: int,
         amplifier: int,
+        hideParticles: bool = True,
     ) -> None:
         try:
-            command = buildEffectCommand(playerName, effectId, seconds, amplifier)
+            command = buildEffectCommand(
+                playerName, effectId, seconds, amplifier, hideParticles
+            )
         except ValueError as error:
             await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
             return
@@ -1414,11 +1456,12 @@ class Admin(commands.Cog):
             (label for eid, label, _s, _a in COMMON_EFFECTS if eid == effectId.strip().lower()),
             effectId.strip().lower(),
         )
+        levelText = f" {amplifier + 1}단계" if amplifier else ""
         await self._quickPlayerAction(
             interaction,
             [command],
             "player.effect",
-            f"`{playerName}` 에게 **{label}** 효과를 {seconds // 60}분 적용했습니다.",
+            f"`{playerName}` 에게 **{label}**{levelText} 효과를 {seconds // 60}분 적용했습니다.",
         )
 
     async def panelClearEffects(
@@ -1565,11 +1608,12 @@ class Admin(commands.Cog):
         gameruleName, koreanLabel = GAMERULES[gameruleKey]
         try:
             current = parseGameruleValue(
-                ensureServerAccepted(await _rcon(buildGameruleQueryCommand(gameruleKey)))
+                ensureGameruleAccepted(await _rcon(buildGameruleQueryCommand(gameruleKey)))
             )
-            ensureServerAccepted(
+            ensureGameruleAccepted(
                 await _rcon(buildGameruleSetCommand(gameruleKey, not current))
             )
+            self.supportedGamerules[gameruleKey] = True
             await self._audit(
                 interaction, "world.gamerule", "success", f"{gameruleName}={not current}"
             )
@@ -1578,6 +1622,8 @@ class Admin(commands.Cog):
                 f"✅ **{koreanLabel}**: {stateText}", ephemeral=True
             )
         except (ValueError, RconError) as error:
+            if str(error) == GAMERULE_UNSUPPORTED_MESSAGE:
+                self.supportedGamerules[gameruleKey] = False
             await self._audit(interaction, "world.gamerule", "failed", str(error)[:200])
             await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
@@ -1962,9 +2008,17 @@ class Admin(commands.Cog):
             "effects": "✨ 상태 효과",
         }
         try:
+            fields: list[tuple[str, str]] = []
             if detailType == "inventory":
-                output = await _rcon(f"data get entity {playerTarget} Inventory")
-                description = summarizeInventory(output)
+                inventoryOutput, enderOutput = await asyncio.gather(
+                    _rcon(f"data get entity {playerTarget} Inventory"),
+                    _rcon(f"data get entity {playerTarget} EnderItems"),
+                )
+                fields = summarizeInventorySections(inventoryOutput)
+                enderBody = summarizeEnderChest(enderOutput)
+                if enderBody:
+                    fields.append(("🟣 엔더상자", enderBody))
+                description = "모든 칸이 비어 있습니다." if not fields else ""
             elif detailType == "position":
                 position, dimension = await asyncio.gather(
                     _rcon(f"data get entity {playerTarget} Pos"),
@@ -1978,21 +2032,21 @@ class Admin(commands.Cog):
                     _rcon(f"data get entity {playerTarget} XpLevel"),
                     _rcon(f"data get entity {playerTarget} playerGameType"),
                 )
-                description = (
-                    f"**체력** `{health[:300]}`\n**허기** `{food[:300]}`\n"
-                    f"**경험치 레벨** `{level[:300]}`\n**게임 모드** `{mode[:300]}`"
-                )
+                description = summarizePlayerStats(health, food, level, mode)
             elif detailType == "effects":
-                description = discordPreview(
-                    await _rcon(f"data get entity {playerTarget} active_effects"), 1500
+                description = summarizeEffects(
+                    await _rcon(f"data get entity {playerTarget} active_effects")
                 )
             else:
                 raise ValueError("Unknown player detail type")
-            return discord.Embed(
+            embed = discord.Embed(
                 title=f"{titleMap[detailType]} — {player}",
                 description=description[:4000],
                 color=BRAND_BLUE,
             )
+            for fieldTitle, fieldBody in fields[:24]:
+                embed.add_field(name=fieldTitle, value=fieldBody[:1024], inline=False)
+            return embed
         except (RconError, ValueError) as error:
             return discord.Embed(
                 title=f"❌ {player} 조회 실패", description=str(error), color=ERR_RED

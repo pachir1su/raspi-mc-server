@@ -96,9 +96,13 @@ class AdminDashboardView(OwnerView):
     async def quickCommands(self, interaction: discord.Interaction, button: discord.ui.Button):
         # 기존 '긴급 복구'를 흡수한 월드 빠른 명령. 플레이어 대상 명령
         # (아이템·효과·TP 등)은 '접속자 관리'에서 접속자를 고른 뒤 사용합니다.
-        await interaction.response.send_message(
+        # 첫 열기에서 서버 버전이 지원하는 게임룰을 조회해(#59) 미지원
+        # 버튼을 비활성화합니다. 조회 결과는 캐시됩니다.
+        await interaction.response.defer(ephemeral=True)
+        supported = await self.controller.probeSupportedGamerules()
+        await interaction.followup.send(
             "시간·날씨·난이도·게임룰·스폰을 버튼으로 바꿉니다. 서버 상태가 즉시 바뀝니다.",
-            view=WorldCommandsView(self.controller, self.ownerId),
+            view=WorldCommandsView(self.controller, self.ownerId, supported),
             ephemeral=True,
         )
 
@@ -325,10 +329,36 @@ class WorldCommandsView(OwnerView):
     async def weatherCycle(self, interaction, button):
         await self._toggle(interaction, "doWeatherCycle")
 
+    # 버튼 콜백 attr 이름 → 게임룰 키(#59 미지원 버튼 비활성화에 사용).
+    _GAMERULE_BUTTONS = {
+        "daylightCycle": "doDaylightCycle",
+        "weatherCycle": "doWeatherCycle",
+        "keepInventory": "keepInventory",
+        "mobGriefing": "mobGriefing",
+        "immediateRespawn": "doImmediateRespawn",
+        "naturalRegeneration": "naturalRegeneration",
+        "showDaysPlayed": "showDaysPlayed",
+    }
+
     # ── 3행: 난이도 드롭다운은 __init__에서 추가 ─────────────
-    def __init__(self, controller, ownerId: int, timeout: float = 600):
+    def __init__(
+        self,
+        controller,
+        ownerId: int,
+        supportedGamerules: dict[str, bool] | None = None,
+        timeout: float = 600,
+    ):
         super().__init__(controller, ownerId, timeout)
         self.add_item(DifficultySelect(controller))
+        # 이 서버 버전에 없는 게임룰 버튼은 눌러도 실패하므로 회색 처리.
+        # 프로브가 판단하지 못한 키(True/미기록)는 그대로 살려 둡니다.
+        for attrName, gameruleKey in self._GAMERULE_BUTTONS.items():
+            if (supportedGamerules or {}).get(gameruleKey, True):
+                continue
+            buttonItem = getattr(self, attrName, None)
+            if isinstance(buttonItem, discord.ui.Button):
+                buttonItem.disabled = True
+                buttonItem.label = f"{buttonItem.label} (버전 미지원)"
 
     # ── 4행: 게임룰 토글 ─────────────────────────────────────
     @discord.ui.button(label="아이템 유지", emoji="🎒", style=discord.ButtonStyle.secondary, row=3)
@@ -482,20 +512,35 @@ class CustomEffectModal(QuickActionModal):
         self.seconds = discord.ui.TextInput(
             label="지속 시간(초, 비우면 300)", required=False, max_length=7
         )
+        self.level = discord.ui.TextInput(
+            label="강도 (1~10, 비우면 1)", required=False, max_length=2
+        )
+        self.particles = discord.ui.TextInput(
+            label="거품 파티클 표시? (y 입력 시 표시, 기본 숨김)",
+            required=False,
+            max_length=1,
+        )
         self.add_item(self.effectId)
         self.add_item(self.seconds)
+        self.add_item(self.level)
+        self.add_item(self.particles)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         secondsText = (self.seconds.value or "").strip()
         if secondsText and not secondsText.isdigit():
             raise ValueError("지속 시간은 숫자(초)로 입력하세요.")
+        levelText = (self.level.value or "").strip()
+        if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 10):
+            raise ValueError("강도는 1~10 사이의 숫자로 입력하세요.")
+        showParticles = (self.particles.value or "").strip().lower() == "y"
         await self.controller.panelApplyEffect(
             interaction,
             self.playerName,
             self.effectId.value,
             int(secondsText) if secondsText else 300,
-            0,
+            (int(levelText) - 1) if levelText else 0,
+            hideParticles=not showParticles,
         )
 
 

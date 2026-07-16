@@ -117,6 +117,8 @@ Everything below stays reachable:
   immediate respawn, natural regeneration, days played), spawn placement
   (from a player's position or typed coordinates), and dropped-item cleanup.
   Dropped-item cleanup asks for confirmation because it can delete friends' items.
+  Gamerule buttons the server version does not support are detected when the
+  panel opens and disabled with a "(버전 미지원)" label.
 - player quick actions: give items (Korean aliases supported), potion effects,
   enchants, gamemode, teleport (player/place/spawn), XP, heal, and kick (with
   confirmation). Effect and enchant dropdowns include a free-input option.
@@ -133,13 +135,17 @@ leaving an apparently dead button.
 The `/admin` dashboard **Players** button builds a dropdown from Paper's
 current `list` output. After selecting a player, inspection buttons show:
 
-- **Inventory** — hotbar, normal slots, armour, offhand item, and counts
+- **Inventory** — equipment (armour/offhand), hotbar, backpack, and ender
+  chest, grouped into sections
 - **Position** — coordinates and dimension
-- **Health/XP** — health, food, experience level, and game mode
-- **Effects** — current active-effect data
+- **Health/XP** — health (with hearts), food, experience level, and game
+  mode as a readable summary
+- **Effects** — effect names (Korean), levels, and remaining time
 
 Action buttons (all audited): give item (Korean alias or English ID with typo
-suggestions), potion effects and enchants (common presets plus free input),
+suggestions), potion effects and enchants (common presets plus free input —
+the effect modal also takes a duration, a strength level of 1–10, and hides
+bubble particles by default),
 gamemode, teleport to another player / a saved place / spawn, XP +10/+30,
 heal, and kick (with confirmation).
 
