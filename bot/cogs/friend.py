@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from discord.ext import commands
 from bot import BRAND_BLUE, ERR_RED, OK_GREEN, WARN_YELLOW, log, userTag
 from bot.app_settings import AppSettingsStore
 from bot.config import cfg
+from bot.cooldowns import CooldownStore, formatRemaining
 from bot.diary import DiaryEntry, DiaryStore
 from bot.error_text import describeError
 from bot.health_score import HealthInputs, calculateHealthScore
@@ -32,7 +34,13 @@ from bot.player_links import (
     buildWhitelistRemoveCommand,
     serverPlayerName,
 )
+from bot.player_info import (
+    parseOnlinePlayers,
+    summarizeEffects,
+    summarizePlayerStats,
+)
 from bot.player_names import buildPlayerSelector
+from bot.quick_commands import buildTeleportToPlayerCommand, ensureServerAccepted
 from bot.rcon import Rcon, RconError
 from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.system_metrics import readSystemMetrics, readThrottleFlags
@@ -66,6 +74,8 @@ class Friend(commands.Cog):
         self.placeStore = PlaceStore(cfg.state_dir)
         self.diaryStore = DiaryStore(cfg.state_dir)
         self.imageStore = ImageStore(cfg.state_dir)
+        # 일반 플레이어 셀프 서비스 쿨타임(디스코드 계정 단위, 파일 저장).
+        self.cooldowns = CooldownStore(cfg.state_dir)
 
     @app_commands.command(
         name="tools", description="Choose one of your Minecraft accounts and use quick tools."
@@ -132,7 +142,11 @@ class Friend(commands.Cog):
             name="`/도구` 버튼 안내 — 먼저 위 드롭다운에서 계정을 선택하세요",
             value=(
                 "🏠 **선택 계정 스폰 귀환** — 길을 잃거나 끼었을 때 스폰으로 "
-                "이동합니다 (게임에 접속 중일 때만 가능).\n"
+                "이동합니다 (게임에 접속 중일 때만 가능, 5분에 한 번).\n"
+                "🚀 **플레이어에게 이동** — 접속 중인 다른 친구에게 순간이동합니다 "
+                "(30분에 한 번).\n"
+                "❤️ **내 상태** — 내 캐릭터의 체력·허기·경험치·포션 효과를 봅니다.\n"
+                "🕰️ **서버 시간** — 현재 플레이 일수와 낮/밤을 봅니다.\n"
                 "📍 **선택 계정 위치** — 내 캐릭터의 현재 차원과 좌표를 확인합니다.\n"
                 "🗺️ **공유 좌표북** — 좋은 장소를 이름 붙여 저장하고 모두와 "
                 "공유합니다. 사진도 붙일 수 있습니다.\n"
@@ -309,6 +323,13 @@ class Friend(commands.Cog):
         link = await self._approvedLink(interaction, linkId)
         if not link:
             return
+        remaining = self.cooldowns.remaining(interaction.user.id, "rescue")
+        if remaining > 0:
+            await interaction.response.send_message(
+                f"⏳ 스폰 귀환은 {formatRemaining(remaining)} 뒤에 다시 쓸 수 있어요.",
+                ephemeral=True,
+            )
+            return
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             playerName = serverPlayerName(
@@ -322,6 +343,10 @@ class Friend(commands.Cog):
             # 플러그인은 실패도 일반 텍스트로 답하므로 응답을 검증해야
             # 미접속 플레이어에게 허위 성공을 보여주지 않습니다(이슈 #45 댓글).
             ensureRescueSucceeded(output)
+            # 성공했을 때만 쿨타임을 시작합니다(미접속 실패는 카운트 안 함).
+            self.cooldowns.start(
+                interaction.user.id, "rescue", cfg.rescue_cooldown_seconds
+            )
             await asyncio.to_thread(
                 self.diaryStore.record,
                 "rescue",
@@ -730,6 +755,115 @@ class Friend(commands.Cog):
     async def panelServerScore(self, interaction: discord.Interaction) -> None:
         """Reuse the on-demand health calculation from a button callback."""
         await self.serverScore(interaction)
+
+    async def _ownMinecraftNames(self, discordUserId: int) -> set[str]:
+        """The Minecraft names this Discord user controls, for self-exclusion."""
+        links = await self.panelLinksForUser(discordUserId)
+        return {
+            serverPlayerName(link, self.appSettings.bedrockUsernamePrefix)
+            for link in links
+        }
+
+    async def panelTeleportTargets(
+        self, interaction: discord.Interaction
+    ) -> list[str]:
+        """Online players a friend may teleport to (excluding their own accounts)."""
+        online = parseOnlinePlayers(await _rcon("list"))
+        mine = await self._ownMinecraftNames(interaction.user.id)
+        return [name for name in online if name not in mine]
+
+    async def panelPlayerTeleport(
+        self, interaction: discord.Interaction, linkId: str, targetName: str
+    ) -> None:
+        """Teleport a friend's own linked player to another online player (#TP).
+
+        No consent step (friends-only trust), but a per-Discord-account cooldown
+        so it cannot be spammed for repeated ambush teleports.
+        """
+        link = await self._approvedLink(interaction, linkId)
+        if not link:
+            return
+        remaining = self.cooldowns.remaining(interaction.user.id, "tp")
+        if remaining > 0:
+            await interaction.response.send_message(
+                f"⏳ 이동은 {formatRemaining(remaining)} 뒤에 다시 쓸 수 있어요.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            playerName = serverPlayerName(
+                link, self.appSettings.bedrockUsernamePrefix
+            )
+            command = buildTeleportToPlayerCommand(playerName, targetName)
+            ensureServerAccepted(await _rcon(command))
+            self.cooldowns.start(
+                interaction.user.id, "tp", cfg.tp_cooldown_seconds
+            )
+            await interaction.followup.send(
+                f"🚀 `{link.minecraftName}` 님을 `{targetName}` 님에게 이동했어요.",
+                ephemeral=True,
+            )
+            _log.info(
+                "friend tp by %s: %s -> %s",
+                userTag(interaction.user), playerName, targetName,
+            )
+        except (ValueError, RconError) as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelMyStatus(
+        self, interaction: discord.Interaction, linkId: str
+    ) -> None:
+        """Show the friend's own linked player's health/food/level/effects."""
+        link = await self._approvedLink(interaction, linkId)
+        if not link:
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            playerName = serverPlayerName(
+                link, self.appSettings.bedrockUsernamePrefix
+            )
+            target = buildPlayerSelector(playerName)
+            health, food, level, mode, effects = await asyncio.gather(
+                _rcon(f"data get entity {target} Health"),
+                _rcon(f"data get entity {target} foodLevel"),
+                _rcon(f"data get entity {target} XpLevel"),
+                _rcon(f"data get entity {target} playerGameType"),
+                _rcon(f"data get entity {target} active_effects"),
+            )
+            embed = discord.Embed(
+                title=f"❤️ 내 상태 — {link.minecraftName}",
+                description=summarizePlayerStats(health, food, level, mode),
+                color=BRAND_BLUE,
+            )
+            embed.add_field(
+                name="✨ 상태 효과", value=summarizeEffects(effects)[:1024], inline=False
+            )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except (ValueError, RconError) as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
+    async def panelServerTime(self, interaction: discord.Interaction) -> None:
+        """Show the current in-game day count and day/night phase."""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            dayOutput, tickOutput = await asyncio.gather(
+                _rcon("time query day"),
+                _rcon("time query daytime"),
+            )
+            dayMatch = re.search(r"(-?\d+)", dayOutput or "")
+            tickMatch = re.search(r"(-?\d+)", tickOutput or "")
+            day = int(dayMatch.group(1)) if dayMatch else None
+            ticks = int(tickMatch.group(1)) % 24000 if tickMatch else None
+            # 0=새벽, 6000=정오, 12000=일몰, 18000=자정. 0~12000을 낮으로 봅니다.
+            phase = "🌙 밤" if ticks is not None and ticks >= 12000 else "☀️ 낮"
+            lines = []
+            if day is not None:
+                lines.append(f"📅 플레이 {day}일차")
+            lines.append(f"{phase} (게임 시각 {ticks if ticks is not None else '?'}틱)")
+            await interaction.followup.send("\n".join(lines), ephemeral=True)
+        except (ValueError, RconError) as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
 
     async def panelPlaces(self) -> list[Place]:
         """Return coordinate choices for the panel dropdown."""
