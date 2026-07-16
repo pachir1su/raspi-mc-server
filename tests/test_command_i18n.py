@@ -9,7 +9,7 @@ class CommandI18nTests(unittest.TestCase):
     def testCoreFriendCommandsHaveKoreanNames(self):
         self.assertEqual("서버", KOREAN_NAMES["server"])
         self.assertEqual("관리자", KOREAN_NAMES["admin"])
-        self.assertEqual("내도구", KOREAN_NAMES["my-tools"])
+        self.assertEqual("도구", KOREAN_NAMES["tools"])
         self.assertEqual("도움말", KOREAN_NAMES["help"])
         self.assertEqual("업로드", KOREAN_NAMES["upload"])
 

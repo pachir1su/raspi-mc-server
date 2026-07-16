@@ -16,7 +16,7 @@ class CommandSurfaceTests(unittest.TestCase):
         }
 
         self.assertEqual(
-            {"server", "admin", "my-tools", "help", "upload"},
+            {"server", "admin", "tools", "help", "upload"},
             commandNames,
         )
 
