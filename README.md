@@ -29,7 +29,10 @@ from Discord, SSH, or the web.
 - **30-minute HDD backups**, SHA-256 verification, Discord restore/map
   upload/switching, administrator-assigned multi-profile Discord↔Minecraft links, self-rescue, a photo
   coordinate book, server diary, on-demand health score, friend portal commands,
-  automatic performance alerts, tuning reports, one-click incident helpers,
+  automatic performance alerts, tuning reports, a quick-command panel
+  (time/weather/difficulty/gamerules/world-spawn placement),
+  player quick actions (give items with Korean aliases, potion effects,
+  enchants, gamemode, teleport, XP, heal, kick),
   backup timelines, a button-first dashboard,
   live-player inventory inspection, health checks, rotating audit logs, **systemd**
   auto-start, and a one-shot **provisioning script**.
