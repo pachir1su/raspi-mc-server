@@ -63,6 +63,19 @@ class OwnerView(discord.ui.View):
 class QuickActionModal(discord.ui.Modal):
     """Shared error handling for the few quick actions that need typed input."""
 
+    def __init__(self, *, panelView: discord.ui.View | None = None, **kwargs):
+        super().__init__(**kwargs)
+        # 드롭다운에서 연 모달이면, 제출 시 그 드롭다운의 선택 강조를 지울 수
+        # 있게 패널 뷰를 기억해 둡니다(resetSelectHighlight 참고).
+        self.panelView = panelView
+
+    async def acknowledge(self, interaction: discord.Interaction) -> None:
+        """첫 응답: 드롭다운에서 열렸으면 선택 강조를 지우고, 아니면 defer."""
+        if self.panelView is not None:
+            await resetSelectHighlight(interaction, self.panelView)
+        else:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         message = f"❌ {describeError(error)}"
         if interaction.response.is_done():
@@ -113,6 +126,20 @@ async def sendScreen(
             view.message = await interaction.original_response()
         except discord.HTTPException:
             pass
+
+
+async def resetSelectHighlight(
+    interaction: discord.Interaction, view: discord.ui.View
+) -> None:
+    """드롭다운의 선택 강조를 지워 같은 옵션을 연달아 다시 고를 수 있게 합니다.
+
+    디스코드 클라이언트는 이미 선택돼 강조된 옵션을 다시 눌러도 새 상호작용을
+    보내지 않습니다. 그래서 예전에는 '신속'을 두 번 연속 적용하려면 다른
+    옵션을 한 번 거쳐야 했습니다. 매 선택 직후 같은 화면을 다시 그려(첫
+    응답을 edit_message로 사용) 강조를 지우면 같은 효과·인챈트를 바로 다시
+    선택할 수 있습니다.
+    """
+    await interaction.response.edit_message(view=view)
 
 
 async def replaceWithLoadingEmbed(
@@ -776,8 +803,10 @@ class GiveItemModal(QuickActionModal):
 class CustomEffectModal(QuickActionModal):
     """드롭다운에 없는 포션 효과를 ID로 직접 지정할 때만 씁니다."""
 
-    def __init__(self, controller, playerName: str):
-        super().__init__(title=f"포션 효과 직접 입력 — {playerName}"[:45])
+    def __init__(self, controller, playerName: str, *, panelView=None):
+        super().__init__(
+            title=f"포션 효과 직접 입력 — {playerName}"[:45], panelView=panelView
+        )
         self.controller = controller
         self.playerName = playerName
         self.effectId = discord.ui.TextInput(
@@ -800,7 +829,7 @@ class CustomEffectModal(QuickActionModal):
         self.add_item(self.particles)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.acknowledge(interaction)
         secondsText = (self.seconds.value or "").strip()
         if secondsText and not secondsText.isdigit():
             raise ValueError("지속 시간은 숫자(초)로 입력하세요.")
@@ -821,8 +850,10 @@ class CustomEffectModal(QuickActionModal):
 class CustomEnchantModal(QuickActionModal):
     """드롭다운에 없는 인챈트를 ID와 레벨로 직접 지정할 때만 씁니다."""
 
-    def __init__(self, controller, playerName: str):
-        super().__init__(title=f"인챈트 직접 입력 — {playerName}"[:45])
+    def __init__(self, controller, playerName: str, *, panelView=None):
+        super().__init__(
+            title=f"인챈트 직접 입력 — {playerName}"[:45], panelView=panelView
+        )
         self.controller = controller
         self.playerName = playerName
         self.enchantId = discord.ui.TextInput(
@@ -835,7 +866,7 @@ class CustomEnchantModal(QuickActionModal):
         self.add_item(self.level)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.acknowledge(interaction)
         levelText = (self.level.value or "").strip()
         if levelText and not levelText.isdigit():
             raise ValueError("레벨은 숫자로 입력하세요.")
@@ -850,8 +881,10 @@ class CustomEnchantModal(QuickActionModal):
 class ForceEnchantModal(QuickActionModal):
     """제한 없는 강제 인챈트(예: 곡괭이에 날카로움, 날카로움 20). #62."""
 
-    def __init__(self, controller, playerName: str):
-        super().__init__(title=f"강제 인챈트 — {playerName}"[:45])
+    def __init__(self, controller, playerName: str, *, panelView=None):
+        super().__init__(
+            title=f"강제 인챈트 — {playerName}"[:45], panelView=panelView
+        )
         self.controller = controller
         self.playerName = playerName
         self.enchantId = discord.ui.TextInput(
@@ -864,7 +897,7 @@ class ForceEnchantModal(QuickActionModal):
         self.add_item(self.level)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.acknowledge(interaction)
         levelText = (self.level.value or "").strip()
         if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 255):
             raise ValueError("레벨은 1~255 사이의 숫자로 입력하세요.")
@@ -900,10 +933,10 @@ class EffectSelect(discord.ui.Select):
         choice = self.values[0]
         if choice == "__custom__":
             await interaction.response.send_modal(
-                CustomEffectModal(self.controller, self.playerName)
+                CustomEffectModal(self.controller, self.playerName, panelView=self.view)
             )
             return
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await resetSelectHighlight(interaction, self.view)
         if choice == "__clear__":
             await self.controller.panelClearEffects(interaction, self.playerName)
             return
@@ -950,15 +983,15 @@ class EnchantSelect(discord.ui.Select):
         choice = self.values[0]
         if choice == "__custom__":
             await interaction.response.send_modal(
-                CustomEnchantModal(self.controller, self.playerName)
+                CustomEnchantModal(self.controller, self.playerName, panelView=self.view)
             )
             return
         if choice == "__force__":
             await interaction.response.send_modal(
-                ForceEnchantModal(self.controller, self.playerName)
+                ForceEnchantModal(self.controller, self.playerName, panelView=self.view)
             )
             return
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await resetSelectHighlight(interaction, self.view)
         enchantId, level = choice.rsplit(":", 1)
         await self.controller.panelEnchant(
             interaction, self.playerName, enchantId, int(level)
