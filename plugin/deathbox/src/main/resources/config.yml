@@ -16,9 +16,10 @@ container: double-chest
 search-radius: 4
 
 # Boxes older than this many hours are removed on the hourly sweep.
-# 0 means boxes never expire. Default 72h so griefed boxes self-clean and the
-# index cannot grow without bound (see max-physical-boxes-per-player).
-expire-hours: 72
+# 0 means boxes never expire. Default 0 (permanent): items are kept until the
+# owner recovers them. Grief pileup is handled by
+# max-physical-boxes-per-player, not by expiry.
+expire-hours: 0
 
 # Anti-grief cap on how many PHYSICAL (block) boxes one player may have active
 # at once. Once a player is at the cap, further deaths are stored in a virtual
