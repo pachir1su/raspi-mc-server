@@ -20,6 +20,7 @@ def _fakeInteraction():
     interaction.response.is_done.return_value = False
     interaction.response.edit_message = AsyncMock(name="edit_message")
     interaction.response.send_message = AsyncMock(name="send_message")
+    interaction.response.send_modal = AsyncMock(name="send_modal")
     interaction.response.defer = AsyncMock(name="defer")
     interaction.edit_original_response = AsyncMock(name="edit_original_response")
     interaction.followup.send = AsyncMock(name="followup_send")
@@ -186,7 +187,7 @@ class NavigationTests(unittest.TestCase):
         for opener in (
             panel.inventory, panel.position, panel.stats, panel.effects,
             panel.records, panel.applyEffect, panel.enchant, panel.gamemode,
-            panel.teleport, panel.invincible, panel.kick,
+            panel.teleport, panel.invincible, panel.summonMenu, panel.kick,
         ):
             with self.subTest(button=opener.label):
                 interaction = _fakeInteraction()
@@ -194,14 +195,16 @@ class NavigationTests(unittest.TestCase):
                 interaction.response.edit_message.assert_awaited_once()
                 interaction.response.send_message.assert_not_called()
 
-    def testCreeperAndLightningButtonsDeferAndCallController(self):
-        """크리퍼 소환·소리·번개 버튼은 즉시 실행(화면 전환 없음)."""
+    def testSummonPanelButtonsDeferAndCallController(self):
+        """연출·소환 서브패널의 버튼은 즉시 실행(화면 전환 없음)."""
         self.controller.panelSummonCreeper = AsyncMock()
+        self.controller.panelChargedCreeper = AsyncMock()
         self.controller.panelCreeperSound = AsyncMock()
         self.controller.panelLightning = AsyncMock()
-        panel = cp.PlayerPanelView(self.controller, self.ownerId, ["Steve"])
+        panel = cp.SummonPanelView(self.controller, self.ownerId, "Steve")
         for button, handler in (
-            (panel.summonCreeper, self.controller.panelSummonCreeper),
+            (panel.creeper, self.controller.panelSummonCreeper),
+            (panel.chargedCreeper, self.controller.panelChargedCreeper),
             (panel.creeperSound, self.controller.panelCreeperSound),
             (panel.lightning, self.controller.panelLightning),
         ):
@@ -211,6 +214,40 @@ class NavigationTests(unittest.TestCase):
                 interaction.response.defer.assert_awaited_once()
                 interaction.response.edit_message.assert_not_called()
                 handler.assert_awaited_once_with(interaction, "Steve")
+
+    def testSpecialMobSelectResetsHighlightAndSummons(self):
+        """특수 몹 드롭다운은 강조를 초기화해 같은 프리셋을 연달아 부를 수 있다."""
+        self.controller.panelSpecialMob = AsyncMock()
+        view = cp.SummonPanelView(self.controller, self.ownerId, "Steve")
+        select = next(i for i in view.children if isinstance(i, cp.SpecialMobSelect))
+        select._values = ["horde"]
+        interaction = _fakeInteraction()
+        self._run(select.callback(interaction))
+        interaction.response.edit_message.assert_awaited_once_with(view=view)
+        self.controller.panelSpecialMob.assert_awaited_once_with(
+            interaction, "Steve", "horde"
+        )
+
+    def testVillagerGoodSelectOpensPriceModal(self):
+        """상품을 고르면 가격 입력 모달이 뜨고, 제출 시 주민을 소환한다."""
+        self.controller.panelSummonVillager = AsyncMock()
+        view = cp.SummonPanelView(self.controller, self.ownerId, "Steve")
+        select = next(i for i in view.children if isinstance(i, cp.VillagerGoodSelect))
+        select._values = ["mending"]
+        interaction = _fakeInteraction()
+        self._run(select.callback(interaction))
+        interaction.response.send_modal.assert_awaited_once()
+        modal = interaction.response.send_modal.await_args.args[0]
+        self.assertIsInstance(modal, cp.VillagerPriceModal)
+        # 가격을 비우면 기본값으로 소환.
+        modal.price._value = ""
+        submit = _fakeInteraction()
+        self._run(modal.on_submit(submit))
+        self.controller.panelSummonVillager.assert_awaited_once()
+        args = self.controller.panelSummonVillager.await_args.args
+        self.assertEqual(args[1], "Steve")
+        self.assertEqual(args[2], "librarian")
+        self.assertEqual(args[3], "mending")
 
     def testBackButtonReturnsToPlayerListKeepingSelection(self):
         """'↩️ 접속자 관리' re-renders the list with the player still selected."""
