@@ -1763,8 +1763,13 @@ class Admin(commands.Cog):
 
         # 대시보드에서 여는 화면이므로 같은 메시지에서 전환하고, 관리
         # 대시보드로 돌아가는 홈 버튼을 함께 둡니다(#58 규칙과 통일).
-        view = ManagedAccountView(friend, interaction.user.id)
-        view.add_item(HomeButton(self, interaction.user.id, row=3))
+        # 사용자를 선택해 화면이 다시 그려져도 팩토리가 홈 버튼을 되살립니다.
+        ownerId = interaction.user.id
+        view = ManagedAccountView(
+            friend,
+            ownerId,
+            extraNavFactory=lambda: [HomeButton(self, ownerId, row=3)],
+        )
         await replaceScreen(
             interaction,
             content=(
