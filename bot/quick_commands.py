@@ -352,15 +352,26 @@ def buildScoreboardGetCommand(playerName: str, objective: str) -> str:
 
 
 def parseScoreboardValue(output: str) -> int:
-    """'... has N [obj]' 형태의 응답에서 값을 읽습니다. 기록 없으면 0."""
+    """'... has N [obj]' 형태의 응답에서 값을 읽습니다. 기록 없으면 0.
+
+    주의(#84): 응답의 "아무 숫자"를 집으면 안 됩니다. 점수가 없을 때
+    Paper는 "Can't get value of mc_deaths for QUI203; none is set"처럼
+    플레이어 이름이 포함된 문장을 돌려주는데, 이름 속 숫자(203)를 점수로
+    읽는 버그가 있었습니다. 반드시 'has N' 형태만 값으로 인정하고,
+    '점수 없음' 응답은 0, 그 외 알 수 없는 응답은 오류로 처리합니다.
+    """
     lowered = (output or "").casefold()
-    if "has no score" in lowered or "no score" in lowered:
+    if not lowered.strip():
+        return 0
+    # 점수가 아직 없는 플레이어: 바닐라/Paper의 두 가지 문구를 모두 처리.
+    if "no score" in lowered or "none is set" in lowered:
         return 0
     match = re.search(r"\bhas\s+(-?\d+)\b", output or "")
     if match:
         return int(match.group(1))
-    match = re.search(r"(-?\d+)", output or "")
-    return int(match.group(1)) if match else 0
+    raise ValueError(
+        f"통계 값을 읽지 못했습니다. 서버 응답: {(output or '').strip()[:120]}"
+    )
 
 
 def buildKickCommand(playerName: str, reason: str = "서버장이 퇴장시켰습니다.") -> str:

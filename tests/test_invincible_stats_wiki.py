@@ -53,6 +53,18 @@ class ScoreboardStatsTests(unittest.TestCase):
         self.assertEqual(0, qc.parseScoreboardValue("Steve has no score"))
         self.assertEqual(0, qc.parseScoreboardValue(""))
 
+    def testParseNeverReadsDigitsFromPlayerName(self):
+        """Regression for #84: digits in the player name must not become the score."""
+        self.assertEqual(
+            0,
+            qc.parseScoreboardValue(
+                "Can't get value of mc_deaths for QUI203; none is set"
+            ),
+        )
+        self.assertEqual(3, qc.parseScoreboardValue("QUI203 has 3 [mc_deaths]"))
+        with self.assertRaises(ValueError):
+            qc.parseScoreboardValue("Unknown scoreboard objective 'mc_deaths'")
+
 
 class WikiTests(unittest.TestCase):
     def testEveryPageBuildsBothLanguageUrls(self):
