@@ -57,8 +57,12 @@ from bot.quick_commands import (
     GAMEMODES,
     GAMERULES,
     GAMERULE_UNSUPPORTED_MESSAGE,
+    LIGHTNING_CLEAR_WEATHER_MESSAGE,
     SCOREBOARD_STATS,
     SPAWN_RADIUS_ZERO_COMMAND,
+    WEATHER_QUERY_COMMAND,
+    buildCreeperBehindCommand,
+    buildCreeperSoundCommand,
     buildDifficultyCommand,
     buildEffectClearCommand,
     buildEffectCommand,
@@ -72,6 +76,7 @@ from bot.quick_commands import (
     buildInvincibilityClearCommands,
     buildInvincibilityCommands,
     buildKickCommand,
+    buildLightningCommand,
     buildScoreboardGetCommand,
     buildScoreboardSetupCommands,
     buildTeleportToCoordsCommand,
@@ -83,6 +88,7 @@ from bot.quick_commands import (
     parseDaysPlayed,
     parseGameruleValue,
     parseScoreboardValue,
+    parseWeatherReply,
 )
 from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.rcon import (
@@ -1525,6 +1531,52 @@ class Admin(commands.Cog):
             "player.enchant_force",
             f"`{playerName}` 가 들고 있는 아이템에 `{enchantId.strip().lower()}` "
             f"{level}레벨을 **제한 없이** 부여했습니다.",
+        )
+
+    # --- 크리퍼/번개 연출 ---------------------------------------------
+    # RCON 실행이라 게임 채팅에는 출력이 없습니다. 결과는 관리자만 보는
+    # ephemeral 메시지이며, 다른 조작과 똑같이 감사 기록을 남깁니다.
+    async def panelSummonCreeper(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """대상 등 뒤 5블록에 크리퍼를 소환합니다."""
+        await self._quickPlayerAction(
+            interaction,
+            [buildCreeperBehindCommand(playerName)],
+            "player.summon_creeper",
+            f"`{playerName}` 등 뒤 5블록에 크리퍼를 소환했습니다. 💥",
+        )
+
+    async def panelCreeperSound(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """대상 등 뒤 3블록에서 크리퍼 점화음만 재생합니다(몹 없음)."""
+        await self._quickPlayerAction(
+            interaction,
+            [buildCreeperSoundCommand(playerName)],
+            "player.creeper_sound",
+            f"`{playerName}` 등 뒤 3블록에서 크리퍼 소리를 재생했습니다. 🔊",
+        )
+
+    async def panelLightning(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """비/뇌우일 때만 대상 위치에 번개를 소환합니다(맑으면 거부)."""
+        try:
+            weather = parseWeatherReply(await _rcon(WEATHER_QUERY_COMMAND))
+        except (ValueError, RconError) as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        if weather == "clear":
+            await interaction.followup.send(
+                f"🌤️ {LIGHTNING_CLEAR_WEATHER_MESSAGE}", ephemeral=True
+            )
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [buildLightningCommand(playerName)],
+            "player.lightning",
+            f"`{playerName}` 위치에 번개를 소환했습니다. ⚡",
         )
 
     async def panelGamemode(

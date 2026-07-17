@@ -230,6 +230,68 @@ def buildForceEnchantCommand(playerName: str, enchantId: str, level: int = 1) ->
     return f"enchantheld {safeName} {safeEnchant} {safeLevel}"
 
 
+# ── 크리퍼/번개 연출 (관리자 장난) ─────────────────────────────────
+# 선택한 접속자 주변에 크리퍼·크리퍼 소리·번개를 소환합니다. RCON 실행이라
+# 게임 채팅에는 출력이 없고, 결과는 관리자 전용 메시지로만 확인합니다.
+# 좌표는 로컬 캐럿(^ ^ ^-N)을 쓰되 `rotated ~ 0`으로 시선의 상하(피치)를
+# 무시해, 대상이 하늘을 봐도 공중이 아니라 발 높이의 등 뒤에 나타납니다.
+
+
+def buildCreeperBehindCommand(playerName: str, distance: int = 5) -> str:
+    """선택한 접속자 등 뒤 distance(기본 5)블록에 크리퍼를 소환합니다."""
+    safeDistance = max(1, min(int(distance), 10))
+    return (
+        f"execute at {buildPlayerSelector(playerName)} rotated ~ 0 run "
+        f"summon minecraft:creeper ^ ^ ^-{safeDistance}"
+    )
+
+
+def buildCreeperSoundCommand(playerName: str, distance: int = 3) -> str:
+    """접속자 등 뒤 distance(기본 3)블록에서 크리퍼 점화음만 재생합니다.
+
+    몹은 소환하지 않으므로 돌아봐도 흔적이 없습니다. 소리는 대상 본인에게만
+    재생되며, 볼륨 1이면 약 16블록까지 들려 3블록 뒤에서는 항상 들립니다.
+    """
+    safeDistance = max(1, min(int(distance), 10))
+    selector = buildPlayerSelector(playerName)
+    return (
+        f"execute at {selector} rotated ~ 0 run "
+        f"playsound minecraft:entity.creeper.primed hostile {selector} "
+        f"^ ^ ^-{safeDistance} 1 1"
+    )
+
+
+def buildLightningCommand(playerName: str) -> str:
+    """접속자 위치에 번개를 소환합니다 (비/뇌우일 때만 호출할 것)."""
+    return (
+        f"execute at {buildPlayerSelector(playerName)} run "
+        f"summon minecraft:lightning_bolt"
+    )
+
+
+# 번개는 맑은 날에는 쓰지 않습니다(자연 번개는 비/뇌우에서만 침). 날씨는
+# RaspiMcOps 플러그인의 읽기 전용 `raspiops weather`로 조회합니다 —
+# 바닐라 Java에는 날씨 조회 명령이 없습니다.
+WEATHER_QUERY_COMMAND = "raspiops weather"
+
+LIGHTNING_CLEAR_WEATHER_MESSAGE = (
+    "지금은 맑은 날씨입니다. 번개는 비가 올 때만 사용할 수 있습니다."
+)
+WEATHER_QUERY_UNSUPPORTED_MESSAGE = (
+    "서버 플러그인이 날씨 조회를 지원하지 않습니다. "
+    "최신 릴리스의 RaspiMcOps JAR을 배포한 뒤 다시 시도하세요."
+)
+
+
+def parseWeatherReply(output: str) -> str:
+    """`raspiops weather` 응답을 'clear'|'rain'|'thunder'로 정규화합니다."""
+    lowered = (output or "").casefold()
+    for state in ("thunder", "rain", "clear"):
+        if state in lowered:
+            return state
+    raise ValueError(WEATHER_QUERY_UNSUPPORTED_MESSAGE)
+
+
 def buildGamemodeCommand(playerName: str, mode: str) -> str:
     if mode not in GAMEMODES:
         raise ValueError("지원하지 않는 게임모드입니다.")

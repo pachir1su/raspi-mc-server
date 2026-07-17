@@ -1256,6 +1256,21 @@ class PlayerPanelView(OwnerView):
             view=ConfirmKickView(self.controller, self.ownerId, self.selectedPlayer),
         )
 
+    @discord.ui.button(label="크리퍼 소환", emoji="💥", style=discord.ButtonStyle.secondary, row=4)
+    async def summonCreeper(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelSummonCreeper(interaction, self.selectedPlayer)
+
+    @discord.ui.button(label="크리퍼 소리", emoji="🔊", style=discord.ButtonStyle.secondary, row=4)
+    async def creeperSound(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelCreeperSound(interaction, self.selectedPlayer)
+
+    @discord.ui.button(label="번개", emoji="⚡", style=discord.ButtonStyle.secondary, row=4)
+    async def lightning(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelLightning(interaction, self.selectedPlayer)
+
 
 class StoredFileSelect(discord.ui.Select):
     """Dropdown shared by backup and imported-world panels."""
