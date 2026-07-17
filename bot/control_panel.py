@@ -816,7 +816,7 @@ class CustomEffectModal(QuickActionModal):
             label="지속 시간(초, 비우면 300)", required=False, max_length=7
         )
         self.level = discord.ui.TextInput(
-            label="강도 (1~10, 비우면 1)", required=False, max_length=2
+            label="강도 (1~256, 비우면 1)", required=False, max_length=3
         )
         self.particles = discord.ui.TextInput(
             label="거품 파티클 표시? (y 입력 시 표시, 기본 숨김)",
@@ -834,8 +834,10 @@ class CustomEffectModal(QuickActionModal):
         if secondsText and not secondsText.isdigit():
             raise ValueError("지속 시간은 숫자(초)로 입력하세요.")
         levelText = (self.level.value or "").strip()
-        if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 10):
-            raise ValueError("강도는 1~10 사이의 숫자로 입력하세요.")
+        # 강도는 게임 실제 한계까지 허용합니다(#증폭치는 바이트라 최대 255 =
+        # 256단계). buildEffectCommand가 증폭치를 0~255로 다시 clamp합니다.
+        if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 256):
+            raise ValueError("강도는 1~256 사이의 숫자로 입력하세요.")
         showParticles = (self.particles.value or "").strip().lower() == "y"
         await self.controller.panelApplyEffect(
             interaction,
