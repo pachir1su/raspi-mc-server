@@ -182,12 +182,23 @@ bubble particles by default; the dropdown redraws itself after every pick so
 the same effect or enchant can be applied repeatedly without switching to a
 different option first),
 gamemode, teleport to another player / a saved place / spawn, XP +10/+30,
-heal, and kick (with confirmation). Three atmosphere buttons also spawn
-things near the selected player without any game-chat output: a creeper 5
-blocks behind them, the creeper fuse sound 3 blocks behind them (sound only,
-no mob), and lightning at their position — the lightning button only fires
-while it is raining or thundering (checked through the plugin's weather
-report) and otherwise says the sky is clear.
+heal, and kick (with confirmation). A 🎭 **Atmosphere / summon** sub-panel
+gathers the owner-only spawns, none of which print to game chat:
+
+- **creeper**, **charged creeper** (only during a thunderstorm with a real
+  creeper nearby to strike), and a **special-mob dropdown** — buffed zombie
+  (iron axe), a normal-looking creeper with a bigger blast, a squad of
+  power-bow skeletons, a trident drowned (only when the player is in water),
+  and a far-away **horde**.
+- **creeper sound** — the fuse hiss 3 blocks behind, sound only, no mob.
+- **lightning** — one bolt at a random spot around the player, only while it
+  is raining or thundering (checked through the plugin's weather report).
+- **villager summon** — a villager pre-set with a single trade you pick
+  (Mending and other enchanted books, diamond gear, ender pearls, and more)
+  at an emerald price you type in.
+
+Every mob is placed by the plugin on a searched, non-suffocating spot so it
+never appears stuck inside a wall.
 
 Names are sourced from the live list and validated again as Java or dot-prefixed Floodgate usernames, so
 they cannot be turned into arbitrary RCON input.
