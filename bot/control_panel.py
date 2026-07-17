@@ -894,6 +894,39 @@ class TeleportPanelView(OwnerView):
         await self.controller.panelTeleportToSpawn(interaction, self.playerName)
 
 
+class InvincibilityPanelView(OwnerView):
+    """무적(#75) 지속 시간 선택과 해제를 버튼으로 제공합니다.
+
+    실제 효과 조합은 bot/quick_commands.py의 buildInvincibilityCommands가
+    담당하며, 해제는 그 세트로 건 효과만 골라 지웁니다.
+    """
+
+    def __init__(self, controller, ownerId: int, playerName: str):
+        super().__init__(controller, ownerId, timeout=300)
+        self.playerName = playerName
+
+    async def _grant(self, interaction: discord.Interaction, seconds: int):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelInvincible(interaction, self.playerName, seconds)
+
+    @discord.ui.button(label="30초", emoji="🛡️", style=discord.ButtonStyle.primary, row=0)
+    async def short(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._grant(interaction, 30)
+
+    @discord.ui.button(label="5분", emoji="🛡️", style=discord.ButtonStyle.primary, row=0)
+    async def medium(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._grant(interaction, 300)
+
+    @discord.ui.button(label="30분", emoji="🛡️", style=discord.ButtonStyle.primary, row=0)
+    async def long(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._grant(interaction, 1800)
+
+    @discord.ui.button(label="해제", emoji="⚔️", style=discord.ButtonStyle.danger, row=0)
+    async def clear(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelMortal(interaction, self.playerName)
+
+
 class ConfirmKickView(OwnerView):
     """추방 전에 한 번 더 확인합니다."""
 
@@ -946,6 +979,10 @@ class PlayerPanelView(OwnerView):
     @discord.ui.button(label="효과 보기", emoji="🔍", style=discord.ButtonStyle.secondary, row=1)
     async def effects(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._show(interaction, "effects")
+
+    @discord.ui.button(label="킬·데스", emoji="📊", style=discord.ButtonStyle.secondary, row=1)
+    async def records(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._show(interaction, "records")
 
     @discord.ui.button(label="아이템 주기", emoji="🎁", style=discord.ButtonStyle.success, row=2)
     async def giveItem(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1003,6 +1040,14 @@ class PlayerPanelView(OwnerView):
     async def heal(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.controller.panelHeal(interaction, self.selectedPlayer)
+
+    @discord.ui.button(label="무적", emoji="🛡️", style=discord.ButtonStyle.primary, row=3)
+    async def invincible(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            f"**{self.selectedPlayer}** 의 무적 지속 시간을 선택하세요.",
+            view=InvincibilityPanelView(self.controller, self.ownerId, self.selectedPlayer),
+            ephemeral=True,
+        )
 
     @discord.ui.button(label="추방", emoji="🥾", style=discord.ButtonStyle.danger, row=3)
     async def kick(self, interaction: discord.Interaction, button: discord.ui.Button):
