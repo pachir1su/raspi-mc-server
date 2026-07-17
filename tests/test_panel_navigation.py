@@ -216,6 +216,73 @@ class NavigationTests(unittest.TestCase):
             any(isinstance(i, cp.BackButton) for i in sentView.children)
         )
 
+    # ── 같은 옵션 연속 선택 (드롭다운 강조 초기화) ────────────────
+
+    def _findSelect(self, view):
+        return next(
+            item for item in view.children if isinstance(item, discord.ui.Select)
+        )
+
+    def testEffectSelectClearsHighlightSoSameEffectRepeats(self):
+        """'신속'을 고른 직후 같은 화면을 다시 그려, 바로 또 고를 수 있다."""
+        self.controller.panelApplyEffect = AsyncMock()
+        view = cp.EffectPanelView(self.controller, self.ownerId, "Steve")
+        select = self._findSelect(view)
+        select._values = ["speed"]
+        interaction = _fakeInteraction()
+        self._run(select.callback(interaction))
+        interaction.response.edit_message.assert_awaited_once_with(view=view)
+        interaction.response.defer.assert_not_called()
+        self.controller.panelApplyEffect.assert_awaited_once()
+        self.assertTrue(all(not option.default for option in select.options))
+
+    def testEffectClearAlsoResetsHighlight(self):
+        self.controller.panelClearEffects = AsyncMock()
+        view = cp.EffectPanelView(self.controller, self.ownerId, "Steve")
+        select = self._findSelect(view)
+        select._values = ["__clear__"]
+        interaction = _fakeInteraction()
+        self._run(select.callback(interaction))
+        interaction.response.edit_message.assert_awaited_once_with(view=view)
+        self.controller.panelClearEffects.assert_awaited_once()
+
+    def testEnchantSelectClearsHighlightSoSameEnchantRepeats(self):
+        self.controller.panelEnchant = AsyncMock()
+        view = cp.EnchantPanelView(self.controller, self.ownerId, "Steve")
+        select = self._findSelect(view)
+        select._values = ["sharpness:5"]
+        interaction = _fakeInteraction()
+        self._run(select.callback(interaction))
+        interaction.response.edit_message.assert_awaited_once_with(view=view)
+        interaction.response.defer.assert_not_called()
+        self.controller.panelEnchant.assert_awaited_once()
+
+    def testCustomEffectModalResetsSelectHighlightOnSubmit(self):
+        """'직접 입력…'으로 연 모달도 제출 시 드롭다운 강조를 지운다."""
+        self.controller.panelApplyEffect = AsyncMock()
+        view = cp.EffectPanelView(self.controller, self.ownerId, "Steve")
+        modal = cp.CustomEffectModal(self.controller, "Steve", panelView=view)
+        modal.effectId._value = "luck"
+        modal.seconds._value = ""
+        modal.level._value = ""
+        modal.particles._value = ""
+        interaction = _fakeInteraction()
+        self._run(modal.on_submit(interaction))
+        interaction.response.edit_message.assert_awaited_once_with(view=view)
+        interaction.response.defer.assert_not_called()
+        self.controller.panelApplyEffect.assert_awaited_once()
+
+    def testModalWithoutPanelViewStillDefers(self):
+        """버튼에서 연 모달(아이템 주기 등)은 기존처럼 thinking defer."""
+        self.controller.panelGiveItem = AsyncMock()
+        modal = cp.GiveItemModal(self.controller, "Steve")
+        modal.itemName._value = "diamond"
+        modal.count._value = ""
+        interaction = _fakeInteraction()
+        self._run(modal.on_submit(interaction))
+        interaction.response.defer.assert_awaited_once()
+        interaction.response.edit_message.assert_not_called()
+
     def testKickCancelReturnsToPlayerList(self):
         view = cp.ConfirmKickView(self.controller, self.ownerId, "Steve")
         interaction = _fakeInteraction()
