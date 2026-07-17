@@ -74,14 +74,17 @@ public final class RaspiMcOpsPlugin extends JavaPlugin {
         }
     }
 
-    /** Resolve an exact validated online identity and teleport only that player. */
+    /** Route the narrow console helpers the Discord bot depends on. */
     private boolean handleRaspiOps(CommandSender sender, String[] args) {
         if (!sender.hasPermission("raspimcops.rescue")) {
             sender.sendMessage("You do not have permission to use this command.");
             return true;
         }
+        if (args.length == 1 && args[0].equalsIgnoreCase("weather")) {
+            return handleWeatherQuery(sender);
+        }
         if (args.length != 2 || !args[0].equalsIgnoreCase("rescue")) {
-            sender.sendMessage("Usage: /raspiops rescue <exact-player-name>");
+            sender.sendMessage("Usage: /raspiops <rescue <exact-player-name>|weather>");
             return true;
         }
         String playerName = args[1];
@@ -107,6 +110,19 @@ public final class RaspiMcOpsPlugin extends JavaPlugin {
         sender.sendMessage("Teleported " + playerName + " to " + destination.getWorld().getName()
             + " spawn at " + destination.getBlockX() + " " + destination.getBlockY()
             + " " + destination.getBlockZ());
+        return true;
+    }
+
+    /** Read-only weather report for the primary world: clear, rain, or thunder. */
+    private boolean handleWeatherQuery(CommandSender sender) {
+        List<World> worlds = Bukkit.getWorlds();
+        if (worlds.isEmpty()) {
+            sender.sendMessage("No world is loaded.");
+            return true;
+        }
+        World world = worlds.getFirst();
+        String state = world.isThundering() ? "thunder" : world.hasStorm() ? "rain" : "clear";
+        sender.sendMessage("weather: " + state);
         return true;
     }
 }
