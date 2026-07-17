@@ -36,6 +36,31 @@ Paper exposes knobs in `config/paper-world-defaults.yml`. Pi-friendly changes:
 
 Apply changes and restart. Change one thing at a time and watch TPS.
 
+## Idle power-saver (empty server, #91)
+
+When nobody is online, the world still ticks — spawn chunks keep loading and
+random block ticks (crop growth, leaf decay, fire spread) keep running, which
+wastes CPU, heat, and power on a Pi. The bot detects an empty server and, after
+a short grace period, quiets that idle work, then restores it the moment a
+player joins:
+
+- `randomTickSpeed` → `0` while empty (no random block ticks), restored on join.
+- `spawnChunkRadius` → `0` while empty (spawn chunks stop ticking), restored on
+  join. This gamerule exists on Minecraft 1.20.5+; on older servers it is
+  skipped automatically.
+
+The bot **reads the current value before changing it** and restores exactly that
+value, so anything you set manually is preserved. Configure it in the tracked
+`.env` on the Pi:
+
+- `IDLE_ECO_ENABLED` — `true`/`false` (default `true`).
+- `IDLE_ECO_AFTER_MINUTES` — minutes the server must stay empty first
+  (default `10`).
+
+This only reduces *idle* load; the heavy work happens while players are online,
+so also keep the static levers above (memory, view/simulation distance, cooling)
+in good shape.
+
 ## Monitoring
 
 Discord `/admin` → **Performance** combines Paper TPS,

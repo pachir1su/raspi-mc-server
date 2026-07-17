@@ -89,6 +89,13 @@ class Config:
     alert_temperature_celsius = float(os.getenv("ALERT_TEMPERATURE_CELSIUS", "80"))
     alert_min_free_gb = float(os.getenv("ALERT_MIN_FREE_GB", "20"))
 
+    # 무인 절전(#91): 접속자가 없을 때 랜덤 틱·스폰 청크 틱을 멈춰 Pi의
+    # CPU·발열·전력을 낮췄다가, 누군가 접속하면 원래대로 되돌립니다.
+    idle_eco_enabled = os.getenv("IDLE_ECO_ENABLED", "true").lower() in {
+        "1", "true", "yes", "on",
+    }
+    idle_eco_after_minutes = int(os.getenv("IDLE_ECO_AFTER_MINUTES", "10"))
+
     # RCON
     rcon_host = os.getenv("RCON_HOST", "127.0.0.1")
     rcon_port = int(os.getenv("RCON_PORT", "25575"))

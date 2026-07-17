@@ -57,6 +57,8 @@ from bot.quick_commands import (
     GAMEMODES,
     GAMERULES,
     GAMERULE_UNSUPPORTED_MESSAGE,
+    IDLE_ECO_RANDOM_TICK,
+    IDLE_ECO_SPAWN_RADIUS,
     LIGHTNING_CLEAR_WEATHER_MESSAGE,
     SCOREBOARD_STATS,
     SPAWN_RADIUS_ZERO_COMMAND,
@@ -73,6 +75,8 @@ from bot.quick_commands import (
     buildGameruleSetCommand,
     buildGiveCommand,
     buildHealCommands,
+    buildIntGameruleQuery,
+    buildIntGameruleSet,
     buildInvincibilityClearCommands,
     buildInvincibilityCommands,
     buildKickCommand,
@@ -88,10 +92,12 @@ from bot.quick_commands import (
     ensureGameruleAccepted,
     ensureServerAccepted,
     parseDaysPlayed,
+    parseGameruleInt,
     parseGameruleValue,
     parseScoreboardValue,
     parseWeatherReply,
 )
+from bot.idle_saver import ENTER, EXIT, decideIdleAction
 from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.rcon import (
     Rcon,
@@ -203,6 +209,11 @@ class Admin(commands.Cog):
         # 게임룰 키 → 이 서버 버전 지원 여부. 빠른 명령 패널을 처음 열 때
         # 한 번 조회해 캐시하고, 미지원 버튼을 비활성화합니다(#59).
         self.supportedGamerules: dict[str, bool] = {}
+        # 무인 절전(#91) 상태: 언제부터 비었는지, 절전 중인지, 끄기 전 원래 값.
+        self._emptySince: datetime | None = None
+        self._ecoActive = False
+        self._savedRandomTick: int | None = None
+        self._savedSpawnRadius: int | None = None
 
     @app_commands.command(
         name="server", description="Check server status and online players with buttons."
@@ -273,6 +284,8 @@ class Admin(commands.Cog):
         """Start the persistent in-bot scheduler after the cog is ready."""
         self.backupScheduler.start()
         self.performanceAlerts.start()
+        if cfg.idle_eco_enabled:
+            self.idleEcoScheduler.start()
         # 운영자 기본값: 즉시 리스폰·자연 재생·플레이 일수 표시를 켠 채로
         # 시작합니다. 서버가 아직 안 떠 있을 수 있어 백그라운드에서 재시도.
         self._defaultGamerulesTask = asyncio.create_task(self._applyDefaultGamerules())
@@ -281,6 +294,8 @@ class Admin(commands.Cog):
         """Stop scheduler polling when the extension unloads."""
         self.backupScheduler.cancel()
         self.performanceAlerts.cancel()
+        if self.idleEcoScheduler.is_running():
+            self.idleEcoScheduler.cancel()
         if getattr(self, "_defaultGamerulesTask", None):
             self._defaultGamerulesTask.cancel()
 
@@ -2405,6 +2420,84 @@ class Admin(commands.Cog):
     async def beforeBackupScheduler(self):
         """Do not touch storage before Discord startup has completed."""
         await self.bot.wait_until_ready()
+
+    @tasks.loop(seconds=60)
+    async def idleEcoScheduler(self):
+        """무인 절전(#91): 서버가 비면 랜덤 틱·스폰 청크를 멈춰 Pi 부하를 낮춥니다.
+
+        접속자가 임계 시간 이상 0명이면 절전으로 들어가고, 누군가 접속하면
+        곧바로(다음 폴링에서) 원래 값으로 되돌립니다. RCON을 못 읽으면 상태를
+        그대로 두어, 서버가 죽은 사이 값이 꼬이지 않게 합니다.
+        """
+        playersOnline = await self._onlinePlayerCount()
+        now = datetime.now(timezone.utc)
+        if playersOnline == 0 and self._emptySince is None:
+            self._emptySince = now
+        elif playersOnline:
+            self._emptySince = None
+        emptyMinutes = 0.0
+        if self._emptySince is not None:
+            emptyMinutes = (now - self._emptySince).total_seconds() / 60
+        action = decideIdleAction(
+            playersOnline, emptyMinutes, self._ecoActive, cfg.idle_eco_after_minutes
+        )
+        if action == ENTER:
+            await self._enterEcoMode()
+        elif action == EXIT:
+            await self._exitEcoMode()
+
+    @idleEcoScheduler.before_loop
+    async def beforeIdleEcoScheduler(self):
+        """Wait for Discord startup before the first player-count poll."""
+        await self.bot.wait_until_ready()
+
+    async def _enterEcoMode(self):
+        """Remember the current perf gamerules, then stop idle ticking work.
+
+        이미 0으로 읽히면(봇 재시작 등으로 이전 절전 값이 남아 있던 경우) 그 0을
+        복원 목표로 저장하지 않고 바닐라 기본값을 씁니다 — 그래야 다음에 접속할 때
+        값이 0에 영원히 갇히지 않고 정상값으로 되돌아옵니다.
+        """
+        try:
+            currentRandomTick = parseGameruleInt(
+                await _rcon(buildIntGameruleQuery(IDLE_ECO_RANDOM_TICK))
+            )
+            self._savedRandomTick = (
+                currentRandomTick if currentRandomTick not in (None, 0) else 3
+            )
+            await _rcon(buildIntGameruleSet(IDLE_ECO_RANDOM_TICK, 0))
+            # spawnChunkRadius는 1.20.5+ 전용 — 없으면 숫자가 안 와서 건너뜁니다.
+            currentSpawnRadius = parseGameruleInt(
+                await _rcon(buildIntGameruleQuery(IDLE_ECO_SPAWN_RADIUS))
+            )
+            if currentSpawnRadius is not None:
+                self._savedSpawnRadius = currentSpawnRadius if currentSpawnRadius else 2
+                await _rcon(buildIntGameruleSet(IDLE_ECO_SPAWN_RADIUS, 0))
+            self._ecoActive = True
+            _log.info(
+                "무인 절전 ON: randomTickSpeed %s→0, spawnChunkRadius %s→0",
+                self._savedRandomTick, self._savedSpawnRadius,
+            )
+        except RconError:
+            # 실패하면 절전으로 표시하지 않아, 다음 폴링에서 다시 시도합니다.
+            _log.warning("무인 절전 진입 실패 (RCON)", exc_info=True)
+
+    async def _exitEcoMode(self):
+        """Restore the gamerules captured on entry (defaults if unknown)."""
+        try:
+            await _rcon(buildIntGameruleSet(
+                IDLE_ECO_RANDOM_TICK,
+                self._savedRandomTick if self._savedRandomTick is not None else 3,
+            ))
+            if self._savedSpawnRadius is not None:
+                await _rcon(buildIntGameruleSet(
+                    IDLE_ECO_SPAWN_RADIUS, self._savedSpawnRadius
+                ))
+            self._ecoActive = False
+            _log.info("무인 절전 OFF: 게임룰 복원 완료")
+        except RconError:
+            # 복원 실패 시 절전 상태를 유지해 다음 폴링에서 다시 복원을 시도합니다.
+            _log.warning("무인 절전 해제 실패 (RCON)", exc_info=True)
 
     async def _sendFile(self, interaction, path: Path, label: str, deferred: bool = False):
         """Respect the guild's actual Discord upload limit before reading the file."""

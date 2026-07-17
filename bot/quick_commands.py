@@ -627,6 +627,42 @@ def parseGameruleValue(output: str) -> bool:
     raise ValueError(f"게임룰 값을 읽지 못했습니다. 서버 응답: {(output or '').strip()[:120]}")
 
 
+# 무인 절전(#91): 서버가 비었을 때 랜덤 틱과 스폰 청크 틱을 멈춰 라즈베리파이의
+# CPU·발열·전력을 낮췄다가, 접속자가 생기면 원래대로 되돌립니다. 성능 전용이라
+# 되돌리기가 안전한 두 정수 게임룰만 건드립니다.
+#   - randomTickSpeed 0: 작물 성장·잎 부패·불 번짐 등 블록 랜덤 틱 정지.
+#   - spawnChunkRadius 0: 항상 로드돼 틱하던 스폰 청크를 언로드(1.20.5+ 전용).
+# 두 값 모두 "끄기 전 현재 값을 읽어 두었다가" 접속 시 그대로 복원하므로
+# 운영자가 바꿔 둔 설정을 덮어쓰지 않습니다.
+IDLE_ECO_RANDOM_TICK = "randomTickSpeed"
+IDLE_ECO_SPAWN_RADIUS = "spawnChunkRadius"
+
+
+def buildIntGameruleQuery(gameruleName: str) -> str:
+    """Query one numeric gamerule the idle saver manages (perf-only names)."""
+    if gameruleName not in (IDLE_ECO_RANDOM_TICK, IDLE_ECO_SPAWN_RADIUS):
+        raise ValueError("지원하지 않는 게임룰입니다.")
+    return f"gamerule {gameruleName}"
+
+
+def buildIntGameruleSet(gameruleName: str, value: int) -> str:
+    """Set one numeric idle-saver gamerule with a clamped, safe value."""
+    if gameruleName not in (IDLE_ECO_RANDOM_TICK, IDLE_ECO_SPAWN_RADIUS):
+        raise ValueError("지원하지 않는 게임룰입니다.")
+    safeValue = max(0, min(int(value), 4096))
+    return f"gamerule {gameruleName} {safeValue}"
+
+
+def parseGameruleInt(output: str) -> int | None:
+    """Read the integer from '... is currently set to: N', or None if absent.
+
+    구버전 마인크래프트에 없는 게임룰(spawnChunkRadius <1.20.5)은 'Incorrect
+    argument'처럼 숫자가 없는 응답을 돌려주므로 None으로 처리해 건너뜁니다.
+    """
+    match = re.search(r"set to:\s*(-?\d+)", output or "", re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
 def buildDifficultyCommand(difficulty: str) -> str:
     if difficulty not in DIFFICULTIES:
         raise ValueError("지원하지 않는 난이도입니다.")
