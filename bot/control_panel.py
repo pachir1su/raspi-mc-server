@@ -832,7 +832,9 @@ class CustomEffectModal(QuickActionModal):
         self.controller = controller
         self.playerName = playerName
         self.effectId = discord.ui.TextInput(
-            label="효과 ID (영어)", placeholder="예: speed, luck, absorption", max_length=64
+            label="효과 (한글 별칭 또는 영어 ID)",
+            placeholder="예: 재생, 신속, speed, absorption",
+            max_length=64,
         )
         self.seconds = discord.ui.TextInput(
             label="지속 시간(초, 비우면 300)", required=False, max_length=7
@@ -881,7 +883,9 @@ class CustomEnchantModal(QuickActionModal):
         self.controller = controller
         self.playerName = playerName
         self.enchantId = discord.ui.TextInput(
-            label="인챈트 ID (영어)", placeholder="예: knockback, thorns", max_length=64
+            label="인챈트 (한글 별칭 또는 영어 ID)",
+            placeholder="예: 넉백, 가시, knockback, thorns",
+            max_length=64,
         )
         self.level = discord.ui.TextInput(
             label="레벨 (비우면 1)", required=False, max_length=3
@@ -912,7 +916,9 @@ class ForceEnchantModal(QuickActionModal):
         self.controller = controller
         self.playerName = playerName
         self.enchantId = discord.ui.TextInput(
-            label="인챈트 ID (영어)", placeholder="예: sharpness, efficiency", max_length=64
+            label="인챈트 (한글 별칭 또는 영어 ID)",
+            placeholder="예: 날카로움, 효율, sharpness, efficiency",
+            max_length=64,
         )
         self.level = discord.ui.TextInput(
             label="레벨 (1~255, 비우면 1)", required=False, max_length=3

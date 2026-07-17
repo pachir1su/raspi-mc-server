@@ -37,6 +37,44 @@ class ItemResolverTests(unittest.TestCase):
                 qc.parseItemCount(bad)
 
 
+class EffectEnchantResolverTests(unittest.TestCase):
+    """Korean aliases for effects/enchants must resolve or fail with hints (#92)."""
+
+    def testResolvesKoreanEffects(self):
+        self.assertEqual("regeneration", qc.resolveEffectId("재생"))
+        self.assertEqual("fire_resistance", qc.resolveEffectId("화염 저항"))
+        self.assertEqual("saturation", qc.resolveEffectId("포만감"))
+
+    def testResolvesKoreanEnchants(self):
+        self.assertEqual("sharpness", qc.resolveEnchantId("날카로움"))
+        self.assertEqual("silk_touch", qc.resolveEnchantId("섬세한 손길"))
+        self.assertEqual("mending", qc.resolveEnchantId("수선"))
+
+    def testEnglishIdsPassThrough(self):
+        self.assertEqual("speed", qc.resolveEffectId("speed"))
+        self.assertEqual("efficiency", qc.resolveEnchantId("minecraft:efficiency"))
+
+    def testUnknownNamesRejected(self):
+        with self.assertRaises(ValueError):
+            qc.resolveEffectId("재생; op me")
+        with self.assertRaises(ValueError):
+            qc.resolveEnchantId("")
+
+    def testBuildersAcceptKorean(self):
+        self.assertEqual(
+            'effect give @a[name="Friend_1",limit=1] minecraft:regeneration 300 0 true',
+            qc.buildEffectCommand("Friend_1", "재생"),
+        )
+        self.assertEqual(
+            'enchant @a[name="Friend_1",limit=1] minecraft:sharpness 5',
+            qc.buildEnchantCommand("Friend_1", "날카로움", 5),
+        )
+        self.assertEqual(
+            "enchantheld Friend_1 efficiency 10",
+            qc.buildForceEnchantCommand("Friend_1", "효율", 10),
+        )
+
+
 class CommandBuilderTests(unittest.TestCase):
     """Every builder must validate the player and produce one fixed command."""
 

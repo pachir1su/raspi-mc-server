@@ -13,7 +13,12 @@ import math
 import random
 import re
 
-from bot.item_aliases import ITEM_ALIASES, KNOWN_ITEM_IDS
+from bot.item_aliases import (
+    EFFECT_ALIASES,
+    ENCHANT_ALIASES,
+    ITEM_ALIASES,
+    KNOWN_ITEM_IDS,
+)
 from bot.player_names import buildPlayerSelector, validateServerPlayerName
 
 
@@ -133,16 +138,6 @@ def ensureServerAccepted(output: str) -> str:
     return output or ""
 
 
-def _validateResourceId(rawId: str, kindLabel: str) -> str:
-    """Normalize one item/effect/enchant ID and reject unsafe characters."""
-    cleaned = (rawId or "").strip().lower().removeprefix("minecraft:")
-    if not _RESOURCE_ID_PATTERN.fullmatch(cleaned):
-        raise ValueError(
-            f"{kindLabel} ID는 영문 소문자·숫자·밑줄만 사용할 수 있습니다 (예: diamond, speed)"
-        )
-    return cleaned
-
-
 def resolveItemId(rawName: str) -> str:
     """Turn free-form input (Korean alias or English ID) into one item ID.
 
@@ -166,6 +161,55 @@ def resolveItemId(rawName: str) -> str:
         else " 영어 아이템 ID(예: diamond, iron_sword)나 등록된 한글 별칭을 입력하세요."
     )
     raise ValueError(f"아이템 이름을 찾지 못했습니다: `{(rawName or '').strip()}`.{hint}")
+
+
+# 포션 효과·인챈트 오타 추천 후보(별칭 값 + 자주 쓰는 ID).
+KNOWN_EFFECT_IDS = sorted(
+    set(EFFECT_ALIASES.values()) | {effectId for effectId, *_ in COMMON_EFFECTS}
+)
+KNOWN_ENCHANT_IDS = sorted(
+    set(ENCHANT_ALIASES.values()) | {enchantId for enchantId, *_ in COMMON_ENCHANTS}
+)
+
+
+def _resolveAlias(
+    rawName: str, aliasTable: dict, knownIds: list[str], kindLabel: str, exampleHint: str
+) -> str:
+    """resolveItemId와 같은 규칙으로 한글 별칭/영어 ID를 하나의 ID로 변환."""
+    cleaned = (rawName or "").strip().lower().removeprefix("minecraft:")
+    compact = cleaned.replace(" ", "")
+    if compact in aliasTable:
+        return aliasTable[compact]
+    candidate = cleaned.replace(" ", "_")
+    if _RESOURCE_ID_PATTERN.fullmatch(candidate):
+        return candidate
+    suggestions = difflib.get_close_matches(
+        compact, list(aliasTable) + knownIds, n=3, cutoff=0.5
+    )
+    hint = (
+        " 혹시 이것인가요? " + ", ".join(f"`{name}`" for name in suggestions)
+        if suggestions
+        else exampleHint
+    )
+    raise ValueError(
+        f"{kindLabel} 이름을 찾지 못했습니다: `{(rawName or '').strip()}`.{hint}"
+    )
+
+
+def resolveEffectId(rawName: str) -> str:
+    """한글 별칭이나 영어 ID를 하나의 포션 효과 ID로 변환합니다(#92)."""
+    return _resolveAlias(
+        rawName, EFFECT_ALIASES, KNOWN_EFFECT_IDS, "효과",
+        " 영어 효과 ID(예: speed, regeneration)나 등록된 한글 별칭을 입력하세요.",
+    )
+
+
+def resolveEnchantId(rawName: str) -> str:
+    """한글 별칭이나 영어 ID를 하나의 인챈트 ID로 변환합니다(#92)."""
+    return _resolveAlias(
+        rawName, ENCHANT_ALIASES, KNOWN_ENCHANT_IDS, "인챈트",
+        " 영어 인챈트 ID(예: sharpness, mending)나 등록된 한글 별칭을 입력하세요.",
+    )
 
 
 def parseItemCount(rawCount: str) -> int:
@@ -195,8 +239,10 @@ def buildEffectCommand(
 
     hideParticles는 바닐라 `effect give`의 마지막 인자로, true면 거품이
     보이지 않습니다. 표시를 원할 때만 False를 넘기세요.
+
+    effectId는 한글 별칭(예: "재생", "신속")이나 영어 ID를 모두 받습니다(#92).
     """
-    safeEffect = _validateResourceId(effectId, "효과")
+    safeEffect = resolveEffectId(effectId)
     safeSeconds = max(1, min(int(seconds), 1_000_000))
     safeAmplifier = max(0, min(int(amplifier), 255))
     return (
@@ -211,7 +257,8 @@ def buildEffectClearCommand(playerName: str) -> str:
 
 
 def buildEnchantCommand(playerName: str, enchantId: str, level: int = 1) -> str:
-    safeEnchant = _validateResourceId(enchantId, "인챈트")
+    # enchantId는 한글 별칭(예: "날카로움")이나 영어 ID를 모두 받습니다(#92).
+    safeEnchant = resolveEnchantId(enchantId)
     safeLevel = max(1, min(int(level), 255))
     return (
         f"enchant {buildPlayerSelector(playerName)} "
@@ -227,7 +274,8 @@ def buildForceEnchantCommand(playerName: str, enchantId: str, level: int = 1) ->
     플러그인이 정확한 이름(선택자 아님)을 받으므로 검증된 이름을 그대로 씁니다.
     """
     safeName = validateServerPlayerName(playerName)
-    safeEnchant = _validateResourceId(enchantId, "인챈트")
+    # enchantId는 한글 별칭(예: "날카로움")이나 영어 ID를 모두 받습니다(#92).
+    safeEnchant = resolveEnchantId(enchantId)
     safeLevel = max(1, min(int(level), 255))
     return f"enchantheld {safeName} {safeEnchant} {safeLevel}"
 

@@ -141,7 +141,8 @@ Everything below stays reachable:
 - player quick actions: give items (Korean aliases supported), potion effects,
   enchants, gamemode, teleport (player/place/spawn), XP, heal, invincibility
   (30s/5m/30m/clear), kill/death lookup, and kick (with confirmation). Effect
-  and enchant dropdowns include a free-input option.
+  and enchant dropdowns include a free-input option that accepts Korean aliases
+  (e.g. 재생, 신속, 날카로움, 효율) as well as English IDs (#92).
 - the live-player and account-link selectors
 - bot, Minecraft, and event-driven player-chat log controls
 - persistent Paper spawn-protection toggle
@@ -176,8 +177,9 @@ current `list` output. After selecting a player, inspection buttons show:
 - **Effects** — effect names (Korean), levels, and remaining time
 
 Action buttons (all audited): give item (Korean alias or English ID with typo
-suggestions), potion effects and enchants (common presets plus free input —
-the effect modal also takes a duration, a strength level up to 256 (the game's
+suggestions), potion effects and enchants (common presets plus free input that
+also accepts Korean aliases or English IDs with typo suggestions, #92 — the
+effect modal also takes a duration, a strength level up to 256 (the game's
 byte limit), and hides
 bubble particles by default; the dropdown redraws itself after every pick so
 the same effect or enchant can be applied repeatedly without switching to a
