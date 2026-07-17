@@ -161,6 +161,8 @@ class Friend(commands.Cog):
                 "📖 **서버 일지** — 서버에서 있었던 일을 기록하고 읽습니다.\n"
                 "🩺 **서버 상태 점수** — 서버가 느린 것 같을 때 0~100점 "
                 "건강 점수를 확인합니다.\n"
+                "📊 **내 통계** — 내 캐릭터의 사망·처치 수를 확인합니다.\n"
+                "📖 **게임 위키** — 양조·인챈트 등 게임 도움말 문서를 엽니다.\n"
                 "👤 **내 계정 목록** — 나에게 등록된 Java/Bedrock 계정을 "
                 "확인합니다."
             ),
@@ -188,12 +190,15 @@ class Friend(commands.Cog):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(
-        name="my-stats", description="Show your own tracked stats (deaths/kills)."
-    )
-    async def myStats(self, interaction: discord.Interaction) -> None:
-        """Look up the invoking friend's own death/kill scoreboard totals (#68)."""
-        link = await self._approvedLink(interaction)
+    async def panelMyStats(
+        self, interaction: discord.Interaction, linkId: str
+    ) -> None:
+        """Look up the friend's own death/kill scoreboard totals (#68).
+
+        이슈 #85로 최상위 `/내통계` 명령 대신 `/도구`의 '내 통계' 버튼으로
+        노출합니다.
+        """
+        link = await self._approvedLink(interaction, linkId)
         if not link:
             return
         await interaction.response.defer(ephemeral=True, thinking=True)

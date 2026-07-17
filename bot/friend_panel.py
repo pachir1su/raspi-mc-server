@@ -2,7 +2,9 @@
 
 import discord
 
+from bot import BRAND_BLUE
 from bot.error_text import describeError
+from bot.wiki import WIKI_PAGES, wikiPageLabel, wikiPageUrl
 
 
 class UserView(discord.ui.View):
@@ -253,6 +255,35 @@ class DiaryPanelView(UserView):
         await interaction.response.send_modal(DiaryModal(self.controller))
 
 
+class WikiSelect(discord.ui.Select):
+    """게임 위키(#71) 문서를 골라 GitHub 문서 링크 카드로 안내합니다."""
+
+    def __init__(self):
+        options = [
+            discord.SelectOption(label=label, value=key)
+            for key, label, _ in WIKI_PAGES
+        ]
+        super().__init__(placeholder="열어볼 위키 문서를 선택하세요", options=options)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        key = self.values[0]
+        embed = discord.Embed(
+            title=f"📖 위키 — {wikiPageLabel(key)}",
+            description=f"[문서 열기]({wikiPageUrl(key, language='ko')})",
+            color=BRAND_BLUE,
+        )
+        embed.set_footer(text="GitHub의 최신 문서로 이동합니다.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class WikiPanelView(UserView):
+    """위키 문서 선택 드롭다운 하나만 담는 얇은 패널."""
+
+    def __init__(self, controller, ownerId: int):
+        super().__init__(controller, ownerId, timeout=300)
+        self.add_item(WikiSelect())
+
+
 class MyToolsView(UserView):
     """Single self-service entry point for linked players."""
 
@@ -347,6 +378,13 @@ class MyToolsView(UserView):
         if await self._requireSelection(interaction):
             await self.controller.panelMyStatus(interaction, self.selectedLinkId)
 
+    @discord.ui.button(label="내 통계", emoji="📊", style=discord.ButtonStyle.secondary, row=3)
+    async def myRecords(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        if await self._requireSelection(interaction):
+            await self.controller.panelMyStats(interaction, self.selectedLinkId)
+
     @discord.ui.button(label="플레이어에게 이동", emoji="🚀", style=discord.ButtonStyle.primary, row=4)
     async def teleport(
         self, interaction: discord.Interaction, button: discord.ui.Button
@@ -372,6 +410,17 @@ class MyToolsView(UserView):
         self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
         await self.controller.panelServerTime(interaction)
+
+    @discord.ui.button(label="게임 위키", emoji="📖", style=discord.ButtonStyle.secondary, row=4)
+    async def wiki(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        # 위키는 계정 선택이 필요 없는 읽기 전용 링크 안내입니다(#71).
+        await interaction.response.send_message(
+            "열어볼 위키 문서를 선택하세요.",
+            view=WikiPanelView(self.controller, self.ownerId),
+            ephemeral=True,
+        )
 
 
 class ManagedAccountModal(discord.ui.Modal):
