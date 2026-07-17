@@ -17,16 +17,16 @@ search-radius: 4
 
 # Boxes older than this many hours are removed on the hourly sweep.
 # 0 means boxes never expire. Default 0 (permanent): items are kept until the
-# owner recovers them. Grief pileup is handled by
-# max-physical-boxes-per-player, not by expiry.
+# owner recovers them.
 expire-hours: 0
 
 # Anti-grief cap on how many PHYSICAL (block) boxes one player may have active
 # at once. Once a player is at the cap, further deaths are stored in a virtual
 # box (no block placed) that an admin recovers, so a player who dies over and
 # over — e.g. at someone else's door — cannot pile up unbreakable chests.
-# 0 disables the cap (unlimited physical boxes).
-max-physical-boxes-per-player: 3
+# 0 disables the cap (unlimited physical boxes). Default 0: every death gets
+# its own box. Set a positive number to re-enable the anti-grief cap.
+max-physical-boxes-per-player: 0
 
 # When true, players holding the deathbox.friend permission may open other
 # players' boxes. When false, only the owner and operators can.

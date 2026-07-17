@@ -46,7 +46,7 @@ final class DeathBoxConfig {
         // Clamp the radius so a misconfiguration can never trigger a huge search.
         int radius = Math.max(1, Math.min(8, c.getInt("search-radius", 4)));
         int expire = Math.max(0, c.getInt("expire-hours", 0));
-        int maxBoxes = Math.max(0, c.getInt("max-physical-boxes-per-player", 3));
+        int maxBoxes = Math.max(0, c.getInt("max-physical-boxes-per-player", 0));
         return new DeathBoxConfig(
                 c.getBoolean("enabled", true),
                 container,
