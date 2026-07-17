@@ -53,7 +53,6 @@ class McBot(commands.Bot):
         await self.tree.set_translator(CommandTranslator())
         await self.load_extension("bot.cogs.admin")
         await self.load_extension("bot.cogs.friend")
-        await self.load_extension("bot.cogs.quick")
         await syncCommandTree(self.tree, cfg.guild_ids)
         if cfg.guild_ids:
             _log.info("synced commands to guilds %s", cfg.guild_ids)
