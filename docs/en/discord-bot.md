@@ -177,7 +177,9 @@ current `list` output. After selecting a player, inspection buttons show:
 Action buttons (all audited): give item (Korean alias or English ID with typo
 suggestions), potion effects and enchants (common presets plus free input —
 the effect modal also takes a duration, a strength level of 1–10, and hides
-bubble particles by default),
+bubble particles by default; the dropdown redraws itself after every pick so
+the same effect or enchant can be applied repeatedly without switching to a
+different option first),
 gamemode, teleport to another player / a saved place / spawn, XP +10/+30,
 heal, and kick (with confirmation).
 
