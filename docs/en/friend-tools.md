@@ -4,6 +4,11 @@ The Discord bot exposes a narrow self-service surface for approved friends. It
 does not make friends Minecraft operators and it never accepts arbitrary RCON
 text from them.
 
+The place book, diary, wiki, and teleport screens of the `/tools` panel **swap
+the same message in place** instead of stacking new replies, and each screen's
+**↩️ 내 도구** button returns to the first screen. When the panel expires its
+buttons grey out and the message says to run `/tools` again.
+
 ## 1. Configure the Pi
 
 Edit the existing `.env` on the Raspberry Pi. Do not commit the real file.
