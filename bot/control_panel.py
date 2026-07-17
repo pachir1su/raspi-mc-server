@@ -115,15 +115,21 @@ async def sendScreen(
             pass
 
 
-async def replaceWithLoadingEmbed(interaction, controller, ownerId, builder):
+async def replaceWithLoadingEmbed(
+    interaction, controller, ownerId, builder, *, backRenderer=None, backLabel="↩️ 뒤로"
+):
     """느린 조회: 먼저 로딩 문구로 교체(3초 응답 한도 회피)한 뒤 결과로 재편집.
 
-    builder는 embed를 반환하는 코루틴입니다. 결과 화면에는 '🏠 홈' 버튼만 둡니다.
+    builder는 embed를 반환하는 코루틴입니다. 결과 화면에는 상위 화면
+    '뒤로'(선택)와 '🏠 홈' 버튼을 둡니다.
     """
     await interaction.response.edit_message(content="⏳ 불러오는 중…", embed=None, view=None)
     embed = await builder()
-    await interaction.edit_original_response(
-        content=None, embed=embed, view=InfoScreenView(controller, ownerId)
+    view = InfoScreenView(
+        controller, ownerId, backRenderer=backRenderer, backLabel=backLabel
+    )
+    view.message = await interaction.edit_original_response(
+        content=None, embed=embed, view=view
     )
 
 
@@ -138,6 +144,97 @@ async def renderAdminHome(interaction: discord.Interaction, controller, ownerId:
     )
 
 
+# ── 구역별 화면 렌더러 ──────────────────────────────────────────
+# 하위 화면의 '↩️ 뒤로' 버튼이 상위 구역을 같은 메시지에 다시 그릴 때 쓰는
+# 코루틴들입니다. 대시보드 버튼과 뒤로 버튼이 똑같은 렌더러를 공유해,
+# 어느 경로로 들어와도 화면이 동일합니다.
+
+
+async def renderPlayerPanel(
+    interaction: discord.Interaction, controller, ownerId: int, selected: str | None = None
+):
+    """접속자 관리 화면. selected 가 아직 접속 중이면 선택을 유지합니다."""
+    players = await controller.panelOnlinePlayers()
+    if not players:
+        await replaceScreen(
+            interaction,
+            content="현재 접속 중인 플레이어가 없습니다.",
+            embed=None,
+            view=InfoScreenView(controller, ownerId),
+        )
+        return
+    view = PlayerPanelView(controller, ownerId, players)
+    if selected in players:
+        view.selectedPlayer = selected
+    await replaceScreen(
+        interaction,
+        content=(
+            f"선택됨: **{view.selectedPlayer}** — 아래 조회·조작 버튼이 이 플레이어에게 적용됩니다."
+            if selected in players
+            else "조회할 플레이어를 선택하세요."
+        ),
+        embed=None,
+        view=view,
+    )
+
+
+async def renderWorldCommands(interaction: discord.Interaction, controller, ownerId: int):
+    """빠른 명령(시간·날씨·게임룰·스폰) 화면."""
+    supported = await controller.probeSupportedGamerules()
+    await replaceScreen(
+        interaction,
+        content="시간·날씨·난이도·게임룰·스폰을 버튼으로 바꿉니다. 서버 상태가 즉시 바뀝니다.",
+        embed=None,
+        view=WorldCommandsView(controller, ownerId, supported),
+    )
+
+
+async def renderLogPanel(interaction: discord.Interaction, controller, ownerId: int):
+    """로그 선택 화면."""
+    await replaceScreen(
+        interaction,
+        content="확인할 로그를 선택하세요.",
+        embed=None,
+        view=LogPanelView(controller, ownerId),
+    )
+
+
+async def renderMoreTools(interaction: discord.Interaction, controller, ownerId: int):
+    """더보기(2차 도구) 화면."""
+    await replaceScreen(
+        interaction,
+        content="자주 쓰지 않는 도구와 설정입니다.",
+        embed=None,
+        view=MoreToolsView(controller, ownerId),
+    )
+
+
+def playerBackRenderer(controller, ownerId: int, playerName: str):
+    """선택한 플레이어를 유지한 채 접속자 관리로 돌아가는 렌더러."""
+
+    async def render(interaction: discord.Interaction):
+        await renderPlayerPanel(interaction, controller, ownerId, playerName)
+
+    return render
+
+
+class PlayerSubScreenView(OwnerView):
+    """접속자 관리 하위 화면 공통 — '↩️ 접속자 관리'와 '🏠 홈'을 함께 둡니다."""
+
+    def __init__(
+        self, controller, ownerId: int, playerName: str, *, navRow: int = 4,
+        timeout: float = 300,
+    ):
+        super().__init__(controller, ownerId, timeout=timeout)
+        self.playerName = playerName
+        self.add_item(BackButton(
+            playerBackRenderer(controller, ownerId, playerName),
+            row=navRow,
+            label="↩️ 접속자 관리",
+        ))
+        self.add_item(HomeButton(controller, ownerId, row=navRow))
+
+
 class HomeButton(discord.ui.Button):
     """어느 하위 패널에서든 관리 대시보드 홈으로 돌아갑니다(#58)."""
 
@@ -150,11 +247,36 @@ class HomeButton(discord.ui.Button):
         await renderAdminHome(interaction, self.controller, self.ownerId)
 
 
-class InfoScreenView(OwnerView):
-    """읽기 전용 결과 화면 — '🏠 홈' 버튼만 둡니다."""
+class BackButton(discord.ui.Button):
+    """한 단계 위 화면으로 같은 메시지 안에서 돌아갑니다.
 
-    def __init__(self, controller, ownerId: int):
+    renderer 는 interaction 하나를 받아 상위 화면을 다시 그리는 코루틴
+    함수입니다. 홈까지 되돌아가지 않고도 같은 구역을 계속 쓸 수 있게 해,
+    '기능 하나 쓰고 나면 /admin 을 다시 쳐야 한다'는 불편을 없앱니다.
+    """
+
+    def __init__(self, renderer, *, row: int = 4, label: str = "↩️ 뒤로"):
+        super().__init__(label=label, style=discord.ButtonStyle.secondary, row=row)
+        self.renderer = renderer
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.renderer(interaction)
+
+
+class InfoScreenView(OwnerView):
+    """읽기 전용 결과 화면 — 상위 화면 '뒤로'(선택)와 '🏠 홈' 버튼."""
+
+    def __init__(
+        self,
+        controller,
+        ownerId: int,
+        *,
+        backRenderer=None,
+        backLabel: str = "↩️ 뒤로",
+    ):
         super().__init__(controller, ownerId)
+        if backRenderer is not None:
+            self.add_item(BackButton(backRenderer, row=0, label=backLabel))
         self.add_item(HomeButton(controller, ownerId, row=0))
 
 
@@ -172,19 +294,7 @@ class AdminDashboardView(OwnerView):
 
     @discord.ui.button(label="접속자 관리", emoji="👥", style=discord.ButtonStyle.primary, row=0)
     async def players(self, interaction: discord.Interaction, button: discord.ui.Button):
-        players = await self.controller.panelOnlinePlayers()
-        if not players:
-            await replaceScreen(
-                interaction,
-                content="현재 접속 중인 플레이어가 없습니다.",
-                embed=None,
-                view=InfoScreenView(self.controller, self.ownerId),
-            )
-            return
-        view = PlayerPanelView(self.controller, self.ownerId, players)
-        await replaceScreen(
-            interaction, content="조회할 플레이어를 선택하세요.", embed=None, view=view
-        )
+        await renderPlayerPanel(interaction, self.controller, self.ownerId)
 
     @discord.ui.button(label="서버 제어", emoji="🎛️", style=discord.ButtonStyle.primary, row=0)
     async def service(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -213,13 +323,7 @@ class AdminDashboardView(OwnerView):
         # (아이템·효과·TP 등)은 '접속자 관리'에서 접속자를 고른 뒤 사용합니다.
         # 첫 열기에서 서버 버전이 지원하는 게임룰을 조회해(#59) 미지원
         # 버튼을 비활성화합니다. 조회 결과는 캐시됩니다.
-        supported = await self.controller.probeSupportedGamerules()
-        await replaceScreen(
-            interaction,
-            content="시간·날씨·난이도·게임룰·스폰을 버튼으로 바꿉니다. 서버 상태가 즉시 바뀝니다.",
-            embed=None,
-            view=WorldCommandsView(self.controller, self.ownerId, supported),
-        )
+        await renderWorldCommands(interaction, self.controller, self.ownerId)
 
     @discord.ui.button(label="상태 진단", emoji="🩺", style=discord.ButtonStyle.secondary, row=1)
     async def health(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -271,26 +375,30 @@ class MoreToolsView(OwnerView):
             )
         return embed
 
+    def _backToMore(self):
+        async def render(interaction: discord.Interaction):
+            await renderMoreTools(interaction, self.controller, self.ownerId)
+
+        return render
+
     @discord.ui.button(label="성능 상세", emoji="📊", style=discord.ButtonStyle.secondary, row=0)
     async def performance(self, interaction: discord.Interaction, button: discord.ui.Button):
         await replaceWithLoadingEmbed(
-            interaction, self.controller, self.ownerId, self.controller.panelMetricsEmbed
+            interaction, self.controller, self.ownerId,
+            self.controller.panelMetricsEmbed,
+            backRenderer=self._backToMore(), backLabel="↩️ 더보기",
         )
 
     @discord.ui.button(label="렉 원인", emoji="🧰", style=discord.ButtonStyle.secondary, row=0)
     async def tuning(self, interaction: discord.Interaction, button: discord.ui.Button):
         await replaceWithLoadingEmbed(
-            interaction, self.controller, self.ownerId, self._tuningEmbed
+            interaction, self.controller, self.ownerId, self._tuningEmbed,
+            backRenderer=self._backToMore(), backLabel="↩️ 더보기",
         )
 
     @discord.ui.button(label="로그", emoji="📄", style=discord.ButtonStyle.secondary, row=0)
     async def logs(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await replaceScreen(
-            interaction,
-            content="확인할 로그를 선택하세요.",
-            embed=None,
-            view=LogPanelView(self.controller, self.ownerId),
-        )
+        await renderLogPanel(interaction, self.controller, self.ownerId)
 
     @discord.ui.button(label="저장공간", emoji="💽", style=discord.ButtonStyle.secondary, row=0)
     async def storage(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -299,7 +407,10 @@ class MoreToolsView(OwnerView):
             interaction,
             content=None,
             embed=embed,
-            view=InfoScreenView(self.controller, self.ownerId),
+            view=InfoScreenView(
+                self.controller, self.ownerId,
+                backRenderer=self._backToMore(), backLabel="↩️ 더보기",
+            ),
         )
 
     @discord.ui.button(label="월드", emoji="🌍", style=discord.ButtonStyle.secondary, row=1)
@@ -415,6 +526,12 @@ class SpawnSetView(OwnerView):
         if players:
             self.add_item(SpawnPlayerSelect(controller, players))
 
+        async def back(interaction: discord.Interaction):
+            await renderWorldCommands(interaction, controller, ownerId)
+
+        self.add_item(BackButton(back, row=2, label="↩️ 빠른 명령"))
+        self.add_item(HomeButton(controller, ownerId, row=2))
+
     @discord.ui.button(label="좌표 직접 입력", emoji="⌨️", style=discord.ButtonStyle.secondary, row=1)
     async def coords(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(SpawnCoordsModal(self.controller))
@@ -450,15 +567,15 @@ class WorldCommandsView(OwnerView):
 
     @discord.ui.button(label="드롭템 정리", emoji="🧹", style=discord.ButtonStyle.danger, row=0)
     async def clearDrops(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            t("incident_clear_drops_prompt"),
+        await sendScreen(
+            interaction,
+            content=t("incident_clear_drops_prompt"),
             view=ConfirmIncidentView(
                 self.controller,
                 self.ownerId,
                 "kill @e[type=item]",
                 "incident_kill_items",
             ),
-            ephemeral=True,
         )
 
     # ── 2행: 날씨 ────────────────────────────────────────────
@@ -535,11 +652,14 @@ class WorldCommandsView(OwnerView):
     @discord.ui.button(label="스폰 지정", emoji="📍", style=discord.ButtonStyle.success, row=4)
     async def setSpawn(self, interaction: discord.Interaction, button: discord.ui.Button):
         players = await self.controller.panelOnlinePlayers()
-        await interaction.response.send_message(
-            "월드 스폰을 지정합니다. 죽었을 때 리스폰(침대 없을 때)과 "
-            "`/도구`의 스폰 귀환이 모두 이 지점으로 바뀝니다.",
+        await replaceScreen(
+            interaction,
+            content=(
+                "월드 스폰을 지정합니다. 죽었을 때 리스폰(침대 없을 때)과 "
+                "`/도구`의 스폰 귀환이 모두 이 지점으로 바뀝니다."
+            ),
+            embed=None,
             view=SpawnSetView(self.controller, self.ownerId, players),
-            ephemeral=True,
         )
 
 
@@ -592,10 +712,10 @@ class ServerActionsView(OwnerView):
         self.add_item(HomeButton(controller, ownerId, row=1))
 
     async def _confirm(self, interaction: discord.Interaction, action: str, koreanName: str):
-        await interaction.response.send_message(
-            f"마인크래프트 서버를 **{koreanName}**할까요?",
+        await sendScreen(
+            interaction,
+            content=f"마인크래프트 서버를 **{koreanName}**할까요?",
             view=ConfirmServiceView(self.controller, self.ownerId, action),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="시작", emoji="▶️", style=discord.ButtonStyle.success)
@@ -797,9 +917,9 @@ class EffectSelect(discord.ui.Select):
         )
 
 
-class EffectPanelView(OwnerView):
+class EffectPanelView(PlayerSubScreenView):
     def __init__(self, controller, ownerId: int, playerName: str):
-        super().__init__(controller, ownerId, timeout=300)
+        super().__init__(controller, ownerId, playerName)
         self.add_item(EffectSelect(controller, playerName))
 
 
@@ -845,18 +965,14 @@ class EnchantSelect(discord.ui.Select):
         )
 
 
-class EnchantPanelView(OwnerView):
+class EnchantPanelView(PlayerSubScreenView):
     def __init__(self, controller, ownerId: int, playerName: str):
-        super().__init__(controller, ownerId, timeout=300)
+        super().__init__(controller, ownerId, playerName)
         self.add_item(EnchantSelect(controller, playerName))
 
 
-class GamemodePanelView(OwnerView):
+class GamemodePanelView(PlayerSubScreenView):
     """선택한 접속자의 게임모드를 버튼 한 번으로 변경."""
-
-    def __init__(self, controller, ownerId: int, playerName: str):
-        super().__init__(controller, ownerId, timeout=300)
-        self.playerName = playerName
 
     async def _apply(self, interaction: discord.Interaction, mode: str):
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -922,12 +1038,11 @@ class TeleportPlaceSelect(discord.ui.Select):
         )
 
 
-class TeleportPanelView(OwnerView):
+class TeleportPanelView(PlayerSubScreenView):
     """접속자·좌표북·스폰 세 종류의 순간이동 목적지를 한 화면에."""
 
     def __init__(self, controller, ownerId: int, playerName: str, otherPlayers, places):
-        super().__init__(controller, ownerId, timeout=300)
-        self.playerName = playerName
+        super().__init__(controller, ownerId, playerName)
         if otherPlayers:
             self.add_item(TeleportTargetSelect(controller, playerName, otherPlayers))
         if places:
@@ -939,16 +1054,12 @@ class TeleportPanelView(OwnerView):
         await self.controller.panelTeleportToSpawn(interaction, self.playerName)
 
 
-class InvincibilityPanelView(OwnerView):
+class InvincibilityPanelView(PlayerSubScreenView):
     """무적(#75) 지속 시간 선택과 해제를 버튼으로 제공합니다.
 
     실제 효과 조합은 bot/quick_commands.py의 buildInvincibilityCommands가
     담당하며, 해제는 그 세트로 건 효과만 골라 지웁니다.
     """
-
-    def __init__(self, controller, ownerId: int, playerName: str):
-        super().__init__(controller, ownerId, timeout=300)
-        self.playerName = playerName
 
     async def _grant(self, interaction: discord.Interaction, seconds: int):
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -972,23 +1083,20 @@ class InvincibilityPanelView(OwnerView):
         await self.controller.panelMortal(interaction, self.playerName)
 
 
-class ConfirmKickView(OwnerView):
+class ConfirmKickView(PlayerSubScreenView):
     """추방 전에 한 번 더 확인합니다."""
-
-    def __init__(self, controller, ownerId: int, playerName: str):
-        super().__init__(controller, ownerId, timeout=60)
-        self.playerName = playerName
 
     @discord.ui.button(label="추방 확인", emoji="🥾", style=discord.ButtonStyle.danger)
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # stop() 하지 않아야 실행 후에도 '뒤로/홈' 버튼으로 이동할 수 있습니다.
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.controller.panelKick(interaction, self.playerName)
-        self.stop()
 
     @discord.ui.button(label="취소", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="추방을 취소했습니다.", view=None)
-        self.stop()
+        await renderPlayerPanel(
+            interaction, self.controller, self.ownerId, self.playerName
+        )
 
 
 class PlayerPanelView(OwnerView):
@@ -1006,8 +1114,15 @@ class PlayerPanelView(OwnerView):
         self.add_item(HomeButton(controller, ownerId, row=4))
 
     async def _show(self, interaction: discord.Interaction, detailType: str):
+        # 조회 결과도 같은 메시지에서 보여 주고, '↩️ 접속자 관리'로 바로
+        # 되돌아갈 수 있게 합니다 — 새 ephemeral 메시지가 쌓이지 않습니다.
         embed = await self.controller.panelPlayerEmbed(self.selectedPlayer, detailType)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await replaceScreen(
+            interaction,
+            content=None,
+            embed=embed,
+            view=PlayerSubScreenView(self.controller, self.ownerId, self.selectedPlayer),
+        )
 
     @discord.ui.button(label="인벤토리", emoji="🎒", style=discord.ButtonStyle.primary, row=1)
     async def inventory(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1037,38 +1152,42 @@ class PlayerPanelView(OwnerView):
 
     @discord.ui.button(label="포션 효과", emoji="✨", style=discord.ButtonStyle.primary, row=2)
     async def applyEffect(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            f"**{self.selectedPlayer}** 에게 적용할 효과를 선택하세요.",
+        await replaceScreen(
+            interaction,
+            content=f"**{self.selectedPlayer}** 에게 적용할 효과를 선택하세요.",
+            embed=None,
             view=EffectPanelView(self.controller, self.ownerId, self.selectedPlayer),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="인챈트", emoji="🗡️", style=discord.ButtonStyle.primary, row=2)
     async def enchant(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            f"**{self.selectedPlayer}** 가 들고 있는 아이템에 부여할 인챈트를 선택하세요.",
+        await replaceScreen(
+            interaction,
+            content=f"**{self.selectedPlayer}** 가 들고 있는 아이템에 부여할 인챈트를 선택하세요.",
+            embed=None,
             view=EnchantPanelView(self.controller, self.ownerId, self.selectedPlayer),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="게임모드", emoji="🎮", style=discord.ButtonStyle.secondary, row=2)
     async def gamemode(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            f"**{self.selectedPlayer}** 의 게임모드를 선택하세요.",
+        await replaceScreen(
+            interaction,
+            content=f"**{self.selectedPlayer}** 의 게임모드를 선택하세요.",
+            embed=None,
             view=GamemodePanelView(self.controller, self.ownerId, self.selectedPlayer),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="TP", emoji="🚀", style=discord.ButtonStyle.secondary, row=2)
     async def teleport(self, interaction: discord.Interaction, button: discord.ui.Button):
         otherPlayers = [name for name in self.players if name != self.selectedPlayer]
         places = await self.controller.panelSharedPlaces()
-        await interaction.response.send_message(
-            f"**{self.selectedPlayer}** 를 어디로 이동시킬까요?",
+        await replaceScreen(
+            interaction,
+            content=f"**{self.selectedPlayer}** 를 어디로 이동시킬까요?",
+            embed=None,
             view=TeleportPanelView(
                 self.controller, self.ownerId, self.selectedPlayer, otherPlayers, places
             ),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="경험치 +10", emoji="⭐", style=discord.ButtonStyle.secondary, row=3)
@@ -1088,18 +1207,20 @@ class PlayerPanelView(OwnerView):
 
     @discord.ui.button(label="무적", emoji="🛡️", style=discord.ButtonStyle.primary, row=3)
     async def invincible(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            f"**{self.selectedPlayer}** 의 무적 지속 시간을 선택하세요.",
+        await replaceScreen(
+            interaction,
+            content=f"**{self.selectedPlayer}** 의 무적 지속 시간을 선택하세요.",
+            embed=None,
             view=InvincibilityPanelView(self.controller, self.ownerId, self.selectedPlayer),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="추방", emoji="🥾", style=discord.ButtonStyle.danger, row=3)
     async def kick(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            f"**{self.selectedPlayer}** 를 서버에서 추방할까요?",
+        await replaceScreen(
+            interaction,
+            content=f"**{self.selectedPlayer}** 를 서버에서 추방할까요?",
+            embed=None,
             view=ConfirmKickView(self.controller, self.ownerId, self.selectedPlayer),
-            ephemeral=True,
         )
 
 
@@ -1206,8 +1327,9 @@ class BackupPanelView(OwnerView):
         if not self.selectedName:
             await interaction.response.send_message("선택한 백업이 없습니다.", ephemeral=True)
             return
-        await interaction.response.send_message(
-            f"⚠️ `{self.selectedName}` 백업으로 복구할까요? 현재 월드는 교체됩니다.",
+        await sendScreen(
+            interaction,
+            content=f"⚠️ `{self.selectedName}` 백업으로 복구할까요? 현재 월드는 교체됩니다.",
             view=ConfirmLegacyActionView(
                 self.controller,
                 self.ownerId,
@@ -1215,7 +1337,6 @@ class BackupPanelView(OwnerView):
                 (self.selectedName, "RESTORE"),
                 "백업 복구",
             ),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="삭제", emoji="🗑️", style=discord.ButtonStyle.danger, row=2)
@@ -1223,8 +1344,9 @@ class BackupPanelView(OwnerView):
         if not self.selectedName:
             await interaction.response.send_message("선택한 백업이 없습니다.", ephemeral=True)
             return
-        await interaction.response.send_message(
-            f"⚠️ `{self.selectedName}` 백업을 영구 삭제할까요?",
+        await sendScreen(
+            interaction,
+            content=f"⚠️ `{self.selectedName}` 백업을 영구 삭제할까요?",
             view=ConfirmLegacyActionView(
                 self.controller,
                 self.ownerId,
@@ -1232,7 +1354,6 @@ class BackupPanelView(OwnerView):
                 (self.selectedName, "DELETE"),
                 "백업 삭제",
             ),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="정리", emoji="🧹", style=discord.ButtonStyle.secondary, row=2)
@@ -1241,10 +1362,12 @@ class BackupPanelView(OwnerView):
 
     @discord.ui.button(label="정책 설정", emoji="⚙️", style=discord.ButtonStyle.primary, row=2)
     async def policy(self, interaction, button):
-        await interaction.response.send_message(
-            "각 항목을 선택하면 즉시 저장됩니다.",
+        # 정책 화면은 드롭다운 5개가 5행을 전부 차지해 뒤로 버튼을 둘 수
+        # 없으므로, 백업 패널을 남겨 둔 채 별도 메시지로 엽니다.
+        await sendScreen(
+            interaction,
+            content="각 항목을 선택하면 즉시 저장됩니다.",
             view=BackupPolicyView(self.controller, self.ownerId, self.settings),
-            ephemeral=True,
         )
 
 
@@ -1310,8 +1433,9 @@ class WorldPanelView(OwnerView):
         if not self.selectedName:
             await interaction.response.send_message("가져온 월드가 없습니다.", ephemeral=True)
             return
-        await interaction.response.send_message(
-            f"⚠️ `{self.selectedName}` 월드를 적용할까요? 서버 월드가 교체됩니다.",
+        await sendScreen(
+            interaction,
+            content=f"⚠️ `{self.selectedName}` 월드를 적용할까요? 서버 월드가 교체됩니다.",
             view=ConfirmLegacyActionView(
                 self.controller,
                 self.ownerId,
@@ -1319,7 +1443,6 @@ class WorldPanelView(OwnerView):
                 (self.selectedName, "ACTIVATE"),
                 "월드 적용",
             ),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="다운로드", emoji="⬇️", style=discord.ButtonStyle.secondary, row=1)
@@ -1331,8 +1454,9 @@ class WorldPanelView(OwnerView):
         if not self.selectedName:
             await interaction.response.send_message("가져온 월드가 없습니다.", ephemeral=True)
             return
-        await interaction.response.send_message(
-            f"⚠️ `{self.selectedName}` 가져온 월드를 삭제할까요?",
+        await sendScreen(
+            interaction,
+            content=f"⚠️ `{self.selectedName}` 가져온 월드를 삭제할까요?",
             view=ConfirmLegacyActionView(
                 self.controller,
                 self.ownerId,
@@ -1340,7 +1464,6 @@ class WorldPanelView(OwnerView):
                 (self.selectedName, "DELETE"),
                 "월드 삭제",
             ),
-            ephemeral=True,
         )
 
 
@@ -1427,7 +1550,18 @@ class LogPanelView(OwnerView):
 
     async def _show(self, interaction: discord.Interaction, source: str, errorsOnly: bool = False):
         embed = await self.controller.panelLogEmbed(source, errorsOnly)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        async def back(backInteraction: discord.Interaction):
+            await renderLogPanel(backInteraction, self.controller, self.ownerId)
+
+        await replaceScreen(
+            interaction,
+            content=None,
+            embed=embed,
+            view=InfoScreenView(
+                self.controller, self.ownerId, backRenderer=back, backLabel="↩️ 로그"
+            ),
+        )
 
     @discord.ui.button(label="봇 로그", emoji="🤖", style=discord.ButtonStyle.primary)
     async def botLog(self, interaction: discord.Interaction, button: discord.ui.Button):
