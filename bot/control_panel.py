@@ -5,7 +5,14 @@ import discord
 from bot.config import cfg
 from bot.error_text import describeError
 from bot.i18n import t
-from bot.quick_commands import COMMON_EFFECTS, COMMON_ENCHANTS, DIFFICULTIES, GAMERULES
+from bot.quick_commands import (
+    COMMON_EFFECTS,
+    COMMON_ENCHANTS,
+    DIFFICULTIES,
+    GAMERULES,
+    SPECIAL_MOB_PRESETS,
+    VILLAGER_GOODS,
+)
 
 
 # 만료된 패널의 버튼을 누르면 디스코드가 "상호작용 실패"만 띄우고 이유를
@@ -1118,6 +1125,118 @@ class InvincibilityPanelView(PlayerSubScreenView):
         await self.controller.panelMortal(interaction, self.playerName)
 
 
+class SpecialMobSelect(discord.ui.Select):
+    """특수 몹 프리셋 드롭다운 — 같은 프리셋을 연달아 또 부를 수 있습니다."""
+
+    def __init__(self, controller, playerName: str):
+        self.controller = controller
+        self.playerName = playerName
+        options = [
+            discord.SelectOption(label=label, value=key, emoji="👹")
+            for key, label in SPECIAL_MOB_PRESETS
+        ]
+        super().__init__(
+            placeholder="특수 몹 선택 (안전한 자리에 소환)",
+            min_values=1, max_values=1, options=options, row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        choice = self.values[0]
+        await resetSelectHighlight(interaction, self.view)
+        await self.controller.panelSpecialMob(interaction, self.playerName, choice)
+
+
+class VillagerGoodSelect(discord.ui.Select):
+    """주민이 팔 상품 드롭다운 — 고르면 가격 입력 모달이 뜹니다."""
+
+    def __init__(self, controller, playerName: str):
+        self.controller = controller
+        self.playerName = playerName
+        options = [
+            discord.SelectOption(label=label, value=good)
+            for good, _prof, label, _price in VILLAGER_GOODS
+        ]
+        super().__init__(
+            placeholder="주민 소환 — 팔 상품 선택",
+            min_values=1, max_values=1, options=options, row=2,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        good, profession, label, defaultPrice = next(
+            (g, p, l, pr) for g, p, l, pr in VILLAGER_GOODS if g == self.values[0]
+        )
+        await interaction.response.send_modal(
+            VillagerPriceModal(
+                self.controller, self.playerName, good, profession, label,
+                defaultPrice, panelView=self.view,
+            )
+        )
+
+
+class VillagerPriceModal(QuickActionModal):
+    """주민 거래 가격(에메랄드)을 정하고 소환합니다."""
+
+    def __init__(
+        self, controller, playerName: str, good: str, profession: str,
+        label: str, defaultPrice: int, *, panelView=None,
+    ):
+        super().__init__(title=f"주민 가격 — {label}"[:45], panelView=panelView)
+        self.controller = controller
+        self.playerName = playerName
+        self.good = good
+        self.profession = profession
+        self.label = label
+        self.defaultPrice = defaultPrice
+        self.price = discord.ui.TextInput(
+            label=f"에메랄드 가격 (1~64, 비우면 {defaultPrice})",
+            required=False, max_length=2,
+        )
+        self.add_item(self.price)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.acknowledge(interaction)
+        priceText = (self.price.value or "").strip()
+        if priceText and not priceText.isdigit():
+            raise ValueError("가격은 숫자로 입력하세요.")
+        price = int(priceText) if priceText else self.defaultPrice
+        await self.controller.panelSummonVillager(
+            interaction, self.playerName, self.profession, self.good, price, self.label
+        )
+
+
+class SummonPanelView(PlayerSubScreenView):
+    """연출·소환 모음 — 몹은 전부 벽에 안 끼는 안전한 자리에 소환됩니다.
+
+    번개는 비/뇌우일 때만, 충전 크리퍼는 뇌우 중 주변에 실제 크리퍼가 있을
+    때만 동작합니다(그 판정은 controller/플러그인이 합니다).
+    """
+
+    def __init__(self, controller, ownerId: int, playerName: str):
+        super().__init__(controller, ownerId, playerName)
+        self.add_item(SpecialMobSelect(controller, playerName))
+        self.add_item(VillagerGoodSelect(controller, playerName))
+
+    @discord.ui.button(label="크리퍼 소환", emoji="💥", style=discord.ButtonStyle.secondary, row=0)
+    async def creeper(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelSummonCreeper(interaction, self.playerName)
+
+    @discord.ui.button(label="충전 크리퍼", emoji="⚡", style=discord.ButtonStyle.secondary, row=0)
+    async def chargedCreeper(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelChargedCreeper(interaction, self.playerName)
+
+    @discord.ui.button(label="크리퍼 소리", emoji="🔊", style=discord.ButtonStyle.secondary, row=0)
+    async def creeperSound(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelCreeperSound(interaction, self.playerName)
+
+    @discord.ui.button(label="번개", emoji="🌩️", style=discord.ButtonStyle.secondary, row=0)
+    async def lightning(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelLightning(interaction, self.playerName)
+
+
 class ConfirmKickView(PlayerSubScreenView):
     """추방 전에 한 번 더 확인합니다."""
 
@@ -1258,20 +1377,17 @@ class PlayerPanelView(OwnerView):
             view=ConfirmKickView(self.controller, self.ownerId, self.selectedPlayer),
         )
 
-    @discord.ui.button(label="크리퍼 소환", emoji="💥", style=discord.ButtonStyle.secondary, row=4)
-    async def summonCreeper(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.controller.panelSummonCreeper(interaction, self.selectedPlayer)
-
-    @discord.ui.button(label="크리퍼 소리", emoji="🔊", style=discord.ButtonStyle.secondary, row=4)
-    async def creeperSound(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.controller.panelCreeperSound(interaction, self.selectedPlayer)
-
-    @discord.ui.button(label="번개", emoji="⚡", style=discord.ButtonStyle.secondary, row=4)
-    async def lightning(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.controller.panelLightning(interaction, self.selectedPlayer)
+    @discord.ui.button(label="연출·소환", emoji="🎭", style=discord.ButtonStyle.secondary, row=4)
+    async def summonMenu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await replaceScreen(
+            interaction,
+            content=(
+                f"**{self.selectedPlayer}** 주변에 소환할 것을 고르세요. "
+                "몹은 벽에 안 끼는 안전한 자리에 나타나고, 게임 채팅엔 출력되지 않습니다."
+            ),
+            embed=None,
+            view=SummonPanelView(self.controller, self.ownerId, self.selectedPlayer),
+        )
 
 
 class StoredFileSelect(discord.ui.Select):
