@@ -29,7 +29,14 @@ from bot.error_text import describeError
 from bot.i18n import t
 from bot.internal_actions import InternalActionGroup, internalAction
 from bot.backup_settings import SettingsStore
-from bot.control_panel import AdminDashboardView, LogPanelView, PlayerPanelView
+from bot.control_panel import (
+    AdminDashboardView,
+    HomeButton,
+    LogPanelView,
+    PlayerPanelView,
+    replaceScreen,
+    sendScreen,
+)
 from bot.log_viewer import discordPreview, filterImportant, readTail
 from bot.loading import animate_while
 from bot.player_info import (
@@ -194,10 +201,10 @@ class Admin(commands.Cog):
     )
     async def serverPanel(self, interaction: discord.Interaction) -> None:
         """Open the read-only public panel without command arguments."""
-        await interaction.response.send_message(
+        await sendScreen(
+            interaction,
             embed=await self.publicServerEmbed(),
             view=PublicServerView(self, interaction.user.id),
-            ephemeral=True,
         )
 
     @app_commands.command(
@@ -205,10 +212,10 @@ class Admin(commands.Cog):
     )
     async def adminPanel(self, interaction: discord.Interaction) -> None:
         """Open the single owner-only entry point for routine operations."""
-        await interaction.response.send_message(
+        await sendScreen(
+            interaction,
             embed=await self.panelOverviewEmbed(),
             view=AdminDashboardView(self, interaction.user.id),
-            ephemeral=True,
         )
 
     @uploadGroup.command(name="world", description="Upload a Java world ZIP to use on this server.")
@@ -1754,11 +1761,18 @@ class Admin(commands.Cog):
             return
         from bot.friend_panel import ManagedAccountView
 
-        await interaction.response.send_message(
-            "**1. Discord 사용자 선택 → 2. Java/Bedrock 계정 추가**\n"
-            "연동 요청이나 승인은 없습니다. 한 사용자에게 계정을 여러 개 등록할 수 있습니다.",
-            view=ManagedAccountView(friend, interaction.user.id),
-            ephemeral=True,
+        # 대시보드에서 여는 화면이므로 같은 메시지에서 전환하고, 관리
+        # 대시보드로 돌아가는 홈 버튼을 함께 둡니다(#58 규칙과 통일).
+        view = ManagedAccountView(friend, interaction.user.id)
+        view.add_item(HomeButton(self, interaction.user.id, row=3))
+        await replaceScreen(
+            interaction,
+            content=(
+                "**1. Discord 사용자 선택 → 2. Java/Bedrock 계정 추가**\n"
+                "연동 요청이나 승인은 없습니다. 한 사용자에게 계정을 여러 개 등록할 수 있습니다."
+            ),
+            embed=None,
+            view=view,
         )
 
     @staticmethod

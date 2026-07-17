@@ -12,11 +12,13 @@ import os
 import sys
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 
 from bot import log
 from bot import userTag
+from bot.error_text import describeError
 from bot.app_settings import ensureFirstRunSetup
 from bot.bundled_plugins import BundledPluginManager
 from bot.crossplay import CrossplayManager
@@ -42,6 +44,38 @@ async def syncCommandTree(tree, guildIds: list[int]) -> None:
     await tree.sync()
 
 
+async def onAppCommandError(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+) -> None:
+    """Log every unhandled slash-command failure and still answer the user.
+
+    Without this handler an exception leaves the user staring at Discord's
+    generic "the application did not respond" and leaves no traceback in the
+    bot log, so failures could not be diagnosed after the fact.
+    """
+    if isinstance(error, app_commands.CheckFailure):
+        # interaction_check already sent its own denial message.
+        return
+    original = getattr(error, "original", None) or error
+    commandName = (
+        interaction.command.qualified_name if interaction.command else "?"
+    )
+    _log.error(
+        "slash command '%s' failed for %s",
+        commandName,
+        userTag(interaction.user),
+        exc_info=original,
+    )
+    message = f"❌ {describeError(original)}"
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+    except discord.HTTPException:
+        pass
+
+
 class McBot(commands.Bot):
     def __init__(self):
         # This bot only needs slash commands — no privileged message intent.
@@ -49,6 +83,7 @@ class McBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
+        self.tree.on_error = onAppCommandError
         # Discord chooses these localizations from each user's client language.
         await self.tree.set_translator(CommandTranslator())
         await self.load_extension("bot.cogs.admin")

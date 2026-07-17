@@ -17,6 +17,7 @@ from bot.cooldowns import CooldownStore, formatRemaining
 from bot.diary import DiaryEntry, DiaryStore
 from bot.error_text import describeError
 from bot.health_score import HealthInputs, calculateHealthScore
+from bot.control_panel import sendScreen
 from bot.friend_panel import ManagedAccountView, MyToolsView
 from bot.internal_actions import InternalActionGroup, internalAction
 from bot.performance_report import parseTps
@@ -111,10 +112,10 @@ class Friend(commands.Cog):
             description=description,
             color=BRAND_BLUE,
         )
-        await interaction.response.send_message(
+        await sendScreen(
+            interaction,
             embed=embed,
             view=MyToolsView(self, interaction.user.id, links),
-            ephemeral=True,
         )
 
     @app_commands.command(

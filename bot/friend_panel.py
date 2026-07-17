@@ -10,10 +10,15 @@ from bot.wiki import WIKI_PAGES, wikiPageLabel, wikiPageUrl
 class UserView(discord.ui.View):
     """Bind a private component panel to the user who opened it."""
 
+    # 만료된 버튼은 "상호작용 실패"만 남기므로, 만료 시 회색 처리하고
+    # 다시 여는 방법을 안내합니다(관리 패널과 같은 규칙).
+    expiredNotice = "⏰ 패널이 만료되었습니다. `/tools` 를 다시 실행해 새 패널을 여세요."
+
     def __init__(self, controller, ownerId: int, timeout: float = 600):
         super().__init__(timeout=timeout)
         self.controller = controller
         self.ownerId = ownerId
+        self.message: discord.Message | None = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.ownerId:
@@ -22,6 +27,16 @@ class UserView(discord.ui.View):
             "이 패널은 명령을 실행한 사용자만 조작할 수 있습니다.", ephemeral=True
         )
         return False
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(content=self.expiredNotice, view=self)
+        except discord.HTTPException:
+            pass
 
     async def on_error(
         self,

@@ -8,13 +8,23 @@ from bot.i18n import t
 from bot.quick_commands import COMMON_EFFECTS, COMMON_ENCHANTS, DIFFICULTIES, GAMERULES
 
 
+# 만료된 패널의 버튼을 누르면 디스코드가 "상호작용 실패"만 띄우고 이유를
+# 알려주지 않습니다. 만료 시점에 버튼을 회색 처리하고 다시 여는 방법을
+# 안내해, 죽은 버튼을 눌러 보는 일이 없게 합니다.
+PANEL_EXPIRED_NOTICE = "⏰ 패널이 만료되었습니다. `/admin` 을 다시 실행해 새 패널을 여세요."
+
+
 class OwnerView(discord.ui.View):
     """Restrict ephemeral controls to the administrator who opened them."""
+
+    expiredNotice = PANEL_EXPIRED_NOTICE
 
     def __init__(self, controller, ownerId: int, timeout: float = 600):
         super().__init__(timeout=timeout)
         self.controller = controller
         self.ownerId = ownerId
+        # 만료 시 자기 메시지를 편집할 수 있게 sendScreen/replaceScreen이 채웁니다.
+        self.message: discord.Message | None = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Reject shared-message component use by anyone outside the allowlist."""
@@ -24,6 +34,17 @@ class OwnerView(discord.ui.View):
             "⛔ 이 관리 패널을 사용할 권한이 없습니다.", ephemeral=True
         )
         return False
+
+    async def on_timeout(self) -> None:
+        """Grey out expired buttons and say how to reopen the panel."""
+        for item in self.children:
+            item.disabled = True
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(content=self.expiredNotice, view=self)
+        except discord.HTTPException:
+            pass
 
     async def on_error(
         self,
@@ -65,9 +86,33 @@ async def replaceScreen(
 ):
     """현재 메시지를 새 화면으로 교체합니다(첫 응답이면 edit_message)."""
     if interaction.response.is_done():
-        await interaction.edit_original_response(content=content, embed=embed, view=view)
+        message = await interaction.edit_original_response(
+            content=content, embed=embed, view=view
+        )
     else:
         await interaction.response.edit_message(content=content, embed=embed, view=view)
+        message = interaction.message
+    # 새 화면이 만료될 때 스스로 버튼을 비활성화할 수 있게 메시지를 연결합니다.
+    if view is not None:
+        view.message = message
+
+
+async def sendScreen(
+    interaction: discord.Interaction,
+    *,
+    content=None,
+    embed=None,
+    view: discord.ui.View | None = None,
+):
+    """새 ephemeral 메시지로 화면을 열고, 만료 처리를 위해 메시지를 연결합니다."""
+    await interaction.response.send_message(
+        content=content, embed=embed, view=view, ephemeral=True
+    )
+    if view is not None:
+        try:
+            view.message = await interaction.original_response()
+        except discord.HTTPException:
+            pass
 
 
 async def replaceWithLoadingEmbed(interaction, controller, ownerId, builder):
