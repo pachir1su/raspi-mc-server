@@ -2097,12 +2097,16 @@ class Admin(commands.Cog):
                     await _rcon(f"data get entity {playerTarget} active_effects")
                 )
             elif detailType == "records":
-                lines = []
-                for _, objective, _, label in SCOREBOARD_STATS:
-                    value = parseScoreboardValue(
-                        await _rcon(buildScoreboardGetCommand(safePlayer, objective))
+                outputs = await asyncio.gather(
+                    *(
+                        _rcon(buildScoreboardGetCommand(safePlayer, objective))
+                        for _, objective, _, _ in SCOREBOARD_STATS
                     )
-                    lines.append(f"• {label}: **{value}**")
+                )
+                lines = [
+                    f"• {label}: **{parseScoreboardValue(output)}**"
+                    for (_, _, _, label), output in zip(SCOREBOARD_STATS, outputs)
+                ]
                 lines.append("\n통계는 봇이 처음 실행된 시점부터 집계됩니다.")
                 description = "\n".join(lines)
             else:
