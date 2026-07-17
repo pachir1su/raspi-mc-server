@@ -426,11 +426,17 @@ def buildHealCommands(playerName: str) -> list[str]:
 # 무적(#75): 대미지 무효화(저항 5)에 재생·화염 저항·포화를 함께 걸어 체력이
 # 줄지 않게 합니다. 저항은 증폭 4단계(=저항 V)가 대부분의 피해를 100% 막습니다.
 # 모든 효과는 파티클을 숨겨(#57 원리) 게임 화면에 거품이 보이지 않습니다.
+#
+# 포화(#89): 포화는 "즉시" 계열 효과라 매 틱 허기를 채워 넣습니다. 증폭이 낮으면
+# 한 틱에 채우는 양이 적어, 활동량이 많은 순간에는 허기가 도로 줄어들 수 있습니다.
+# 그래서 증폭을 최대(255)로 올려 무적이 걸린 내내 허기가 항상 가득 차게 합니다
+# (커뮤니티에서 "허기 무한" 명령으로 쓰는 `saturation <시간> 255`와 같은 원리).
+_SATURATION_AMPLIFIER = 255
 _INVINCIBILITY_EFFECTS = (
     ("resistance", 4),
     ("regeneration", 1),
     ("fire_resistance", 0),
-    ("saturation", 0),
+    ("saturation", _SATURATION_AMPLIFIER),
 )
 
 # 무적 지속 시간(초)의 안전 범위: 최소 1초, 최대 1시간.

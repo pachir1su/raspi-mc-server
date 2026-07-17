@@ -107,7 +107,7 @@ unchanged — only the entry point differs.
 |---|---|---|
 | Kill/death lookup (#68) | `/admin` → players → **킬·데스** | Show the selected player's death/kill totals. |
 | My stats (#68) | `/tools` → **내 통계** | Show your own linked player's death/kill totals. |
-| Invincibility (#75) | `/admin` → players → **무적** | Grant 30s/5m/30m invincibility or clear it: regeneration, resistance, fire resistance, and saturation with hidden particles. |
+| Invincibility (#75, #89) | `/admin` → players → **무적** | Grant 30s/5m/30m invincibility or clear it: regeneration, resistance, fire resistance, and saturation with hidden particles. Saturation is applied at maximum amplifier so hunger stays full for the entire invincibility window. |
 | Game wiki (#71) | `/tools` → **게임 위키** | Jump to a GitHub help doc — brewing, enchantments, farming, and more. |
 
 Stats are tracked by scoreboards from the moment the bot first starts (no
