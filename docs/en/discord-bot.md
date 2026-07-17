@@ -7,7 +7,8 @@ the service, back up the world, and pull logs — all from Discord.
 ## Why a bot?
 
 - Manage the server from your phone without SSH.
-- `/admin` → **Advanced tools** → **In-game command** is your remote cheat console (op level 4).
+- **In-game command** sits right on the `/admin` dashboard as your remote cheat
+  console (op level 4, #79); the same button also stays under **Advanced tools**.
 - Slow actions (backup, restart) show a **loading animation** so you get
   feedback instead of a frozen "thinking…".
 - `/admin` → **Logs** previews or attaches the current log for quick debugging.

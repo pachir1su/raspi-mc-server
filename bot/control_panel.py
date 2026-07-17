@@ -382,6 +382,21 @@ class AdminDashboardView(OwnerView):
             view=InfoScreenView(self.controller, self.ownerId),
         )
 
+    @discord.ui.button(label="인게임 명령어", emoji="⌨️", style=discord.ButtonStyle.danger, row=1)
+    async def rcon(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # #79: 원격 치트 콘솔을 대시보드 첫 화면에서 바로 열 수 있게 합니다.
+        # 예전에는 더보기 → 고급 도구 → 인게임 명령어로 세 단계를 거쳐야 했습니다.
+        # (고급 도구 화면에도 같은 버튼이 그대로 남아 있습니다.)
+        await interaction.response.send_modal(
+            TextActionModal(
+                self.controller,
+                "인게임 명령어 실행",
+                "마인크래프트 콘솔 명령 (/ 없이 입력)",
+                "mc",
+                "예: time set day, gamemode creative 닉네임",
+            )
+        )
+
     @discord.ui.button(label="더보기", emoji="🧰", style=discord.ButtonStyle.secondary, row=1)
     async def more(self, interaction: discord.Interaction, button: discord.ui.Button):
         await replaceScreen(
