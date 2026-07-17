@@ -8,10 +8,13 @@ from bot.error_text import describeError
 class PublicServerView(discord.ui.View):
     """Keep common read-only server actions one click away."""
 
+    expiredNotice = "⏰ 패널이 만료되었습니다. `/server` 를 다시 실행해 새 패널을 여세요."
+
     def __init__(self, controller, ownerId: int, timeout: float = 300):
         super().__init__(timeout=timeout)
         self.controller = controller
         self.ownerId = ownerId
+        self.message: discord.Message | None = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Only the user who opened the private panel may operate it."""
@@ -21,6 +24,17 @@ class PublicServerView(discord.ui.View):
             "이 패널은 명령을 실행한 사용자만 조작할 수 있습니다.", ephemeral=True
         )
         return False
+
+    async def on_timeout(self) -> None:
+        """Grey out expired buttons and say how to reopen the panel."""
+        for item in self.children:
+            item.disabled = True
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(content=self.expiredNotice, view=self)
+        except discord.HTTPException:
+            pass
 
     async def on_error(
         self,

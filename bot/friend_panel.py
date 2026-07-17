@@ -1,8 +1,11 @@
 """Button-first self-service panels for linked Minecraft players."""
 
+import asyncio
+
 import discord
 
 from bot import BRAND_BLUE
+from bot.control_panel import BackButton, replaceScreen, sendScreen
 from bot.error_text import describeError
 from bot.wiki import WIKI_PAGES, wikiPageLabel, wikiPageUrl
 
@@ -10,10 +13,15 @@ from bot.wiki import WIKI_PAGES, wikiPageLabel, wikiPageUrl
 class UserView(discord.ui.View):
     """Bind a private component panel to the user who opened it."""
 
+    # 만료된 버튼은 "상호작용 실패"만 남기므로, 만료 시 회색 처리하고
+    # 다시 여는 방법을 안내합니다(관리 패널과 같은 규칙).
+    expiredNotice = "⏰ 패널이 만료되었습니다. `/tools` 를 다시 실행해 새 패널을 여세요."
+
     def __init__(self, controller, ownerId: int, timeout: float = 600):
         super().__init__(timeout=timeout)
         self.controller = controller
         self.ownerId = ownerId
+        self.message: discord.Message | None = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.ownerId:
@@ -22,6 +30,16 @@ class UserView(discord.ui.View):
             "이 패널은 명령을 실행한 사용자만 조작할 수 있습니다.", ephemeral=True
         )
         return False
+
+    async def on_timeout(self) -> None:
+        for item in self.children:
+            item.disabled = True
+        if self.message is None:
+            return
+        try:
+            await self.message.edit(content=self.expiredNotice, view=self)
+        except discord.HTTPException:
+            pass
 
     async def on_error(
         self,
@@ -34,6 +52,42 @@ class UserView(discord.ui.View):
             await interaction.followup.send(message, ephemeral=True)
         else:
             await interaction.response.send_message(message, ephemeral=True)
+
+
+async def buildMyToolsScreen(controller, ownerId: int):
+    """`/tools` 첫 화면(임베드 + 뷰)을 만든다 — 명령과 뒤로 버튼이 공유."""
+    links = await asyncio.to_thread(controller.linkStore.listForUser, ownerId)
+    if links:
+        accountLines = [
+            f"• `{link.minecraftName}` — "
+            f"{'Java (PC)' if link.edition == 'java' else 'Bedrock (모바일/콘솔)'}"
+            for link in links
+        ]
+        description = (
+            "사용할 계정을 먼저 고른 뒤 아래 버튼을 누르세요.\n\n"
+            + "\n".join(accountLines)
+        )
+    else:
+        description = (
+            "등록된 Minecraft 계정이 없습니다.\n"
+            "관리자에게 Java 또는 Bedrock 계정 등록을 요청하세요."
+        )
+    embed = discord.Embed(
+        title="🧰 내 Minecraft 도구",
+        description=description,
+        color=BRAND_BLUE,
+    )
+    return embed, MyToolsView(controller, ownerId, links)
+
+
+def toolsBackRenderer(controller, ownerId: int):
+    """하위 화면의 '↩️ 내 도구' 버튼이 첫 화면을 같은 메시지에 다시 그립니다."""
+
+    async def render(interaction: discord.Interaction):
+        embed, view = await buildMyToolsScreen(controller, ownerId)
+        await replaceScreen(interaction, content=None, embed=embed, view=view)
+
+    return render
 
 
 class TeleportTargetSelect(discord.ui.Select):
@@ -66,6 +120,9 @@ class FriendTeleportView(UserView):
     def __init__(self, controller, ownerId: int, linkId: str, targets: list[str]):
         super().__init__(controller, ownerId, timeout=120)
         self.add_item(TeleportTargetSelect(controller, ownerId, linkId, targets))
+        self.add_item(BackButton(
+            toolsBackRenderer(controller, ownerId), row=1, label="↩️ 내 도구"
+        ))
 
 
 class PlayerAccountSelect(discord.ui.Select):
@@ -159,6 +216,9 @@ class PlacePanelView(UserView):
         self.linkId = linkId
         if places:
             self.add_item(PlaceSelect(self, places))
+        self.add_item(BackButton(
+            toolsBackRenderer(controller, ownerId), row=2, label="↩️ 내 도구"
+        ))
 
     @discord.ui.button(label="보기", emoji="👁️", style=discord.ButtonStyle.primary, row=1)
     async def show(
@@ -238,6 +298,9 @@ class DiaryPanelView(UserView):
         self.selectedId = entries[0].entryId if entries else None
         if entries:
             self.add_item(DiarySelect(self, entries))
+        self.add_item(BackButton(
+            toolsBackRenderer(controller, ownerId), row=2, label="↩️ 내 도구"
+        ))
 
     @discord.ui.button(label="보기", emoji="👁️", style=discord.ButtonStyle.primary, row=1)
     async def show(
@@ -282,6 +345,9 @@ class WikiPanelView(UserView):
     def __init__(self, controller, ownerId: int):
         super().__init__(controller, ownerId, timeout=300)
         self.add_item(WikiSelect())
+        self.add_item(BackButton(
+            toolsBackRenderer(controller, ownerId), row=1, label="↩️ 내 도구"
+        ))
 
 
 class MyToolsView(UserView):
@@ -336,12 +402,13 @@ class MyToolsView(UserView):
         if not await self._requireSelection(interaction):
             return
         places = await self.controller.panelPlaces()
-        await interaction.response.send_message(
-            "저장된 좌표를 보거나, 선택한 Minecraft 계정의 현재 위치를 저장합니다.",
+        await replaceScreen(
+            interaction,
+            content="저장된 좌표를 보거나, 선택한 Minecraft 계정의 현재 위치를 저장합니다.",
+            embed=None,
             view=PlacePanelView(
                 self.controller, self.ownerId, places, self.selectedLinkId
             ),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="서버 일지", emoji="📖", style=discord.ButtonStyle.secondary, row=2)
@@ -351,10 +418,11 @@ class MyToolsView(UserView):
         if not await self.controller._requireFriendAccess(interaction):
             return
         entries = await self.controller.panelDiaryEntries()
-        await interaction.response.send_message(
-            "최근 일지를 선택하거나 새 일지를 작성하세요.",
+        await replaceScreen(
+            interaction,
+            content="최근 일지를 선택하거나 새 일지를 작성하세요.",
+            embed=None,
             view=DiaryPanelView(self.controller, self.ownerId, entries),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="데스박스 찾기", emoji="📦", style=discord.ButtonStyle.secondary, row=3)
@@ -397,12 +465,13 @@ class MyToolsView(UserView):
                 "이동할 수 있는 다른 접속자가 없습니다.", ephemeral=True
             )
             return
-        await interaction.response.send_message(
-            "이동할 접속 중인 플레이어를 선택하세요. (30분에 한 번)",
+        await replaceScreen(
+            interaction,
+            content="이동할 접속 중인 플레이어를 선택하세요. (30분에 한 번)",
+            embed=None,
             view=FriendTeleportView(
                 self.controller, self.ownerId, self.selectedLinkId, targets
             ),
-            ephemeral=True,
         )
 
     @discord.ui.button(label="서버 시간", emoji="🕰️", style=discord.ButtonStyle.secondary, row=4)
@@ -416,10 +485,11 @@ class MyToolsView(UserView):
         self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
         # 위키는 계정 선택이 필요 없는 읽기 전용 링크 안내입니다(#71).
-        await interaction.response.send_message(
-            "열어볼 위키 문서를 선택하세요.",
+        await replaceScreen(
+            interaction,
+            content="열어볼 위키 문서를 선택하세요.",
+            embed=None,
             view=WikiPanelView(self.controller, self.ownerId),
-            ephemeral=True,
         )
 
 
@@ -472,6 +542,7 @@ class ManagedDiscordUserSelect(discord.ui.UserSelect):
                 self.parentView.ownerId,
                 user.id,
                 links,
+                extraNavFactory=self.parentView.extraNavFactory,
             ),
         )
 
@@ -527,7 +598,10 @@ class ConfirmManagedRemovalView(UserView):
 class ManagedAccountView(UserView):
     """Administrator-owned direct multi-profile account management."""
 
-    def __init__(self, controller, ownerId: int, discordUserId=None, links=None):
+    def __init__(
+        self, controller, ownerId: int, discordUserId=None, links=None,
+        extraNavFactory=None,
+    ):
         super().__init__(controller, ownerId)
         self.discordUserId = discordUserId
         self.links = links or []
@@ -535,6 +609,12 @@ class ManagedAccountView(UserView):
         self.add_item(ManagedDiscordUserSelect(self))
         if self.links:
             self.add_item(ManagedProfileSelect(self, self.links))
+        # 관리 대시보드에서 열렸을 때 '🏠 홈' 버튼을 유지하기 위한 훅.
+        # 사용자 선택으로 뷰를 다시 만들 때도 같은 팩토리를 물려받습니다.
+        self.extraNavFactory = extraNavFactory
+        if extraNavFactory is not None:
+            for item in extraNavFactory():
+                self.add_item(item)
 
     async def _requireUser(self, interaction: discord.Interaction) -> bool:
         if self.discordUserId is not None:
@@ -571,11 +651,13 @@ class ManagedAccountView(UserView):
         editionLabel = (
             "Java (PC)" if selected.edition == "java" else "Bedrock (모바일/콘솔)"
         )
-        await interaction.response.send_message(
-            f"**{editionLabel}** `{selected.minecraftName}` 계정만 삭제할까요? "
-            "같은 Discord 사용자의 다른 계정은 유지됩니다.",
+        await sendScreen(
+            interaction,
+            content=(
+                f"**{editionLabel}** `{selected.minecraftName}` 계정만 삭제할까요? "
+                "같은 Discord 사용자의 다른 계정은 유지됩니다."
+            ),
             view=ConfirmManagedRemovalView(
                 self.controller, self.ownerId, self.selectedLinkId
             ),
-            ephemeral=True,
         )

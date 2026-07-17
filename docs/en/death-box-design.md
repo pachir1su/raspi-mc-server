@@ -93,8 +93,8 @@ bot's `.env` and not `server.properties`):
 enabled: true
 container: double-chest          # double-chest | chest | barrel
 search-radius: 4                 # bounded; clamped to 1..8
-expire-hours: 72                 # 0 means never expire (default 72h)
-max-physical-boxes-per-player: 3 # anti-grief cap; 0 disables
+expire-hours: 0                  # 0 means never expire (default: permanent)
+max-physical-boxes-per-player: 0 # anti-grief cap; 0 disables (default: off)
 friends-can-open: false
 fallback-virtual-box: true
 messages:                        # player-facing text (Korean defaults)
@@ -108,14 +108,15 @@ All player-facing text defaults to Korean (#60). Override any key under
 
 ### Anti-grief (#65)
 
-To stop one player from repeatedly dying at someone else's door and stacking
-unbreakable chests:
+Both protections are **off by default** on this friends-only server; turn them
+on if box griefing ever becomes a problem:
 
-- `max-physical-boxes-per-player` caps active **physical (block)** boxes per
-  player (default 3). Beyond the cap, deaths are stored in a **virtual** box
-  (no block placed) that an admin recovers with `/deathbox recover`, so blocks
-  never pile up without bound.
-- `expire-hours` defaults to 72h so old boxes are swept hourly.
+- `max-physical-boxes-per-player` (default 0 = unlimited) caps active
+  **physical (block)** boxes per player when set above 0. Beyond the cap,
+  deaths are stored in a **virtual** box (no block placed) that an admin
+  recovers with `/deathbox recover`, so blocks never pile up without bound.
+- `expire-hours` defaults to 0: boxes are kept **permanently** until the owner
+  recovers them. Set it above 0 to have an hourly sweep remove older boxes.
 - Emptied boxes already auto-remove the moment they are opened and cleared.
 
 ## Commands

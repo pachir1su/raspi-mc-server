@@ -17,7 +17,8 @@ from bot.cooldowns import CooldownStore, formatRemaining
 from bot.diary import DiaryEntry, DiaryStore
 from bot.error_text import describeError
 from bot.health_score import HealthInputs, calculateHealthScore
-from bot.friend_panel import ManagedAccountView, MyToolsView
+from bot.control_panel import sendScreen
+from bot.friend_panel import ManagedAccountView, MyToolsView, buildMyToolsScreen
 from bot.internal_actions import InternalActionGroup, internalAction
 from bot.performance_report import parseTps
 from bot.places import (
@@ -88,34 +89,8 @@ class Friend(commands.Cog):
     )
     async def myTools(self, interaction: discord.Interaction) -> None:
         """Open the text-light self-service panel for the invoking user."""
-        links = await asyncio.to_thread(
-            self.linkStore.listForUser, interaction.user.id
-        )
-        if links:
-            accountLines = [
-                f"• `{link.minecraftName}` — "
-                f"{'Java (PC)' if link.edition == 'java' else 'Bedrock (모바일/콘솔)'}"
-                for link in links
-            ]
-            description = (
-                "사용할 계정을 먼저 고른 뒤 아래 버튼을 누르세요.\n\n"
-                + "\n".join(accountLines)
-            )
-        else:
-            description = (
-                "등록된 Minecraft 계정이 없습니다.\n"
-                "관리자에게 Java 또는 Bedrock 계정 등록을 요청하세요."
-            )
-        embed = discord.Embed(
-            title="🧰 내 Minecraft 도구",
-            description=description,
-            color=BRAND_BLUE,
-        )
-        await interaction.response.send_message(
-            embed=embed,
-            view=MyToolsView(self, interaction.user.id, links),
-            ephemeral=True,
-        )
+        embed, view = await buildMyToolsScreen(self, interaction.user.id)
+        await sendScreen(interaction, embed=embed, view=view)
 
     @app_commands.command(
         name="help", description="Show friend-safe Minecraft bot help."

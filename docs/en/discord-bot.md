@@ -146,14 +146,21 @@ Everything below stays reachable:
 - persistent Paper spawn-protection toggle
 
 The ephemeral panel is visible only to the administrator who opened it and
-expires after ten minutes. Callback failures produce a visible error instead of
-leaving an apparently dead button.
+expires after ten minutes. **On expiry the buttons grey out and the message
+says how to reopen the panel** — no more dead buttons that only answer with
+Discord's "interaction failed". Callback failures produce a visible error
+instead of leaving an apparently dead button, and a global handler logs any
+unexpected slash-command exception to the bot log while still answering the
+user in Korean.
 
-Sub-panels (players, service, backups, quick commands, More, health, …) **swap
-the screen in place inside the same message instead of posting a new one**
-(#58), so pressing buttons no longer piles up chat, and every sub-screen has a
-**🏠 홈** button that returns to the dashboard in one tap. Slow lookups
-(performance, tuning) show a loading frame first, then edit to the result.
+Sub-panels (players, service, backups, quick commands, More, health, …) and
+even the player lookup results and the effect/enchant/gamemode/teleport/
+invincibility/kick screens **swap the screen in place inside the same message
+instead of posting a new one** (#58), so pressing buttons no longer piles up
+chat. Every sub-screen carries both an **↩️ back** button (one level up:
+players, More, logs, …) and a **🏠 home** button, so features can be chained
+without retyping `/admin`. Slow lookups (performance, tuning) show a loading
+frame first, then edit to the result.
 
 ## Player management (inspection + actions)
 
