@@ -50,6 +50,7 @@ from bot.quick_commands import (
     GAMEMODES,
     GAMERULES,
     GAMERULE_UNSUPPORTED_MESSAGE,
+    SCOREBOARD_STATS,
     SPAWN_RADIUS_ZERO_COMMAND,
     buildDifficultyCommand,
     buildEffectClearCommand,
@@ -61,7 +62,11 @@ from bot.quick_commands import (
     buildGameruleSetCommand,
     buildGiveCommand,
     buildHealCommands,
+    buildInvincibilityClearCommands,
+    buildInvincibilityCommands,
     buildKickCommand,
+    buildScoreboardGetCommand,
+    buildScoreboardSetupCommands,
     buildTeleportToCoordsCommand,
     buildTeleportToPlayerCommand,
     buildWorldSpawnCommand,
@@ -70,6 +75,7 @@ from bot.quick_commands import (
     ensureServerAccepted,
     parseDaysPlayed,
     parseGameruleValue,
+    parseScoreboardValue,
 )
 from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.rcon import (
@@ -293,6 +299,13 @@ class Admin(commands.Cog):
                 _log.warning("default gamerule %s failed: %s", gameruleKey, error)
             except RconError as error:
                 _log.warning("default gamerule %s failed: %s", gameruleKey, error)
+        # 통계 스코어보드 목표(#68)도 서버가 준비된 뒤 만들어 둡니다.
+        # 이미 존재하면 서버가 오류 문구를 돌려주지만 무해하므로 넘어갑니다.
+        for command in buildScoreboardSetupCommands():
+            try:
+                await _rcon(command)
+            except RconError as error:
+                _log.warning("scoreboard setup failed: %s", error)
 
     async def probeSupportedGamerules(self) -> dict[str, bool]:
         """Ask the server once which panel gamerules exist in this version.
@@ -1598,6 +1611,33 @@ class Admin(commands.Cog):
             f"`{playerName}` 를 서버에서 추방했습니다.",
         )
 
+    async def panelInvincible(
+        self, interaction: discord.Interaction, playerName: str, seconds: int
+    ) -> None:
+        """무적 세트(#75)를 접속자 관리 패널 버튼으로 부여합니다."""
+        await self._quickPlayerAction(
+            interaction,
+            buildInvincibilityCommands(playerName, seconds),
+            "player.invincible",
+            f"`{playerName}` 를 **{seconds}초** 동안 무적으로 만들었습니다. "
+            "(재생·저항·화염 저항·포화, 파티클 숨김)",
+        )
+
+    async def panelMortal(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """무적을 즉시 해제합니다 — 무적 세트로 건 효과만 골라 지웁니다."""
+        try:
+            for command in buildInvincibilityClearCommands(playerName):
+                await _rcon(command)
+            await self._audit(interaction, "player.mortal", "success", playerName)
+            await interaction.followup.send(
+                f"⚔️ `{playerName}` 의 무적을 해제했습니다.", ephemeral=True
+            )
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, "player.mortal", "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+
     async def panelSharedPlaces(self):
         """Return the shared coordinate book for the teleport dropdown."""
         return await asyncio.to_thread(self.placeStore.list)
@@ -2024,6 +2064,7 @@ class Admin(commands.Cog):
             "position": "🧭 위치",
             "stats": "❤️ 체력·경험치",
             "effects": "✨ 상태 효과",
+            "records": "📊 킬·데스",
         }
         try:
             fields: list[tuple[str, str]] = []
@@ -2055,6 +2096,19 @@ class Admin(commands.Cog):
                 description = summarizeEffects(
                     await _rcon(f"data get entity {playerTarget} active_effects")
                 )
+            elif detailType == "records":
+                outputs = await asyncio.gather(
+                    *(
+                        _rcon(buildScoreboardGetCommand(safePlayer, objective))
+                        for _, objective, _, _ in SCOREBOARD_STATS
+                    )
+                )
+                lines = [
+                    f"• {label}: **{parseScoreboardValue(output)}**"
+                    for (_, _, _, label), output in zip(SCOREBOARD_STATS, outputs)
+                ]
+                lines.append("\n통계는 봇이 처음 실행된 시점부터 집계됩니다.")
+                description = "\n".join(lines)
             else:
                 raise ValueError("Unknown player detail type")
             embed = discord.Embed(

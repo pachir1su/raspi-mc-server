@@ -96,31 +96,23 @@ See [backup.md](backup.md) for the complete retention and file-safety model.
 See [friend-tools.md](friend-tools.md) for exact Pi configuration, approval flow,
 runtime files, command examples, and troubleshooting.
 
-## Flat quick commands
+## Stats, invincibility, and wiki (panel buttons)
 
-The most-used actions run as a **single top-level slash command** instead of
-digging through panels (issue #79). Every command reuses the same validated RCON
-builders as the panel buttons, and replies are visible only to the caller.
+Issue #79 briefly added eleven flat top-level commands (`/invincible`,
+`/stats`, `/wiki`, and friends), but feedback (#85) was that they cluttered
+the command picker, so they moved back behind panel buttons. The features are
+unchanged — only the entry point differs.
 
-| Command | Access | What it does |
+| Feature | Entry point | What it does |
 |---|---|---|
-| `/cmd <command>` | Admin | Run one server console command as-is (cheats included). |
-| `/who` | Admin | Show who is online right now. |
-| `/notice <message>` | Admin | Broadcast to everyone in-game. |
-| `/time <day·noon·night·midnight>` | Admin | Set the world time preset. |
-| `/weather <clear·rain·thunder>` | Admin | Set the world weather preset. |
-| `/invincible <player> [seconds]` | Admin | Make a player temporarily invincible (default 5s): regeneration, resistance, fire resistance, and saturation with hidden particles (issue #75). |
-| `/mortal <player>` | Admin | Remove only the invincibility effects granted above. |
-| `/give <player> <item> [count]` | Admin | Give an item, accepting Korean aliases. |
-| `/stats <player>` | Admin | Show a player's death/kill totals. |
-| `/my-stats` | Friend | Show your own linked player's death/kill totals (issue #68). |
-| `/wiki <page>` | Public | Jump to a GitHub help doc — brewing, enchantments, farming, and more (issue #71). |
+| Kill/death lookup (#68) | `/admin` → players → **킬·데스** | Show the selected player's death/kill totals. |
+| My stats (#68) | `/tools` → **내 통계** | Show your own linked player's death/kill totals. |
+| Invincibility (#75) | `/admin` → players → **무적** | Grant 30s/5m/30m invincibility or clear it: regeneration, resistance, fire resistance, and saturation with hidden particles. |
+| Game wiki (#71) | `/tools` → **게임 위키** | Jump to a GitHub help doc — brewing, enchantments, farming, and more. |
 
-Commands that take a player offer **online-player autocomplete**, so names never
-have to be typed from memory. Invincibility hides its particles, and stats are
-tracked by scoreboards from the moment the bot first starts (no retroactive
-history). The wiki base URL defaults to the repository docs and can be changed
-with `MC_WIKI_BASE_URL` in `.env`.
+Stats are tracked by scoreboards from the moment the bot first starts (no
+retroactive history). The wiki base URL defaults to the repository docs and can
+be changed with `MC_WIKI_BASE_URL` in `.env`.
 
 ## Button-first dashboard
 
@@ -146,8 +138,9 @@ Everything below stays reachable:
   Gamerule buttons the server version does not support are detected when the
   panel opens and disabled with a "(버전 미지원)" label.
 - player quick actions: give items (Korean aliases supported), potion effects,
-  enchants, gamemode, teleport (player/place/spawn), XP, heal, and kick (with
-  confirmation). Effect and enchant dropdowns include a free-input option.
+  enchants, gamemode, teleport (player/place/spawn), XP, heal, invincibility
+  (30s/5m/30m/clear), kill/death lookup, and kick (with confirmation). Effect
+  and enchant dropdowns include a free-input option.
 - the live-player and account-link selectors
 - bot, Minecraft, and event-driven player-chat log controls
 - persistent Paper spawn-protection toggle
