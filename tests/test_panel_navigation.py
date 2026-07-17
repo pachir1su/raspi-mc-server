@@ -194,6 +194,24 @@ class NavigationTests(unittest.TestCase):
                 interaction.response.edit_message.assert_awaited_once()
                 interaction.response.send_message.assert_not_called()
 
+    def testCreeperAndLightningButtonsDeferAndCallController(self):
+        """크리퍼 소환·소리·번개 버튼은 즉시 실행(화면 전환 없음)."""
+        self.controller.panelSummonCreeper = AsyncMock()
+        self.controller.panelCreeperSound = AsyncMock()
+        self.controller.panelLightning = AsyncMock()
+        panel = cp.PlayerPanelView(self.controller, self.ownerId, ["Steve"])
+        for button, handler in (
+            (panel.summonCreeper, self.controller.panelSummonCreeper),
+            (panel.creeperSound, self.controller.panelCreeperSound),
+            (panel.lightning, self.controller.panelLightning),
+        ):
+            with self.subTest(button=button.label):
+                interaction = _fakeInteraction()
+                self._run(button.callback(interaction))
+                interaction.response.defer.assert_awaited_once()
+                interaction.response.edit_message.assert_not_called()
+                handler.assert_awaited_once_with(interaction, "Steve")
+
     def testBackButtonReturnsToPlayerListKeepingSelection(self):
         """'↩️ 접속자 관리' re-renders the list with the player still selected."""
         view = cp.EffectPanelView(self.controller, self.ownerId, "Steve")

@@ -101,6 +101,40 @@ class CommandBuilderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             qc.buildForceEnchantCommand("@a", "sharpness", 5)
 
+    def testCreeperBehindSummonsBehindIgnoringPitch(self):
+        self.assertEqual(
+            'execute at @a[name="Friend_1",limit=1] rotated ~ 0 run '
+            "summon minecraft:creeper ^ ^ ^-5",
+            qc.buildCreeperBehindCommand("Friend_1"),
+        )
+        # 거리는 1~10으로 clamp.
+        self.assertTrue(qc.buildCreeperBehindCommand("Friend_1", 99).endswith("^-10"))
+        with self.assertRaises(ValueError):
+            qc.buildCreeperBehindCommand("@a")
+
+    def testCreeperSoundPlaysBehindWithoutSummoning(self):
+        command = qc.buildCreeperSoundCommand("Friend_1")
+        self.assertEqual(
+            'execute at @a[name="Friend_1",limit=1] rotated ~ 0 run '
+            "playsound minecraft:entity.creeper.primed hostile "
+            '@a[name="Friend_1",limit=1] ^ ^ ^-3 1 1',
+            command,
+        )
+        self.assertNotIn("summon", command)
+        with self.assertRaises(ValueError):
+            qc.buildCreeperSoundCommand("@a")
+
+    def testLightningAndWeatherReply(self):
+        self.assertEqual(
+            'execute at @a[name="Friend_1",limit=1] run summon minecraft:lightning_bolt',
+            qc.buildLightningCommand("Friend_1"),
+        )
+        self.assertEqual("thunder", qc.parseWeatherReply("weather: thunder"))
+        self.assertEqual("rain", qc.parseWeatherReply("Weather: RAIN"))
+        self.assertEqual("clear", qc.parseWeatherReply("weather: clear"))
+        with self.assertRaises(ValueError):
+            qc.parseWeatherReply("Usage: /raspiops rescue <exact-player-name>")
+
     def testGamemode(self):
         self.assertEqual(
             'gamemode creative @a[name="Friend_1",limit=1]',
