@@ -26,6 +26,13 @@ itself is moved via `/admin` → **Quick commands** → **Set spawn**, and alway
 matches the on-death respawn location. (The old `MC_SPAWN_X/Y/Z` coordinate
 override was removed because it let the two locations drift apart.)
 
+## Weather report
+
+`raspiops weather` prints the primary world's current weather as
+`weather: clear`, `weather: rain`, or `weather: thunder`. It is read-only;
+the Discord admin panel's lightning button uses it to fire only while it is
+raining. Vanilla Java has no weather query command, hence this helper.
+
 ## Spawn safe zone
 
 The default safe zone is enabled with a square radius of 16 blocks around the

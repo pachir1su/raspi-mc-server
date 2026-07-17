@@ -181,7 +181,12 @@ bubble particles by default; the dropdown redraws itself after every pick so
 the same effect or enchant can be applied repeatedly without switching to a
 different option first),
 gamemode, teleport to another player / a saved place / spawn, XP +10/+30,
-heal, and kick (with confirmation).
+heal, and kick (with confirmation). Three atmosphere buttons also spawn
+things near the selected player without any game-chat output: a creeper 5
+blocks behind them, the creeper fuse sound 3 blocks behind them (sound only,
+no mob), and lightning at their position — the lightning button only fires
+while it is raining or thundering (checked through the plugin's weather
+report) and otherwise says the sky is clear.
 
 Names are sourced from the live list and validated again as Java or dot-prefixed Floodgate usernames, so
 they cannot be turned into arbitrary RCON input.
