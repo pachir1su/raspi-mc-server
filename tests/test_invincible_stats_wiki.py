@@ -27,6 +27,9 @@ class InvincibilityTests(unittest.TestCase):
             self.assertIn(f"minecraft:{effect}", joined)
         # Resistance must be amplifier 4 (Resistance V = full immunity).
         self.assertIn("minecraft:resistance 30 4 true", joined)
+        # 포화(#89)는 무적 시간 내내 허기가 줄지 않도록 최대 증폭(255)으로 걸어
+        # 매 틱 허기를 가득 채웁니다.
+        self.assertIn("minecraft:saturation 30 255 true", joined)
 
     def testClearRemovesOnlyGrantedEffects(self):
         commands = qc.buildInvincibilityClearCommands("Steve")

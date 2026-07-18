@@ -1,13 +1,15 @@
-"""자주 쓰는 아이템의 한글 별칭 → 마인크래프트 아이템 ID 대응표.
+"""한글 별칭 → 마인크래프트 ID 대응표(아이템·포션 효과·인챈트, #92).
 
 [유지보수 안내 — 별칭 추가 방법]
 - 키는 한글 별칭에서 "공백을 모두 뺀" 형태로 적습니다. 입력을 비교할 때도
   공백을 제거하므로 "다이아 검"과 "다이아검" 모두 같은 항목에 걸립니다.
-- 값은 `minecraft:` 접두사를 뺀 소문자 아이템 ID입니다.
-- 별칭에 없는 이름이라도 영어 아이템 ID(예: diamond, iron_sword)는 항상
+- 값은 `minecraft:` 접두사를 뺀 소문자 ID입니다.
+- 별칭에 없는 이름이라도 영어 ID(예: diamond, speed, sharpness)는 항상
   그대로 사용할 수 있습니다. 별칭은 편의 기능일 뿐입니다.
 - 어떤 이름이 애매하면(예: "곡괭이"만으로는 재질을 모름) 추가하지 말고
   재질을 붙인 별칭만 둡니다.
+- 표는 세 개입니다: 아이템(ITEM_ALIASES), 포션 효과(EFFECT_ALIASES),
+  인챈트(ENCHANT_ALIASES). 각각 quick_commands.py의 resolve* 함수가 씁니다.
 """
 
 ITEM_ALIASES = {
@@ -160,6 +162,74 @@ ITEM_ALIASES = {
     "폭죽": "firework_rocket",
     "불꽃놀이로켓": "firework_rocket",
     "유리병": "glass_bottle",
+    # ── 추가 블록·자원 (아이템 주기 한글 개선, #92) ───────────────
+    "사탕수수": "sugar_cane",
+    "대나무": "bamboo",
+    "선인장": "cactus",
+    "점토": "clay",
+    "점토공": "clay_ball",
+    "점토볼": "clay_ball",
+    "벽돌": "brick",
+    "벽돌블록": "bricks",
+    "유리판": "glass_pane",
+    "양털": "white_wool",
+    "양모": "white_wool",
+    "눈덩이": "snowball",
+    "눈블록": "snow_block",
+    "얼음": "ice",
+    "푸른얼음": "blue_ice",
+    "뼈블록": "bone_block",
+    "건초더미": "hay_block",
+    "잭오랜턴": "jack_o_lantern",
+    "호박": "pumpkin",
+    "수박블록": "melon",
+    "책장": "bookshelf",
+    "화분": "flower_pot",
+    "액자": "item_frame",
+    "갑옷거치대": "armor_stand",
+    "깃발": "white_banner",
+    "표지판": "oak_sign",
+    "문": "oak_door",
+    "울타리": "oak_fence",
+    "계단": "oak_stairs",
+    "반블록": "oak_slab",
+    "가마솥": "cauldron",
+    "양조대": "brewing_stand",
+    "발사기": "dispenser",
+    "공급기": "dropper",
+    "깔때기": "hopper",
+    "화염구": "fire_charge",
+    "파이어차지": "fire_charge",
+    "물약": "potion",
+    "스플래시물약": "splash_potion",
+    "잔류물약": "lingering_potion",
+    "황금당근": "golden_carrot",
+    "마법황금사과": "enchanted_golden_apple",
+    "인챈트황금사과": "enchanted_golden_apple",
+    "종려잎": "kelp",
+    "다시마": "kelp",
+    "코코아콩": "cocoa_beans",
+    "코코아": "cocoa_beans",
+    "네더라이트도끼": "netherite_axe",
+    "네더라이트삽": "netherite_shovel",
+    "네더라이트괭이": "netherite_hoe",
+    "네더라이트투구": "netherite_helmet",
+    "네더라이트레깅스": "netherite_leggings",
+    "네더라이트부츠": "netherite_boots",
+    "네더라이트블록": "netherite_block",
+    "구리블록": "copper_block",
+    "석탄블록": "coal_block",
+    "청금석블록": "lapis_block",
+    "레드스톤블록": "redstone_block",
+    "레드스톤가루": "redstone",
+    "레드스톤횃불": "redstone_torch",
+    "중계기": "repeater",
+    "비교기": "comparator",
+    "감지기": "observer",
+    "북": "note_block",
+    "주크박스": "jukebox",
+    "역청": "magma_block",
+    "마그마블록": "magma_block",
 }
 
 # 오타 추천에 쓰는 후보 목록. 별칭의 값(영어 ID)을 기본으로 하고, 별칭은
@@ -176,3 +246,104 @@ KNOWN_ITEM_IDS = sorted(
         "enchanted_golden_apple", "chorus_fruit", "shulker_box",
     }
 )
+
+
+# 포션 효과의 한글 별칭 → 효과 ID (#92). 아이템 별칭과 같은 규칙:
+# 키는 공백을 뺀 한글, 값은 `minecraft:` 접두사 없는 소문자 효과 ID입니다.
+# 영어 효과 ID(예: speed)는 별칭에 없어도 항상 그대로 쓸 수 있습니다.
+EFFECT_ALIASES = {
+    "신속": "speed", "스피드": "speed", "이동속도": "speed",
+    "구속": "slowness", "느림": "slowness", "감속": "slowness",
+    "성급함": "haste", "급함": "haste", "채굴속도": "haste", "헤이스트": "haste",
+    "채굴피로": "mining_fatigue", "채굴피로도": "mining_fatigue",
+    "힘": "strength", "완력": "strength",
+    "즉시회복": "instant_health", "즉시치유": "instant_health", "즉시체력": "instant_health", "힐": "instant_health",
+    "즉시피해": "instant_damage", "즉시데미지": "instant_damage", "즉시대미지": "instant_damage",
+    "점프강화": "jump_boost", "점프": "jump_boost", "도약": "jump_boost",
+    "멀미": "nausea", "구역질": "nausea",
+    "재생": "regeneration", "재생력": "regeneration", "리젠": "regeneration",
+    "저항": "resistance", "저항력": "resistance", "피해저항": "resistance",
+    "화염저항": "fire_resistance", "화염저항력": "fire_resistance", "불저항": "fire_resistance", "화염내성": "fire_resistance",
+    "수중호흡": "water_breathing", "물속호흡": "water_breathing", "잠수": "water_breathing",
+    "투명화": "invisibility", "투명": "invisibility",
+    "실명": "blindness", "블라인드": "blindness",
+    "야간투시": "night_vision", "야시": "night_vision", "밤눈": "night_vision",
+    "허기": "hunger", "배고픔": "hunger",
+    "나약함": "weakness", "약함": "weakness", "쇠약": "weakness",
+    "독": "poison", "중독": "poison",
+    "시듦": "wither", "시들": "wither", "위더": "wither",
+    "체력증가": "health_boost", "최대체력": "health_boost", "체력부스트": "health_boost",
+    "흡수": "absorption", "흡수력": "absorption",
+    "포화": "saturation", "포만감": "saturation", "포만": "saturation", "포화도": "saturation",
+    "발광": "glowing", "빛남": "glowing", "글로잉": "glowing",
+    "공중부양": "levitation", "부양": "levitation", "레비테이션": "levitation",
+    "행운": "luck",
+    "불운": "unluck", "불행": "unluck",
+    "느린낙하": "slow_falling", "저속낙하": "slow_falling", "천천히낙하": "slow_falling",
+    "전달체의힘": "conduit_power", "전도체의힘": "conduit_power", "전달체": "conduit_power",
+    "돌고래의우아함": "dolphins_grace", "돌고래": "dolphins_grace",
+    "불길한징조": "bad_omen", "징조": "bad_omen",
+    "마을의영웅": "hero_of_the_village", "영웅": "hero_of_the_village",
+    "어둠": "darkness",
+    "바람충전": "wind_charged", "윈드차지": "wind_charged",
+    "직조": "weaving", "거미줄": "weaving",
+    "삼출": "oozing", "우징": "oozing",
+    "감염": "infested", "침투": "infested",
+    "습격징조": "raid_omen",
+    "시련의징조": "trial_omen", "시험의징조": "trial_omen",
+}
+
+# 인챈트의 한글 별칭 → 인챈트 ID (#92). 들고 있는 아이템에 적용되므로
+# 호환되지 않으면 서버가 거부합니다. 영어 ID(예: sharpness)는 그대로 사용 가능.
+ENCHANT_ALIASES = {
+    # 무기
+    "날카로움": "sharpness", "샤프": "sharpness", "예리함": "sharpness",
+    "강타": "smite",
+    "살충": "bane_of_arthropods", "벌레잡이": "bane_of_arthropods", "절지동물살해": "bane_of_arthropods",
+    "넉백": "knockback", "밀치기": "knockback",
+    "발화": "fire_aspect", "화염": "fire_aspect", "불속성": "fire_aspect",
+    "약탈": "looting", "루팅": "looting",
+    "휩쓸기": "sweeping_edge", "휩쓸기의칼날": "sweeping_edge", "스위핑": "sweeping_edge",
+    # 도구
+    "효율": "efficiency", "효율성": "efficiency",
+    "섬세한손길": "silk_touch", "실크터치": "silk_touch",
+    "내구성": "unbreaking", "내구도": "unbreaking",
+    "행운": "fortune", "포춘": "fortune",
+    "수선": "mending", "멘딩": "mending",
+    # 방어구
+    "보호": "protection", "방어": "protection",
+    "화염보호": "fire_protection", "화염방어": "fire_protection", "불보호": "fire_protection",
+    "발사체보호": "projectile_protection", "투사체보호": "projectile_protection", "원거리보호": "projectile_protection",
+    "폭발보호": "blast_protection", "폭발방어": "blast_protection",
+    "가시": "thorns", "가시덤불": "thorns", "쏜즈": "thorns",
+    "깃털낙하": "feather_falling", "낙하보호": "feather_falling", "가벼운착지": "feather_falling",
+    "물갈퀴": "depth_strider", "유영": "depth_strider", "심해보행": "depth_strider",
+    "차가운걸음": "frost_walker", "빙결보행": "frost_walker", "서리걷기": "frost_walker",
+    "호흡": "respiration", "잠수호흡": "respiration",
+    "친수성": "aqua_affinity", "물속반응": "aqua_affinity", "아쿠아어피니티": "aqua_affinity",
+    "영혼가속": "soul_speed", "소울스피드": "soul_speed",
+    "신속잠행": "swift_sneak", "빠른웅크리기": "swift_sneak", "스위프트스니크": "swift_sneak",
+    "귀속의저주": "binding_curse", "귀속저주": "binding_curse", "바인딩저주": "binding_curse",
+    "소멸의저주": "vanishing_curse", "소멸저주": "vanishing_curse",
+    # 활
+    "힘": "power", "파워": "power",
+    "펀치": "punch", "밀어내기": "punch",
+    "불꽃": "flame", "플레임": "flame",
+    "무한": "infinity", "인피니티": "infinity",
+    # 석궁
+    "다중발사": "multishot", "멀티샷": "multishot",
+    "관통": "piercing", "피어싱": "piercing",
+    "신속장전": "quick_charge", "고속장전": "quick_charge", "퀵차지": "quick_charge",
+    # 삼지창
+    "충성심": "loyalty", "충성": "loyalty",
+    "급류": "riptide", "리프타이드": "riptide",
+    "집전": "channeling", "번개": "channeling", "채널링": "channeling",
+    "작살": "impaling", "찌르기": "impaling",
+    # 낚싯대
+    "바다의행운": "luck_of_the_sea", "바다의운": "luck_of_the_sea",
+    "미끼": "lure", "루어": "lure",
+    # 둔기(철퇴)
+    "밀도": "density", "덴시티": "density",
+    "돌파": "breach", "브리치": "breach",
+    "바람돌풍": "wind_burst", "윈드버스트": "wind_burst", "돌풍": "wind_burst",
+}

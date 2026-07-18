@@ -18,7 +18,7 @@ Your friends play normal survival with no command access. You keep full control.
 
 ## How to op yourself (and only yourself)
 
-From the server console or Discord `/admin` → **Advanced tools** → **In-game command**:
+From the server console or Discord `/admin` → **In-game command** (on the dashboard or under **Advanced tools**):
 
 ```
 op YourMinecraftName

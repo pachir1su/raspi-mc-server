@@ -120,6 +120,18 @@ class NavigationTests(unittest.TestCase):
         interaction.response.edit_message.assert_awaited_once()
         interaction.response.send_message.assert_not_called()
 
+    def testDashboardExposesInGameCommand(self):
+        """#79: 인게임 명령어 is reachable in one click from the dashboard."""
+        view = cp.AdminDashboardView(self.controller, self.ownerId)
+        button = self._findButton(view, "인게임 명령어")
+        interaction = _fakeInteraction()
+        interaction.response.send_modal = AsyncMock(name="send_modal")
+        self._run(button.callback(interaction))
+        interaction.response.send_modal.assert_awaited_once()
+        modal = interaction.response.send_modal.await_args.args[0]
+        self.assertIsInstance(modal, cp.TextActionModal)
+        self.assertEqual("mc", modal.action)
+
     def testQuickCommandsEditsInPlaceWithoutDefer(self):
         view = cp.AdminDashboardView(self.controller, self.ownerId)
         interaction = _fakeInteraction()

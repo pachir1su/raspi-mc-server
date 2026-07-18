@@ -126,20 +126,36 @@ class Rcon:
             self._reader = None
 
     async def command(self, cmd: str) -> str:
-        """Send a command and return the server's text response."""
+        """Send a command and return the server's full text response.
+
+        Source RCON은 약 4KB를 넘는 응답을 여러 패킷으로 쪼개 보냅니다(#90).
+        한 패킷만 읽으면 인벤토리 조회처럼 긴 응답이 중간에서 잘려 SNBT 파싱이
+        실패했습니다("인벤토리 조회 잘 안 됨"). 명령 뒤에 빈 센티넬 패킷을 하나
+        더 보내고, 서버가 그 센티넬에 응답(마인크래프트는 "Unknown request")할
+        때까지 받은 본문을 모두 이어 붙입니다. 서버는 요청을 받은 순서대로
+        처리·응답하므로, 센티넬 응답이 왔다는 것은 명령 응답이 모두 도착했다는
+        뜻입니다. 응답이 한 패킷이면 첫 패킷만 이어 붙이고 바로 끝납니다.
+        """
         if self._writer is None:
             raise RconConnectionError("not connected")
-        await self._write(TYPE_COMMAND, cmd)
-        _resp_id, _ptype, body = await self._read()
-        return body
+        cmd_id = await self._write(TYPE_COMMAND, cmd)
+        # 센티넬: 서버가 알 수 없는 타입으로 취급해 즉시 되돌려 주는 빈 패킷.
+        sentinel_id = await self._write(TYPE_RESPONSE, "")
+        chunks: list[str] = []
+        while True:
+            resp_id, _ptype, body = await self._read()
+            if resp_id == sentinel_id:
+                break
+            chunks.append(body)
+        return "".join(chunks)
 
     # --- wire protocol -------------------------------------------------
     def _next_id(self) -> int:
         self._id += 1
         return self._id
 
-    async def _write(self, ptype: int, payload: str):
-        """Frame and send a single request packet."""
+    async def _write(self, ptype: int, payload: str) -> int:
+        """Frame and send a single request packet, returning its request id."""
         req_id = self._id if ptype == TYPE_AUTH else self._next_id()
         body = payload.encode("utf-8") + b"\x00\x00"
         packet = struct.pack("<ii", req_id, ptype) + body
@@ -149,6 +165,7 @@ class Rcon:
             await self._writer.drain()
         except OSError as e:
             raise RconConnectionError(f"RCON write failed: {e}") from e
+        return req_id
 
     async def _read(self):
         """Read one framed packet, mapping timeouts and EOF to typed errors."""

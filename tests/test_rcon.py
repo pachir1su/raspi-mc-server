@@ -78,6 +78,13 @@ class FakeRconServer:
             await writer.drain()
             while True:
                 cmd_id, cmd_type, body = await _readPacket(reader)
+                if self.behaviour == "multipacket" and body:
+                    # 4KB를 넘는 응답처럼 한 명령 응답을 두 패킷으로 쪼개 보냅니다
+                    # (같은 req id). 빈 센티넬 패킷은 아래 일반 경로로 되돌려 줍니다.
+                    writer.write(_pack(cmd_id, TYPE_RESPONSE, "PART1-" * 800))
+                    writer.write(_pack(cmd_id, TYPE_RESPONSE, "-PART2"))
+                    await writer.drain()
+                    continue
                 reply = "There are 0 of a max of 20 players online:" if body == "list" else body
                 writer.write(_pack(cmd_id, TYPE_RESPONSE, reply))
                 await writer.drain()
@@ -96,6 +103,16 @@ class RconClientTests(unittest.IsolatedAsyncioTestCase):
             async with Rcon("127.0.0.1", server.port, "secret", timeout=5) as client:
                 out = await client.command("list")
             self.assertIn("players online", out)
+
+    async def testConcatenatesMultiPacketResponse(self):
+        # #90: 인벤토리처럼 4KB를 넘어 여러 패킷으로 쪼개진 응답을 끝까지
+        # 이어 붙여야 합니다. 한 패킷만 읽으면 뒷부분이 잘려 파싱이 실패합니다.
+        async with FakeRconServer("multipacket") as server:
+            async with Rcon("127.0.0.1", server.port, "secret", timeout=5) as client:
+                out = await client.command("data get entity @p Inventory")
+        self.assertTrue(out.startswith("PART1-"))
+        self.assertTrue(out.endswith("-PART2"))
+        self.assertEqual(len("PART1-") * 800 + len("-PART2"), len(out))
 
 
 class RconCliTests(unittest.IsolatedAsyncioTestCase):

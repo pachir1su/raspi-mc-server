@@ -13,7 +13,12 @@ import math
 import random
 import re
 
-from bot.item_aliases import ITEM_ALIASES, KNOWN_ITEM_IDS
+from bot.item_aliases import (
+    EFFECT_ALIASES,
+    ENCHANT_ALIASES,
+    ITEM_ALIASES,
+    KNOWN_ITEM_IDS,
+)
 from bot.player_names import buildPlayerSelector, validateServerPlayerName
 
 
@@ -133,16 +138,6 @@ def ensureServerAccepted(output: str) -> str:
     return output or ""
 
 
-def _validateResourceId(rawId: str, kindLabel: str) -> str:
-    """Normalize one item/effect/enchant ID and reject unsafe characters."""
-    cleaned = (rawId or "").strip().lower().removeprefix("minecraft:")
-    if not _RESOURCE_ID_PATTERN.fullmatch(cleaned):
-        raise ValueError(
-            f"{kindLabel} ID는 영문 소문자·숫자·밑줄만 사용할 수 있습니다 (예: diamond, speed)"
-        )
-    return cleaned
-
-
 def resolveItemId(rawName: str) -> str:
     """Turn free-form input (Korean alias or English ID) into one item ID.
 
@@ -166,6 +161,55 @@ def resolveItemId(rawName: str) -> str:
         else " 영어 아이템 ID(예: diamond, iron_sword)나 등록된 한글 별칭을 입력하세요."
     )
     raise ValueError(f"아이템 이름을 찾지 못했습니다: `{(rawName or '').strip()}`.{hint}")
+
+
+# 포션 효과·인챈트 오타 추천 후보(별칭 값 + 자주 쓰는 ID).
+KNOWN_EFFECT_IDS = sorted(
+    set(EFFECT_ALIASES.values()) | {effectId for effectId, *_ in COMMON_EFFECTS}
+)
+KNOWN_ENCHANT_IDS = sorted(
+    set(ENCHANT_ALIASES.values()) | {enchantId for enchantId, *_ in COMMON_ENCHANTS}
+)
+
+
+def _resolveAlias(
+    rawName: str, aliasTable: dict, knownIds: list[str], kindLabel: str, exampleHint: str
+) -> str:
+    """resolveItemId와 같은 규칙으로 한글 별칭/영어 ID를 하나의 ID로 변환."""
+    cleaned = (rawName or "").strip().lower().removeprefix("minecraft:")
+    compact = cleaned.replace(" ", "")
+    if compact in aliasTable:
+        return aliasTable[compact]
+    candidate = cleaned.replace(" ", "_")
+    if _RESOURCE_ID_PATTERN.fullmatch(candidate):
+        return candidate
+    suggestions = difflib.get_close_matches(
+        compact, list(aliasTable) + knownIds, n=3, cutoff=0.5
+    )
+    hint = (
+        " 혹시 이것인가요? " + ", ".join(f"`{name}`" for name in suggestions)
+        if suggestions
+        else exampleHint
+    )
+    raise ValueError(
+        f"{kindLabel} 이름을 찾지 못했습니다: `{(rawName or '').strip()}`.{hint}"
+    )
+
+
+def resolveEffectId(rawName: str) -> str:
+    """한글 별칭이나 영어 ID를 하나의 포션 효과 ID로 변환합니다(#92)."""
+    return _resolveAlias(
+        rawName, EFFECT_ALIASES, KNOWN_EFFECT_IDS, "효과",
+        " 영어 효과 ID(예: speed, regeneration)나 등록된 한글 별칭을 입력하세요.",
+    )
+
+
+def resolveEnchantId(rawName: str) -> str:
+    """한글 별칭이나 영어 ID를 하나의 인챈트 ID로 변환합니다(#92)."""
+    return _resolveAlias(
+        rawName, ENCHANT_ALIASES, KNOWN_ENCHANT_IDS, "인챈트",
+        " 영어 인챈트 ID(예: sharpness, mending)나 등록된 한글 별칭을 입력하세요.",
+    )
 
 
 def parseItemCount(rawCount: str) -> int:
@@ -195,8 +239,10 @@ def buildEffectCommand(
 
     hideParticles는 바닐라 `effect give`의 마지막 인자로, true면 거품이
     보이지 않습니다. 표시를 원할 때만 False를 넘기세요.
+
+    effectId는 한글 별칭(예: "재생", "신속")이나 영어 ID를 모두 받습니다(#92).
     """
-    safeEffect = _validateResourceId(effectId, "효과")
+    safeEffect = resolveEffectId(effectId)
     safeSeconds = max(1, min(int(seconds), 1_000_000))
     safeAmplifier = max(0, min(int(amplifier), 255))
     return (
@@ -211,7 +257,8 @@ def buildEffectClearCommand(playerName: str) -> str:
 
 
 def buildEnchantCommand(playerName: str, enchantId: str, level: int = 1) -> str:
-    safeEnchant = _validateResourceId(enchantId, "인챈트")
+    # enchantId는 한글 별칭(예: "날카로움")이나 영어 ID를 모두 받습니다(#92).
+    safeEnchant = resolveEnchantId(enchantId)
     safeLevel = max(1, min(int(level), 255))
     return (
         f"enchant {buildPlayerSelector(playerName)} "
@@ -227,7 +274,8 @@ def buildForceEnchantCommand(playerName: str, enchantId: str, level: int = 1) ->
     플러그인이 정확한 이름(선택자 아님)을 받으므로 검증된 이름을 그대로 씁니다.
     """
     safeName = validateServerPlayerName(playerName)
-    safeEnchant = _validateResourceId(enchantId, "인챈트")
+    # enchantId는 한글 별칭(예: "날카로움")이나 영어 ID를 모두 받습니다(#92).
+    safeEnchant = resolveEnchantId(enchantId)
     safeLevel = max(1, min(int(level), 255))
     return f"enchantheld {safeName} {safeEnchant} {safeLevel}"
 
@@ -426,11 +474,17 @@ def buildHealCommands(playerName: str) -> list[str]:
 # 무적(#75): 대미지 무효화(저항 5)에 재생·화염 저항·포화를 함께 걸어 체력이
 # 줄지 않게 합니다. 저항은 증폭 4단계(=저항 V)가 대부분의 피해를 100% 막습니다.
 # 모든 효과는 파티클을 숨겨(#57 원리) 게임 화면에 거품이 보이지 않습니다.
+#
+# 포화(#89): 포화는 "즉시" 계열 효과라 매 틱 허기를 채워 넣습니다. 증폭이 낮으면
+# 한 틱에 채우는 양이 적어, 활동량이 많은 순간에는 허기가 도로 줄어들 수 있습니다.
+# 그래서 증폭을 최대(255)로 올려 무적이 걸린 내내 허기가 항상 가득 차게 합니다
+# (커뮤니티에서 "허기 무한" 명령으로 쓰는 `saturation <시간> 255`와 같은 원리).
+_SATURATION_AMPLIFIER = 255
 _INVINCIBILITY_EFFECTS = (
     ("resistance", 4),
     ("regeneration", 1),
     ("fire_resistance", 0),
-    ("saturation", 0),
+    ("saturation", _SATURATION_AMPLIFIER),
 )
 
 # 무적 지속 시간(초)의 안전 범위: 최소 1초, 최대 1시간.
@@ -571,6 +625,42 @@ def parseGameruleValue(output: str) -> bool:
     if lowered.rstrip().endswith("false") or ": false" in lowered:
         return False
     raise ValueError(f"게임룰 값을 읽지 못했습니다. 서버 응답: {(output or '').strip()[:120]}")
+
+
+# 무인 절전(#91): 서버가 비었을 때 랜덤 틱과 스폰 청크 틱을 멈춰 라즈베리파이의
+# CPU·발열·전력을 낮췄다가, 접속자가 생기면 원래대로 되돌립니다. 성능 전용이라
+# 되돌리기가 안전한 두 정수 게임룰만 건드립니다.
+#   - randomTickSpeed 0: 작물 성장·잎 부패·불 번짐 등 블록 랜덤 틱 정지.
+#   - spawnChunkRadius 0: 항상 로드돼 틱하던 스폰 청크를 언로드(1.20.5+ 전용).
+# 두 값 모두 "끄기 전 현재 값을 읽어 두었다가" 접속 시 그대로 복원하므로
+# 운영자가 바꿔 둔 설정을 덮어쓰지 않습니다.
+IDLE_ECO_RANDOM_TICK = "randomTickSpeed"
+IDLE_ECO_SPAWN_RADIUS = "spawnChunkRadius"
+
+
+def buildIntGameruleQuery(gameruleName: str) -> str:
+    """Query one numeric gamerule the idle saver manages (perf-only names)."""
+    if gameruleName not in (IDLE_ECO_RANDOM_TICK, IDLE_ECO_SPAWN_RADIUS):
+        raise ValueError("지원하지 않는 게임룰입니다.")
+    return f"gamerule {gameruleName}"
+
+
+def buildIntGameruleSet(gameruleName: str, value: int) -> str:
+    """Set one numeric idle-saver gamerule with a clamped, safe value."""
+    if gameruleName not in (IDLE_ECO_RANDOM_TICK, IDLE_ECO_SPAWN_RADIUS):
+        raise ValueError("지원하지 않는 게임룰입니다.")
+    safeValue = max(0, min(int(value), 4096))
+    return f"gamerule {gameruleName} {safeValue}"
+
+
+def parseGameruleInt(output: str) -> int | None:
+    """Read the integer from '... is currently set to: N', or None if absent.
+
+    구버전 마인크래프트에 없는 게임룰(spawnChunkRadius <1.20.5)은 'Incorrect
+    argument'처럼 숫자가 없는 응답을 돌려주므로 None으로 처리해 건너뜁니다.
+    """
+    match = re.search(r"set to:\s*(-?\d+)", output or "", re.IGNORECASE)
+    return int(match.group(1)) if match else None
 
 
 def buildDifficultyCommand(difficulty: str) -> str:
