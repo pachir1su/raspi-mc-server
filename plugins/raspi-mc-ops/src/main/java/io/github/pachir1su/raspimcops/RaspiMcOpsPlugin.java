@@ -20,6 +20,7 @@ public final class RaspiMcOpsPlugin extends JavaPlugin {
     private SpawnProtectionService spawnProtection;
     private ContainerLockService containerLock;
     private EnchantService enchant;
+    private SummonService summon;
 
     @Override
     public void onEnable() {
@@ -27,6 +28,7 @@ public final class RaspiMcOpsPlugin extends JavaPlugin {
         spawnProtection = new SpawnProtectionService(this);
         containerLock = new ContainerLockService(this);
         enchant = new EnchantService(this);
+        summon = new SummonService(this);
         Bukkit.getPluginManager().registerEvents(new ChatLogService(this), this);
         Bukkit.getPluginManager().registerEvents(spawnProtection, this);
         Bukkit.getPluginManager().registerEvents(containerLock, this);
@@ -74,14 +76,26 @@ public final class RaspiMcOpsPlugin extends JavaPlugin {
         }
     }
 
-    /** Resolve an exact validated online identity and teleport only that player. */
+    /** Route the narrow console helpers the Discord bot depends on. */
     private boolean handleRaspiOps(CommandSender sender, String[] args) {
         if (!sender.hasPermission("raspimcops.rescue")) {
             sender.sendMessage("You do not have permission to use this command.");
             return true;
         }
+        if (args.length == 1 && args[0].equalsIgnoreCase("weather")) {
+            return handleWeatherQuery(sender);
+        }
+        if (args.length >= 1 && args[0].equalsIgnoreCase("summon")) {
+            return summon.handleSummon(sender, args);
+        }
+        if (args.length >= 1 && args[0].equalsIgnoreCase("villager")) {
+            return summon.handleVillager(sender, args);
+        }
         if (args.length != 2 || !args[0].equalsIgnoreCase("rescue")) {
-            sender.sendMessage("Usage: /raspiops rescue <exact-player-name>");
+            sender.sendMessage(
+                "Usage: /raspiops <rescue <name>|weather|summon <name> <preset>|"
+                + "villager <name> <profession> <good> <price>>"
+            );
             return true;
         }
         String playerName = args[1];
@@ -107,6 +121,19 @@ public final class RaspiMcOpsPlugin extends JavaPlugin {
         sender.sendMessage("Teleported " + playerName + " to " + destination.getWorld().getName()
             + " spawn at " + destination.getBlockX() + " " + destination.getBlockY()
             + " " + destination.getBlockZ());
+        return true;
+    }
+
+    /** Read-only weather report for the primary world: clear, rain, or thunder. */
+    private boolean handleWeatherQuery(CommandSender sender) {
+        List<World> worlds = Bukkit.getWorlds();
+        if (worlds.isEmpty()) {
+            sender.sendMessage("No world is loaded.");
+            return true;
+        }
+        World world = worlds.getFirst();
+        String state = world.isThundering() ? "thunder" : world.hasStorm() ? "rain" : "clear";
+        sender.sendMessage("weather: " + state);
         return true;
     }
 }

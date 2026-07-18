@@ -26,6 +26,28 @@ itself is moved via `/admin` → **Quick commands** → **Set spawn**, and alway
 matches the on-death respawn location. (The old `MC_SPAWN_X/Y/Z` coordinate
 override was removed because it let the two locations drift apart.)
 
+## Weather report
+
+`raspiops weather` prints the primary world's current weather as
+`weather: clear`, `weather: rain`, or `weather: thunder`. It is read-only;
+the Discord admin panel's lightning button uses it to fire only while it is
+raining. Vanilla Java has no weather query command, hence this helper.
+
+## Safe summons
+
+`raspiops summon <player> <preset>` and
+`raspiops villager <player> <profession> <good> <price>` back the owner-only
+spawns in the `/admin` → **Atmosphere / summon** sub-panel. The plugin does
+the work vanilla commands cannot: it searches near the player for a spot with
+two passable blocks over solid ground and spawns there, so mobs never
+suffocate inside a wall. Presets (`creeper`, `charged_creeper`, `boom_creeper`,
+`buffed_zombie`, `skeleton_squad`, `trident_drowned`, `horde`) and their gates
+(thunder for charging, water for the drowned) live in the plugin using the
+Bukkit API rather than raw item NBT, so they stay valid across the server's
+item-component format. Each call prints a `summon: ...` status line the bot
+relays; a no-op (no safe spot, wrong weather, no nearby creeper) is reported
+instead of a false success.
+
 ## Spawn safe zone
 
 The default safe zone is enabled with a square radius of 16 blocks around the

@@ -9,6 +9,8 @@
 """
 
 import difflib
+import math
+import random
 import re
 
 from bot.item_aliases import ITEM_ALIASES, KNOWN_ITEM_IDS
@@ -228,6 +230,150 @@ def buildForceEnchantCommand(playerName: str, enchantId: str, level: int = 1) ->
     safeEnchant = _validateResourceId(enchantId, "인챈트")
     safeLevel = max(1, min(int(level), 255))
     return f"enchantheld {safeName} {safeEnchant} {safeLevel}"
+
+
+# ── 크리퍼/번개/특수 몹/주민 소환 (관리자 장난) ──────────────────────
+# 몹 소환은 전부 RaspiMcOps 플러그인의 `raspiops summon`을 경유합니다.
+# 플러그인이 대상 등 뒤에서 발/머리 칸이 뚫려 있고 바닥이 단단한 안전한
+# 자리를 찾아 소환하므로 몹이 벽에 끼지 않습니다(순수 명령어로는 불가능).
+# 소리·번개는 벽 문제가 없어 바닐라 명령을 그대로 씁니다.
+
+# 특수 몹 드롭다운에 노출하는 플러그인 프리셋: (프리셋 키, 한글 라벨).
+SPECIAL_MOB_PRESETS = (
+    ("buffed_zombie", "강화 좀비 (철 도끼)"),
+    ("boom_creeper", "폭발 강화 크리퍼 (겉보기 일반)"),
+    ("skeleton_squad", "파워 활 스켈레톤 4마리"),
+    ("trident_drowned", "삼지창 드라운드 (물에서만)"),
+    ("horde", "몹 물량 (멀리서 떼거리)"),
+)
+
+# 버튼으로 직접 부르는 프리셋까지 포함한, 허용된 전체 소환 프리셋.
+SUMMON_PRESETS = frozenset(
+    {"creeper", "charged_creeper"} | {key for key, _label in SPECIAL_MOB_PRESETS}
+)
+
+
+def buildSummonPresetCommand(playerName: str, preset: str) -> str:
+    """플러그인 안전 소환 명령. 프리셋은 SUMMON_PRESETS 안에서만 허용합니다."""
+    safeName = validateServerPlayerName(playerName)
+    if preset not in SUMMON_PRESETS:
+        raise ValueError("지원하지 않는 소환 프리셋입니다.")
+    return f"raspiops summon {safeName} {preset}"
+
+
+def buildCreeperSoundCommand(playerName: str, distance: int = 3) -> str:
+    """접속자 등 뒤 distance(기본 3)블록에서 크리퍼 점화음만 재생합니다.
+
+    몹은 소환하지 않으므로 돌아봐도 흔적이 없습니다. 소리는 대상 본인에게만
+    재생되며, 볼륨 1이면 약 16블록까지 들려 3블록 뒤에서는 항상 들립니다.
+    """
+    safeDistance = max(1, min(int(distance), 10))
+    selector = buildPlayerSelector(playerName)
+    return (
+        f"execute at {selector} rotated ~ 0 run "
+        f"playsound minecraft:entity.creeper.primed hostile {selector} "
+        f"^ ^ ^-{safeDistance} 1 1"
+    )
+
+
+# 번개 낙뢰 반경(블록): 대상 정중앙이 아니라 주변에 랜덤으로 한 발 꽂습니다.
+_LIGHTNING_MIN_RADIUS = 4
+_LIGHTNING_MAX_RADIUS = 10
+
+
+def buildLightningCommand(
+    playerName: str, rng: random.Random | None = None
+) -> str:
+    """대상 주변 반경 4~10블록 랜덤 한 지점에 번개 한 발 (비/뇌우일 때만 호출).
+
+    정중앙에 계속 치면 어색하므로 실행할 때마다 무작위 위치에 한 발만 칩니다.
+    """
+    chooser = rng or random
+    angle = chooser.uniform(0, 2 * math.pi)
+    radius = chooser.uniform(_LIGHTNING_MIN_RADIUS, _LIGHTNING_MAX_RADIUS)
+    dx = round(radius * math.cos(angle))
+    dz = round(radius * math.sin(angle))
+    return (
+        f"execute at {buildPlayerSelector(playerName)} run "
+        f"summon minecraft:lightning_bolt ~{dx} ~ ~{dz}"
+    )
+
+
+# 번개는 맑은 날에는 쓰지 않습니다(자연 번개는 비/뇌우에서만 침). 날씨는
+# RaspiMcOps 플러그인의 읽기 전용 `raspiops weather`로 조회합니다 —
+# 바닐라 Java에는 날씨 조회 명령이 없습니다.
+WEATHER_QUERY_COMMAND = "raspiops weather"
+
+LIGHTNING_CLEAR_WEATHER_MESSAGE = (
+    "지금은 맑은 날씨입니다. 번개는 비가 올 때만 사용할 수 있습니다."
+)
+WEATHER_QUERY_UNSUPPORTED_MESSAGE = (
+    "서버 플러그인이 날씨 조회를 지원하지 않습니다. "
+    "최신 릴리스의 RaspiMcOps JAR을 배포한 뒤 다시 시도하세요."
+)
+
+
+def parseWeatherReply(output: str) -> str:
+    """`raspiops weather` 응답을 'clear'|'rain'|'thunder'로 정규화합니다."""
+    lowered = (output or "").casefold()
+    for state in ("thunder", "rain", "clear"):
+        if state in lowered:
+            return state
+    raise ValueError(WEATHER_QUERY_UNSUPPORTED_MESSAGE)
+
+
+# ── 조건부 주민 소환 (장난 아님, 유틸) ──────────────────────────────
+# 미리 박은 거래 하나를 가진 주민을 플러그인 안전 소환으로 만듭니다.
+# 드롭다운: (상품 키, 직업 키, 한글 라벨, 기본 에메랄드 가격). 상품이
+# 직업을 결정하므로 관리자는 상품과 가격만 고르면 됩니다.
+VILLAGER_GOODS = (
+    ("mending", "librarian", "📚 수선 책", 15),
+    ("efficiency5", "librarian", "📚 효율 V 책", 20),
+    ("protection4", "librarian", "📚 보호 IV 책", 20),
+    ("unbreaking3", "librarian", "📚 내구성 III 책", 12),
+    ("fortune3", "librarian", "📚 행운 III 책", 25),
+    ("silk_touch", "librarian", "📚 섬세한 손길 책", 20),
+    ("sharpness5", "librarian", "📚 날카로움 V 책", 20),
+    ("diamond_sword", "weaponsmith", "⚔️ 다이아 검 (날카로움 V)", 20),
+    ("diamond_pickaxe", "toolsmith", "⛏️ 다이아 곡괭이 (효율 V)", 20),
+    ("diamond_helmet", "armorer", "🛡️ 다이아 투구 (보호 IV)", 15),
+    ("diamond_chestplate", "armorer", "🛡️ 다이아 흉갑 (보호 IV)", 20),
+    ("diamond_leggings", "armorer", "🛡️ 다이아 각반 (보호 IV)", 18),
+    ("diamond_boots", "armorer", "🛡️ 다이아 부츠 (보호 IV)", 15),
+    ("ender_pearl", "cleric", "⛪ 엔더 진주", 5),
+    ("xp_bottle", "cleric", "⛪ 경험치 병", 5),
+    ("crossbow", "fletcher", "🏹 석궁", 8),
+    ("arrows", "fletcher", "🏹 화살 16개", 3),
+)
+
+_VILLAGER_GOOD_KEYS = {good for good, _prof, _label, _price in VILLAGER_GOODS}
+_VILLAGER_PROFESSIONS = {prof for _good, prof, _label, _price in VILLAGER_GOODS}
+
+MIN_VILLAGER_PRICE = 1
+MAX_VILLAGER_PRICE = 64
+
+
+def parseVillagerPrice(rawPrice: str | int) -> int:
+    """주민 거래 가격(에메랄드 1~64)을 검증합니다."""
+    cleaned = str(rawPrice).strip()
+    if not cleaned.isdigit() or not MIN_VILLAGER_PRICE <= int(cleaned) <= MAX_VILLAGER_PRICE:
+        raise ValueError(
+            f"가격은 {MIN_VILLAGER_PRICE}~{MAX_VILLAGER_PRICE} 사이의 에메랄드 개수여야 합니다."
+        )
+    return int(cleaned)
+
+
+def buildVillagerSummonCommand(
+    playerName: str, profession: str, good: str, price: int
+) -> str:
+    """플러그인 안전 소환으로 거래 하나를 가진 주민을 만듭니다."""
+    safeName = validateServerPlayerName(playerName)
+    if good not in _VILLAGER_GOOD_KEYS:
+        raise ValueError("지원하지 않는 상품입니다.")
+    if profession not in _VILLAGER_PROFESSIONS:
+        raise ValueError("지원하지 않는 직업입니다.")
+    safePrice = parseVillagerPrice(price)
+    return f"raspiops villager {safeName} {profession} {good} {safePrice}"
 
 
 def buildGamemodeCommand(playerName: str, mode: str) -> str:

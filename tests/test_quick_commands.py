@@ -101,6 +101,79 @@ class CommandBuilderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             qc.buildForceEnchantCommand("@a", "sharpness", 5)
 
+    def testSummonPresetGoesThroughPlugin(self):
+        self.assertEqual(
+            "raspiops summon Friend_1 creeper",
+            qc.buildSummonPresetCommand("Friend_1", "creeper"),
+        )
+        self.assertEqual(
+            "raspiops summon .Pocket horde",
+            qc.buildSummonPresetCommand(".Pocket", "horde"),
+        )
+        # 프리셋 화이트리스트 밖은 거부.
+        with self.assertRaises(ValueError):
+            qc.buildSummonPresetCommand("Friend_1", "wither")
+        with self.assertRaises(ValueError):
+            qc.buildSummonPresetCommand("@a", "creeper")
+        # 특수 몹 드롭다운 키는 전부 허용 프리셋이어야 한다.
+        for key, _label in qc.SPECIAL_MOB_PRESETS:
+            self.assertIn(key, qc.SUMMON_PRESETS)
+
+    def testCreeperSoundPlaysBehindWithoutSummoning(self):
+        command = qc.buildCreeperSoundCommand("Friend_1")
+        self.assertEqual(
+            'execute at @a[name="Friend_1",limit=1] rotated ~ 0 run '
+            "playsound minecraft:entity.creeper.primed hostile "
+            '@a[name="Friend_1",limit=1] ^ ^ ^-3 1 1',
+            command,
+        )
+        self.assertNotIn("summon", command)
+        with self.assertRaises(ValueError):
+            qc.buildCreeperSoundCommand("@a")
+
+    def testLightningStrikesRandomOffsetEachCall(self):
+        import random as _random
+
+        command = qc.buildLightningCommand("Friend_1", rng=_random.Random(0))
+        self.assertTrue(
+            command.startswith(
+                'execute at @a[name="Friend_1",limit=1] run '
+                "summon minecraft:lightning_bolt ~"
+            )
+        )
+        # 오프셋은 항상 반경 안(각 축 |offset| <= 최대 반경).
+        offsets = command.rsplit("lightning_bolt ", 1)[1].split()
+        dx = int(offsets[0].lstrip("~") or "0")
+        dz = int(offsets[2].lstrip("~") or "0")
+        self.assertLessEqual(dx * dx + dz * dz, qc._LIGHTNING_MAX_RADIUS**2 + 2)
+        with self.assertRaises(ValueError):
+            qc.buildLightningCommand("@a")
+
+    def testVillagerSummonGoesThroughPlugin(self):
+        self.assertEqual(
+            "raspiops villager Friend_1 librarian mending 15",
+            qc.buildVillagerSummonCommand("Friend_1", "librarian", "mending", 15),
+        )
+        with self.assertRaises(ValueError):  # 알 수 없는 상품
+            qc.buildVillagerSummonCommand("Friend_1", "librarian", "nether_star", 5)
+        with self.assertRaises(ValueError):  # 가격 범위 밖
+            qc.buildVillagerSummonCommand("Friend_1", "librarian", "mending", 999)
+        with self.assertRaises(ValueError):  # 이름 검증
+            qc.buildVillagerSummonCommand("@a", "librarian", "mending", 5)
+        # 드롭다운의 모든 상품/직업이 빌더 화이트리스트와 일치해야 한다.
+        for good, profession, _label, price in qc.VILLAGER_GOODS:
+            self.assertEqual(
+                f"raspiops villager Friend_1 {profession} {good} {price}",
+                qc.buildVillagerSummonCommand("Friend_1", profession, good, price),
+            )
+
+    def testWeatherReply(self):
+        self.assertEqual("thunder", qc.parseWeatherReply("weather: thunder"))
+        self.assertEqual("rain", qc.parseWeatherReply("Weather: RAIN"))
+        self.assertEqual("clear", qc.parseWeatherReply("weather: clear"))
+        with self.assertRaises(ValueError):
+            qc.parseWeatherReply("Usage: /raspiops rescue <exact-player-name>")
+
     def testGamemode(self):
         self.assertEqual(
             'gamemode creative @a[name="Friend_1",limit=1]',

@@ -5,7 +5,14 @@ import discord
 from bot.config import cfg
 from bot.error_text import describeError
 from bot.i18n import t
-from bot.quick_commands import COMMON_EFFECTS, COMMON_ENCHANTS, DIFFICULTIES, GAMERULES
+from bot.quick_commands import (
+    COMMON_EFFECTS,
+    COMMON_ENCHANTS,
+    DIFFICULTIES,
+    GAMERULES,
+    SPECIAL_MOB_PRESETS,
+    VILLAGER_GOODS,
+)
 
 
 # 만료된 패널의 버튼을 누르면 디스코드가 "상호작용 실패"만 띄우고 이유를
@@ -63,6 +70,19 @@ class OwnerView(discord.ui.View):
 class QuickActionModal(discord.ui.Modal):
     """Shared error handling for the few quick actions that need typed input."""
 
+    def __init__(self, *, panelView: discord.ui.View | None = None, **kwargs):
+        super().__init__(**kwargs)
+        # 드롭다운에서 연 모달이면, 제출 시 그 드롭다운의 선택 강조를 지울 수
+        # 있게 패널 뷰를 기억해 둡니다(resetSelectHighlight 참고).
+        self.panelView = panelView
+
+    async def acknowledge(self, interaction: discord.Interaction) -> None:
+        """첫 응답: 드롭다운에서 열렸으면 선택 강조를 지우고, 아니면 defer."""
+        if self.panelView is not None:
+            await resetSelectHighlight(interaction, self.panelView)
+        else:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+
     async def on_error(self, interaction: discord.Interaction, error: Exception):
         message = f"❌ {describeError(error)}"
         if interaction.response.is_done():
@@ -113,6 +133,20 @@ async def sendScreen(
             view.message = await interaction.original_response()
         except discord.HTTPException:
             pass
+
+
+async def resetSelectHighlight(
+    interaction: discord.Interaction, view: discord.ui.View
+) -> None:
+    """드롭다운의 선택 강조를 지워 같은 옵션을 연달아 다시 고를 수 있게 합니다.
+
+    디스코드 클라이언트는 이미 선택돼 강조된 옵션을 다시 눌러도 새 상호작용을
+    보내지 않습니다. 그래서 예전에는 '신속'을 두 번 연속 적용하려면 다른
+    옵션을 한 번 거쳐야 했습니다. 매 선택 직후 같은 화면을 다시 그려(첫
+    응답을 edit_message로 사용) 강조를 지우면 같은 효과·인챈트를 바로 다시
+    선택할 수 있습니다.
+    """
+    await interaction.response.edit_message(view=view)
 
 
 async def replaceWithLoadingEmbed(
@@ -776,8 +810,10 @@ class GiveItemModal(QuickActionModal):
 class CustomEffectModal(QuickActionModal):
     """드롭다운에 없는 포션 효과를 ID로 직접 지정할 때만 씁니다."""
 
-    def __init__(self, controller, playerName: str):
-        super().__init__(title=f"포션 효과 직접 입력 — {playerName}"[:45])
+    def __init__(self, controller, playerName: str, *, panelView=None):
+        super().__init__(
+            title=f"포션 효과 직접 입력 — {playerName}"[:45], panelView=panelView
+        )
         self.controller = controller
         self.playerName = playerName
         self.effectId = discord.ui.TextInput(
@@ -787,7 +823,7 @@ class CustomEffectModal(QuickActionModal):
             label="지속 시간(초, 비우면 300)", required=False, max_length=7
         )
         self.level = discord.ui.TextInput(
-            label="강도 (1~10, 비우면 1)", required=False, max_length=2
+            label="강도 (1~256, 비우면 1)", required=False, max_length=3
         )
         self.particles = discord.ui.TextInput(
             label="거품 파티클 표시? (y 입력 시 표시, 기본 숨김)",
@@ -800,13 +836,15 @@ class CustomEffectModal(QuickActionModal):
         self.add_item(self.particles)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.acknowledge(interaction)
         secondsText = (self.seconds.value or "").strip()
         if secondsText and not secondsText.isdigit():
             raise ValueError("지속 시간은 숫자(초)로 입력하세요.")
         levelText = (self.level.value or "").strip()
-        if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 10):
-            raise ValueError("강도는 1~10 사이의 숫자로 입력하세요.")
+        # 강도는 게임 실제 한계까지 허용합니다(#증폭치는 바이트라 최대 255 =
+        # 256단계). buildEffectCommand가 증폭치를 0~255로 다시 clamp합니다.
+        if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 256):
+            raise ValueError("강도는 1~256 사이의 숫자로 입력하세요.")
         showParticles = (self.particles.value or "").strip().lower() == "y"
         await self.controller.panelApplyEffect(
             interaction,
@@ -821,8 +859,10 @@ class CustomEffectModal(QuickActionModal):
 class CustomEnchantModal(QuickActionModal):
     """드롭다운에 없는 인챈트를 ID와 레벨로 직접 지정할 때만 씁니다."""
 
-    def __init__(self, controller, playerName: str):
-        super().__init__(title=f"인챈트 직접 입력 — {playerName}"[:45])
+    def __init__(self, controller, playerName: str, *, panelView=None):
+        super().__init__(
+            title=f"인챈트 직접 입력 — {playerName}"[:45], panelView=panelView
+        )
         self.controller = controller
         self.playerName = playerName
         self.enchantId = discord.ui.TextInput(
@@ -835,7 +875,7 @@ class CustomEnchantModal(QuickActionModal):
         self.add_item(self.level)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.acknowledge(interaction)
         levelText = (self.level.value or "").strip()
         if levelText and not levelText.isdigit():
             raise ValueError("레벨은 숫자로 입력하세요.")
@@ -850,8 +890,10 @@ class CustomEnchantModal(QuickActionModal):
 class ForceEnchantModal(QuickActionModal):
     """제한 없는 강제 인챈트(예: 곡괭이에 날카로움, 날카로움 20). #62."""
 
-    def __init__(self, controller, playerName: str):
-        super().__init__(title=f"강제 인챈트 — {playerName}"[:45])
+    def __init__(self, controller, playerName: str, *, panelView=None):
+        super().__init__(
+            title=f"강제 인챈트 — {playerName}"[:45], panelView=panelView
+        )
         self.controller = controller
         self.playerName = playerName
         self.enchantId = discord.ui.TextInput(
@@ -864,7 +906,7 @@ class ForceEnchantModal(QuickActionModal):
         self.add_item(self.level)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.acknowledge(interaction)
         levelText = (self.level.value or "").strip()
         if levelText and (not levelText.isdigit() or not 1 <= int(levelText) <= 255):
             raise ValueError("레벨은 1~255 사이의 숫자로 입력하세요.")
@@ -900,10 +942,10 @@ class EffectSelect(discord.ui.Select):
         choice = self.values[0]
         if choice == "__custom__":
             await interaction.response.send_modal(
-                CustomEffectModal(self.controller, self.playerName)
+                CustomEffectModal(self.controller, self.playerName, panelView=self.view)
             )
             return
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await resetSelectHighlight(interaction, self.view)
         if choice == "__clear__":
             await self.controller.panelClearEffects(interaction, self.playerName)
             return
@@ -950,15 +992,15 @@ class EnchantSelect(discord.ui.Select):
         choice = self.values[0]
         if choice == "__custom__":
             await interaction.response.send_modal(
-                CustomEnchantModal(self.controller, self.playerName)
+                CustomEnchantModal(self.controller, self.playerName, panelView=self.view)
             )
             return
         if choice == "__force__":
             await interaction.response.send_modal(
-                ForceEnchantModal(self.controller, self.playerName)
+                ForceEnchantModal(self.controller, self.playerName, panelView=self.view)
             )
             return
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await resetSelectHighlight(interaction, self.view)
         enchantId, level = choice.rsplit(":", 1)
         await self.controller.panelEnchant(
             interaction, self.playerName, enchantId, int(level)
@@ -1081,6 +1123,118 @@ class InvincibilityPanelView(PlayerSubScreenView):
     async def clear(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True, thinking=True)
         await self.controller.panelMortal(interaction, self.playerName)
+
+
+class SpecialMobSelect(discord.ui.Select):
+    """특수 몹 프리셋 드롭다운 — 같은 프리셋을 연달아 또 부를 수 있습니다."""
+
+    def __init__(self, controller, playerName: str):
+        self.controller = controller
+        self.playerName = playerName
+        options = [
+            discord.SelectOption(label=label, value=key, emoji="👹")
+            for key, label in SPECIAL_MOB_PRESETS
+        ]
+        super().__init__(
+            placeholder="특수 몹 선택 (안전한 자리에 소환)",
+            min_values=1, max_values=1, options=options, row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        choice = self.values[0]
+        await resetSelectHighlight(interaction, self.view)
+        await self.controller.panelSpecialMob(interaction, self.playerName, choice)
+
+
+class VillagerGoodSelect(discord.ui.Select):
+    """주민이 팔 상품 드롭다운 — 고르면 가격 입력 모달이 뜹니다."""
+
+    def __init__(self, controller, playerName: str):
+        self.controller = controller
+        self.playerName = playerName
+        options = [
+            discord.SelectOption(label=label, value=good)
+            for good, _prof, label, _price in VILLAGER_GOODS
+        ]
+        super().__init__(
+            placeholder="주민 소환 — 팔 상품 선택",
+            min_values=1, max_values=1, options=options, row=2,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        good, profession, label, defaultPrice = next(
+            (g, p, l, pr) for g, p, l, pr in VILLAGER_GOODS if g == self.values[0]
+        )
+        await interaction.response.send_modal(
+            VillagerPriceModal(
+                self.controller, self.playerName, good, profession, label,
+                defaultPrice, panelView=self.view,
+            )
+        )
+
+
+class VillagerPriceModal(QuickActionModal):
+    """주민 거래 가격(에메랄드)을 정하고 소환합니다."""
+
+    def __init__(
+        self, controller, playerName: str, good: str, profession: str,
+        label: str, defaultPrice: int, *, panelView=None,
+    ):
+        super().__init__(title=f"주민 가격 — {label}"[:45], panelView=panelView)
+        self.controller = controller
+        self.playerName = playerName
+        self.good = good
+        self.profession = profession
+        self.label = label
+        self.defaultPrice = defaultPrice
+        self.price = discord.ui.TextInput(
+            label=f"에메랄드 가격 (1~64, 비우면 {defaultPrice})",
+            required=False, max_length=2,
+        )
+        self.add_item(self.price)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.acknowledge(interaction)
+        priceText = (self.price.value or "").strip()
+        if priceText and not priceText.isdigit():
+            raise ValueError("가격은 숫자로 입력하세요.")
+        price = int(priceText) if priceText else self.defaultPrice
+        await self.controller.panelSummonVillager(
+            interaction, self.playerName, self.profession, self.good, price, self.label
+        )
+
+
+class SummonPanelView(PlayerSubScreenView):
+    """연출·소환 모음 — 몹은 전부 벽에 안 끼는 안전한 자리에 소환됩니다.
+
+    번개는 비/뇌우일 때만, 충전 크리퍼는 뇌우 중 주변에 실제 크리퍼가 있을
+    때만 동작합니다(그 판정은 controller/플러그인이 합니다).
+    """
+
+    def __init__(self, controller, ownerId: int, playerName: str):
+        super().__init__(controller, ownerId, playerName)
+        self.add_item(SpecialMobSelect(controller, playerName))
+        self.add_item(VillagerGoodSelect(controller, playerName))
+
+    @discord.ui.button(label="크리퍼 소환", emoji="💥", style=discord.ButtonStyle.secondary, row=0)
+    async def creeper(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelSummonCreeper(interaction, self.playerName)
+
+    @discord.ui.button(label="충전 크리퍼", emoji="⚡", style=discord.ButtonStyle.secondary, row=0)
+    async def chargedCreeper(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelChargedCreeper(interaction, self.playerName)
+
+    @discord.ui.button(label="크리퍼 소리", emoji="🔊", style=discord.ButtonStyle.secondary, row=0)
+    async def creeperSound(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelCreeperSound(interaction, self.playerName)
+
+    @discord.ui.button(label="번개", emoji="🌩️", style=discord.ButtonStyle.secondary, row=0)
+    async def lightning(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await self.controller.panelLightning(interaction, self.playerName)
 
 
 class ConfirmKickView(PlayerSubScreenView):
@@ -1221,6 +1375,18 @@ class PlayerPanelView(OwnerView):
             content=f"**{self.selectedPlayer}** 를 서버에서 추방할까요?",
             embed=None,
             view=ConfirmKickView(self.controller, self.ownerId, self.selectedPlayer),
+        )
+
+    @discord.ui.button(label="연출·소환", emoji="🎭", style=discord.ButtonStyle.secondary, row=4)
+    async def summonMenu(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await replaceScreen(
+            interaction,
+            content=(
+                f"**{self.selectedPlayer}** 주변에 소환할 것을 고르세요. "
+                "몹은 벽에 안 끼는 안전한 자리에 나타나고, 게임 채팅엔 출력되지 않습니다."
+            ),
+            embed=None,
+            view=SummonPanelView(self.controller, self.ownerId, self.selectedPlayer),
         )
 
 

@@ -7,7 +7,7 @@ api-version: '26.1.2'
 commands:
   raspiops:
     description: Narrow console integration used by the Discord bot.
-    usage: /raspiops rescue <exact-player-name>
+    usage: "/raspiops <rescue <name>|weather|summon <name> <preset>|villager <name> <profession> <good> <price>>"
     permission: raspimcops.rescue
   spawnprotection:
     description: Inspect or toggle the event-level spawn safe zone.

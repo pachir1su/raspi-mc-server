@@ -176,10 +176,29 @@ current `list` output. After selecting a player, inspection buttons show:
 
 Action buttons (all audited): give item (Korean alias or English ID with typo
 suggestions), potion effects and enchants (common presets plus free input —
-the effect modal also takes a duration, a strength level of 1–10, and hides
-bubble particles by default),
+the effect modal also takes a duration, a strength level up to 256 (the game's
+byte limit), and hides
+bubble particles by default; the dropdown redraws itself after every pick so
+the same effect or enchant can be applied repeatedly without switching to a
+different option first),
 gamemode, teleport to another player / a saved place / spawn, XP +10/+30,
-heal, and kick (with confirmation).
+heal, and kick (with confirmation). A 🎭 **Atmosphere / summon** sub-panel
+gathers the owner-only spawns, none of which print to game chat:
+
+- **creeper**, **charged creeper** (only during a thunderstorm with a real
+  creeper nearby to strike), and a **special-mob dropdown** — buffed zombie
+  (iron axe), a normal-looking creeper with a bigger blast, a squad of
+  power-bow skeletons, a trident drowned (only when the player is in water),
+  and a far-away **horde**.
+- **creeper sound** — the fuse hiss 3 blocks behind, sound only, no mob.
+- **lightning** — one bolt at a random spot around the player, only while it
+  is raining or thundering (checked through the plugin's weather report).
+- **villager summon** — a villager pre-set with a single trade you pick
+  (Mending and other enchanted books, diamond gear, ender pearls, and more)
+  at an emerald price you type in.
+
+Every mob is placed by the plugin on a searched, non-suffocating spot so it
+never appears stuck inside a wall.
 
 Names are sourced from the live list and validated again as Java or dot-prefixed Floodgate usernames, so
 they cannot be turned into arbitrary RCON input.

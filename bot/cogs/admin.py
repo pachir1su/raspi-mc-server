@@ -57,8 +57,12 @@ from bot.quick_commands import (
     GAMEMODES,
     GAMERULES,
     GAMERULE_UNSUPPORTED_MESSAGE,
+    LIGHTNING_CLEAR_WEATHER_MESSAGE,
     SCOREBOARD_STATS,
     SPAWN_RADIUS_ZERO_COMMAND,
+    SPECIAL_MOB_PRESETS,
+    WEATHER_QUERY_COMMAND,
+    buildCreeperSoundCommand,
     buildDifficultyCommand,
     buildEffectClearCommand,
     buildEffectCommand,
@@ -72,10 +76,13 @@ from bot.quick_commands import (
     buildInvincibilityClearCommands,
     buildInvincibilityCommands,
     buildKickCommand,
+    buildLightningCommand,
     buildScoreboardGetCommand,
     buildScoreboardSetupCommands,
+    buildSummonPresetCommand,
     buildTeleportToCoordsCommand,
     buildTeleportToPlayerCommand,
+    buildVillagerSummonCommand,
     buildWorldSpawnCommand,
     buildXpCommand,
     ensureGameruleAccepted,
@@ -83,6 +90,7 @@ from bot.quick_commands import (
     parseDaysPlayed,
     parseGameruleValue,
     parseScoreboardValue,
+    parseWeatherReply,
 )
 from bot.rescue import buildAutomaticSpawnCommand, ensureRescueSucceeded, parsePosition
 from bot.rcon import (
@@ -1525,6 +1533,133 @@ class Admin(commands.Cog):
             "player.enchant_force",
             f"`{playerName}` 가 들고 있는 아이템에 `{enchantId.strip().lower()}` "
             f"{level}레벨을 **제한 없이** 부여했습니다.",
+        )
+
+    # --- 크리퍼/번개 연출 ---------------------------------------------
+    # RCON 실행이라 게임 채팅에는 출력이 없습니다. 결과는 관리자만 보는
+    # ephemeral 메시지이며, 다른 조작과 똑같이 감사 기록을 남깁니다.
+    async def _runSummon(
+        self,
+        interaction: discord.Interaction,
+        command: str,
+        auditAction: str,
+        successMessage: str,
+    ) -> None:
+        """플러그인 안전 소환 실행 — 응답으로 실제 소환 여부를 판별합니다.
+
+        플러그인은 실패도 일반 텍스트("no safe spot", "not thundering" 등)로
+        돌려주므로, 'spawned'/'struck'이 있을 때만 성공으로 봅니다. 조건
+        불충족이나 구 JAR이면 그 사유를 관리자에게 그대로 보여 줍니다.
+        """
+        try:
+            reply = ensureServerAccepted(await _rcon(command))
+        except (ValueError, RconError) as error:
+            await self._audit(interaction, auditAction, "failed", str(error)[:200])
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        lowered = reply.casefold()
+        if "spawned" in lowered or "struck" in lowered:
+            await self._audit(interaction, auditAction, "success", reply[:200])
+            await interaction.followup.send(f"✅ {successMessage}", ephemeral=True)
+            _log.info("%s by %s", auditAction, userTag(interaction.user))
+            return
+        note = reply.strip() or "플러그인이 응답하지 않았습니다(최신 RaspiMcOps JAR 배포 필요)."
+        await self._audit(interaction, auditAction, "noop", note[:200])
+        await interaction.followup.send(f"⚠️ 소환하지 못했습니다: {note}", ephemeral=True)
+
+    async def panelSummonCreeper(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """대상 등 뒤 안전한 자리에 크리퍼를 소환합니다(플러그인 경유)."""
+        await self._runSummon(
+            interaction,
+            buildSummonPresetCommand(playerName, "creeper"),
+            "player.summon_creeper",
+            f"`{playerName}` 등 뒤에 크리퍼를 소환했습니다. 💥",
+        )
+
+    async def panelChargedCreeper(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """뇌우 중 + 주변에 실제 크리퍼가 있을 때만 충전시킵니다(플러그인 경유)."""
+        await self._runSummon(
+            interaction,
+            buildSummonPresetCommand(playerName, "charged_creeper"),
+            "player.charged_creeper",
+            f"`{playerName}` 주변 크리퍼를 충전시켰습니다. ⚡",
+        )
+
+    async def panelSpecialMob(
+        self, interaction: discord.Interaction, playerName: str, preset: str
+    ) -> None:
+        """특수 몹 프리셋을 안전한 자리에 소환합니다(플러그인 경유)."""
+        try:
+            command = buildSummonPresetCommand(playerName, preset)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        label = next(
+            (label for key, label in SPECIAL_MOB_PRESETS if key == preset), preset
+        )
+        await self._runSummon(
+            interaction,
+            command,
+            "player.summon_special",
+            f"`{playerName}` 주변에 **{label}** 을(를) 소환했습니다. 👹",
+        )
+
+    async def panelCreeperSound(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """대상 등 뒤 3블록에서 크리퍼 점화음만 재생합니다(몹 없음)."""
+        await self._quickPlayerAction(
+            interaction,
+            [buildCreeperSoundCommand(playerName)],
+            "player.creeper_sound",
+            f"`{playerName}` 등 뒤 3블록에서 크리퍼 소리를 재생했습니다. 🔊",
+        )
+
+    async def panelLightning(
+        self, interaction: discord.Interaction, playerName: str
+    ) -> None:
+        """비/뇌우일 때만 대상 주변 랜덤 위치에 번개를 소환합니다(맑으면 거부)."""
+        try:
+            weather = parseWeatherReply(await _rcon(WEATHER_QUERY_COMMAND))
+        except (ValueError, RconError) as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        if weather == "clear":
+            await interaction.followup.send(
+                f"🌤️ {LIGHTNING_CLEAR_WEATHER_MESSAGE}", ephemeral=True
+            )
+            return
+        await self._quickPlayerAction(
+            interaction,
+            [buildLightningCommand(playerName)],
+            "player.lightning",
+            f"`{playerName}` 주변에 번개를 소환했습니다. ⚡",
+        )
+
+    async def panelSummonVillager(
+        self,
+        interaction: discord.Interaction,
+        playerName: str,
+        profession: str,
+        good: str,
+        price: int,
+        label: str,
+    ) -> None:
+        """조건부 주민(거래 하나 고정)을 안전한 자리에 소환합니다(플러그인 경유)."""
+        try:
+            command = buildVillagerSummonCommand(playerName, profession, good, price)
+        except ValueError as error:
+            await interaction.followup.send(f"❌ {describeError(error)}", ephemeral=True)
+            return
+        await self._runSummon(
+            interaction,
+            command,
+            "player.summon_villager",
+            f"`{playerName}` 옆에 **{label}** 를 에메랄드 {price}개에 파는 주민을 소환했습니다. 🧑‍🌾",
         )
 
     async def panelGamemode(
